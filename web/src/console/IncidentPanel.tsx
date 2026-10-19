@@ -6,6 +6,8 @@ import {
 } from 'lucide-react'
 import { AdvisoryCards, useAdvisory } from './Advisory'
 import PremiseBox from './PremiseBox'
+import CallAssist from './CallAssist'
+import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
 import { run as runLine } from './UnitBoard'
 import { api, errText } from '../api'
@@ -139,6 +141,7 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
       {(call.problems ?? []).map((p) => (
         <div key={p} className="text-[11px] text-amber-300">⚠ {p}</div>
       ))}
+      <CallAssist call={call} view={view} />
       {can.dispatch(me) && live && fromBV && (
         <div className="flex flex-wrap gap-1">
           <button className="btn h-6 px-2 py-0 text-[11px]" disabled={!bvOK || !!busy || !call.canRebid} onClick={() => act('Rebid', 'rebid')} title={call.canRebid ? 'Ask for the caller’s location again' : 'This call has no location reference to rebid'}>
@@ -349,6 +352,7 @@ function Timeline({ inc, now }: { inc: Incident; now: number }) {
   const kindColor: Record<string, string> = {
     created: 'text-sky-300', dispatch: 'text-orange-300', status: 'text-slate-300', note: 'text-slate-100', 'priority-note': 'text-rose-200 font-semibold',
     change: 'text-violet-300', call: 'text-sky-300', close: 'text-emerald-300', reopen: 'text-amber-300', emergency: 'text-rose-300 font-bold',
+    radio: 'text-teal-200 italic', drone: 'text-cyan-300',
   }
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Timeline">
@@ -455,7 +459,9 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
             {closed && <span className="text-emerald-300">closed {hhmm(inc.closed)} · {inc.disposition}</span>}
           </div>
         </div>
+        {!closed && view.summaries?.[inc.number] && <SummaryBox inc={inc} text={view.summaries[inc.number]} />}
         <PremiseBox premises={view.premises?.[inc.number]} prior={view.prior?.[inc.number]} />
+        <DroneBox inc={inc} view={view} />
         {calls.map((c) => <CallBox key={c.id} call={c} view={view} now={now} />)}
         {!closed && <RecommendBox inc={inc} rec={rec} reload={reloadRec} />}
         <UnitsOn inc={inc} view={view} now={now} />

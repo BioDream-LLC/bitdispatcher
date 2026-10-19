@@ -125,3 +125,15 @@ func TestALIListener(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+// A device-based hybrid fix in 3-D: the altitude and its uncertainty, which tell the floor.
+func TestParsePIDF3D(t *testing.T) {
+	doc := `<presence xmlns="urn:ietf:params:xml:ns:pidf" xmlns:gp="urn:ietf:params:xml:ns:pidf:geopriv10" xmlns:gs="http://www.opengis.net/pidflo/1.0" xmlns:gml="http://www.opengis.net/gml">
+<tuple id="a"><status><gp:geopriv><gp:location-info><gs:Ellipsoid srsName="urn:ogc:def:crs:EPSG::4979"><gml:pos>37.27 -79.94 312.5</gml:pos>
+<gs:semiMajorAxis>6</gs:semiMajorAxis><gs:semiMinorAxis>4</gs:semiMinorAxis><gs:verticalAxis>3</gs:verticalAxis></gs:Ellipsoid></gp:location-info>
+<gp:usage-rules/><gp:method>DBH</gp:method></gp:geopriv></status></tuple></presence>`
+	l, err := ParsePIDF([]byte(doc))
+	if err != nil || l.Altitude == nil || *l.Altitude != 312.5 || l.VRadius != 3 || l.Radius != 6 || l.Method != "DBH" {
+		t.Fatalf("%+v %v", l, err)
+	}
+}

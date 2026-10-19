@@ -179,6 +179,84 @@ export default function Integrations({ view }: { view: View }) {
           </section>
         </div>
       )}
+      <Connections view={view} />
     </Page>
+  )
+}
+
+type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean }
+
+// Connections are the wishlist's: the hooks other systems send to (transcripts, crash data, drones, radio
+// words), the drone system, and the optional language model for translation.
+function Connections({ view }: { view: View }) {
+  const [x, setX] = useState<XV | null>(null)
+  const [hook, setHook] = useState('')
+  const [droneUrl, setDroneUrl] = useState('')
+  const [droneToken, setDroneToken] = useState('')
+  const [droneAuto, setDroneAuto] = useState(false)
+  const [modelUrl, setModelUrl] = useState('')
+  const [modelKey, setModelKey] = useState('')
+  const [modelName, setModelName] = useState('')
+  const [modelOn, setModelOn] = useState(false)
+  const fill = (v: XV) => {
+    setX(v)
+    setDroneUrl(v.droneUrl)
+    setDroneAuto(v.droneAuto)
+    setModelUrl(v.modelUrl)
+    setModelName(v.modelName)
+    setModelOn(v.modelOn)
+  }
+  useEffect(() => {
+    api.get<XV>('/admin/connections').then(fill).catch((e) => toast.error(errText(e)))
+  }, [])
+  const save = async () => {
+    try {
+      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn }))
+      setHook('')
+      setDroneToken('')
+      setModelKey('')
+      toast.success('Connections saved')
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  if (!x) return null
+  const base = `${location.origin}/api/hooks`
+  return (
+    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <section className="panel space-y-3 rounded-lg p-4">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-100"><KeyRound size={15} aria-hidden /> Hooks: transcripts, crash data, drones, radio words</h2>
+        <p className="text-xs text-slate-400">Other systems post here with <span className="font-mono">Authorization: Bearer</span> and this token: a speech-to-text engine (call transcripts), a telematics provider (vehicle crash notifications), the drone system (status, position, live picture), a radio system's transcription. Without a token the hooks are off.</p>
+        <ul className="space-y-1 text-xs">
+          {['transcript', 'acn', 'drone', 'radio-text'].map((h) => <li key={h}><Copyable text={`${base}/${h}`} /></li>)}
+        </ul>
+        <Field label={`Hook token ${x.hookTokenSet ? '(set)' : '(not set: hooks off)'}`} htmlFor="ht" hint="Leave empty to keep it; - clears it">
+          <div className="flex gap-1">
+            <input id="ht" className="input font-mono" value={hook} onChange={(e) => setHook(e.target.value)} placeholder={x.hookTokenSet ? '••••••••' : ''} />
+            <button type="button" className="btn" onClick={async () => setHook((await api.post<{ secret: string }>('/admin/integrations/secret')).secret)}>New</button>
+          </div>
+        </Field>
+        {hook && hook !== '-' && <p className="text-xs text-amber-300">Copy it now and give it to the sending system: <Copyable text={hook} /></p>}
+      </section>
+      <section className="panel space-y-3 rounded-lg p-4">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} aria-hidden /> Drone as first responder</h2>
+        <p className="text-xs text-slate-400">bitdispatcher posts a launch request (incident, type, priority, position, summary) to the drone system's address; the drone system reports back to the drone hook. With the launch rule on, incidents of call types marked for a drone (Call types) ask by themselves, once each.</p>
+        <Field label="Drone system's launch address" htmlFor="du"><input id="du" className="input font-mono" value={droneUrl} onChange={(e) => setDroneUrl(e.target.value)} placeholder="https://dfr.example/api/launch" /></Field>
+        <Field label={`Token sent with it ${x.droneTokenSet ? '(set)' : ''}`} htmlFor="dt"><input id="dt" className="input font-mono" value={droneToken} onChange={(e) => setDroneToken(e.target.value)} placeholder={x.droneTokenSet ? '••••••••' : ''} /></Field>
+        <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={droneAuto} onChange={(e) => setDroneAuto(e.target.checked)} /> Launch rule: ask for a drone for call types marked for one</label>
+        <p className="text-xs text-slate-500">{view.health.drone ? 'A drone system is configured: incidents show Send a drone.' : 'No drone system configured.'}</p>
+      </section>
+      <section className="panel space-y-3 rounded-lg p-4 lg:col-span-2">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-100"><PlugZap size={15} aria-hidden /> Translation by a language model (optional)</h2>
+        <p className="text-xs text-slate-400">Without one, a built-in emergency phrasebook translates Spanish and English and says when it only has the gist. A model on an OpenAI-compatible chat API (one on this server, or a service your agency has an agreement with) translates the rest. <b className="text-amber-200">What callers say is sent to it</b>: switch it on only under your agency's policy.</p>
+        <div className="grid gap-2 md:grid-cols-3">
+          <Field label="Address" htmlFor="mu"><input id="mu" className="input font-mono" value={modelUrl} onChange={(e) => setModelUrl(e.target.value)} placeholder="http://127.0.0.1:11434/v1" /></Field>
+          <Field label="Model" htmlFor="mn"><input id="mn" className="input font-mono" value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="llama3.1" /></Field>
+          <Field label={`Key ${x.modelKeySet ? '(set)' : ''}`} htmlFor="mk"><input id="mk" type="password" className="input font-mono" value={modelKey} onChange={(e) => setModelKey(e.target.value)} placeholder={x.modelKeySet ? '••••••••' : 'none for a local model'} /></Field>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={modelOn} onChange={(e) => setModelOn(e.target.checked)} /> Use it for translation</label>
+        <div className="flex justify-end"><button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save connections</button></div>
+      </section>
+    </div>
   )
 }

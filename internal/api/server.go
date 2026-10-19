@@ -35,6 +35,7 @@ import (
 type Integrations struct {
 	BitVoice  bitvoice.Config `json:"bitvoice"`
 	ALIListen string          `json:"aliListen"` // host:port to accept ALI spills on; empty: off
+	Extra     Extra           `json:"extra"`     // hooks, the drone system, the language model
 }
 
 // Server is the API.
@@ -65,6 +66,14 @@ type Server struct {
 	aliAt  time.Time
 	aliN   int
 	mux    *http.ServeMux
+
+	// The training environment: a server of its own on its own ledger, for sessions signed in to train.
+	trainer    *trainer
+	isTraining bool
+	quit       chan struct{} // closed when a training environment is reset, ending its streams
+	player     *player
+	// resetTraining rebuilds the training environment (set on a training server).
+	resetTraining func() (*Server, error)
 }
 
 // SpillWait is how long an unmatched ALI spill waits for the same call to arrive from another source.
@@ -83,11 +92,16 @@ func New(s *Server) (*Server, error) {
 		return nil, err
 	}
 	s.routes()
-	if s.Photos != nil {
+	if s.Photos != nil && !s.isTraining {
 		s.photoEvents()
 	}
+	if !s.isTraining {
+		s.trainer = &trainer{live: s}
+	}
 	if s.Maps != nil {
-		s.mapEvents()
+		if !s.isTraining {
+			s.mapEvents()
+		}
 		if s.Maps.Store() != nil {
 			s.Eng.SetRouter(mapRouter{s})
 			s.Eng.SetGeocoder(mapGeocoder{s})
@@ -189,6 +203,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Strict-Transport-Security", "max-age=31536000")
 	h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "+
 		"media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+	if t := s.trainingFor(r); t != nil {
+		t.ServeHTTP(w, r)
+		return
+	}
+	if s.isTraining && (strings.HasPrefix(r.URL.Path, "/api/admin/") || strings.HasPrefix(r.URL.Path, "/api/sites")) {
+		fail(w, http.StatusForbidden, "not in training: sign in without training to change the configuration")
+		return
+	}
 	s.mux.ServeHTTP(w, r)
 }
 
@@ -341,6 +363,10 @@ func (s *Server) routes() {
 		s.photoRoutes()
 	}
 	s.mdtRoutes()
+	s.dreamRoutes()
+	if s.isTraining {
+		s.trainingRoutes()
+	}
 	s.siteRoutes()
 	s.rmsRoutes()
 	s.migrateRoutes()
@@ -371,6 +397,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Console  string `json:"console"`
+		Training bool   `json:"training"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -396,6 +423,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, err.Error())
 		return
 	}
+	if b.Training {
+		s.Auth.SetTraining(se.ID)
+		se.Training = true
+	}
 	s.signedIn(w, se, nil)
 }
 
@@ -418,7 +449,8 @@ func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var b struct {
-		Console string `json:"console"`
+		Console  string `json:"console"`
+		Training bool   `json:"training"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -431,6 +463,10 @@ func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, http.StatusNotFound, err.Error())
 		return
+	}
+	if b.Training {
+		s.Auth.SetTraining(se.ID)
+		se.Training = true
 	}
 	s.signedIn(w, se, map[string]string{"demo": "true"})
 }
@@ -487,6 +523,15 @@ type View struct {
 	// incidents there.
 	Premises map[string][]*cad.Premise `json:"premises"`
 	Prior    map[string][]cad.History  `json:"prior"`
+	// The wishlist: each open incident in a paragraph, drones, radio words, critical calls and their care,
+	// breaks, the denial-of-service warning, and whether this is the training environment.
+	Summaries map[string]string     `json:"summaries"`
+	Drones    []*cad.Drone          `json:"drones"`
+	Radio     []cad.RadioLine       `json:"radio"`
+	Care      []*cad.CareCase       `json:"care"`
+	Breaks    map[string]*cad.Break `json:"breaks"`
+	TDoS      cad.TDoS              `json:"tdos"`
+	Training  *TrainingView         `json:"training,omitempty"`
 }
 
 // HealthView is every interface's health.
@@ -500,6 +545,9 @@ type HealthView struct {
 	Site     string           `json:"site,omitempty"`
 	Sites    []PeerHealth     `json:"sites,omitempty"`
 	Advisory *advisory.Status `json:"advisory,omitempty"`
+	Drone    bool             `json:"drone"` // a drone system is configured
+	Hooks    bool             `json:"hooks"` // the inbound hooks are on
+	Model    bool             `json:"model"` // a language model translates
 }
 
 // ALIHealth is the ALI listener's health.
@@ -523,7 +571,9 @@ func (s *Server) health() HealthView {
 	tiles := s.Tiles != nil && s.Tiles.Configured()
 	var seq uint64
 	s.Eng.Read(func(st *cad.State) { seq = st.Seq })
-	return HealthView{BitVoice: s.BV.Health(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth()}
+	x := s.extra()
+	return HealthView{BitVoice: s.BV.Health(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth(),
+		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != ""}
 }
 
 func (s *Server) view() ([]byte, error) {
@@ -570,6 +620,26 @@ func (s *Server) view() ([]byte, error) {
 			}
 		}
 		sort.Slice(v.Calls, func(i, j int) bool { return v.Calls[i].Start.After(v.Calls[j].Start) })
+		v.Training = s.trainingView()
+		v.Summaries, v.Drones, v.Care, v.Breaks, v.TDoS = map[string]string{}, []*cad.Drone{}, []*cad.CareCase{}, st.Breaks, st.TDoS
+		for _, in := range v.Incidents {
+			if in.Status != cad.Closed {
+				v.Summaries[in.Number] = st.Summary(in)
+			}
+		}
+		for _, d := range st.Drones {
+			if now.Sub(d.Updated) < 12*time.Hour {
+				v.Drones = append(v.Drones, d)
+			}
+		}
+		sort.Slice(v.Drones, func(i, j int) bool { return v.Drones[i].ID < v.Drones[j].ID })
+		v.Radio = st.Radio[max(0, len(st.Radio)-60):]
+		for _, cc := range st.Care {
+			if cc.Status != "closed" || now.Sub(cc.At) < 24*time.Hour {
+				v.Care = append(v.Care, cc)
+			}
+		}
+		sort.Slice(v.Care, func(i, j int) bool { return v.Care[i].At.After(v.Care[j].At) })
 		for _, e := range st.Emergencies {
 			if e.AckedAt.IsZero() || now.Sub(e.AckedAt) < time.Hour {
 				v.Emergencies = append(v.Emergencies, e)
@@ -632,6 +702,8 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, se *auth.Session
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-s.quit:
 			return
 		case n := <-ch:
 			b, _ := json.Marshal(n)
@@ -1436,6 +1508,8 @@ func (s *Server) positions(w http.ResponseWriter, r *http.Request, se *auth.Sess
 func (s *Server) Run(ctx context.Context) {
 	go s.BV.Run(ctx)
 	go s.runSites(ctx)
+	go s.droneRule(ctx)
+	go s.translator(ctx)
 	if s.Advisory != nil {
 		go s.Advisory.Run(ctx)
 	}

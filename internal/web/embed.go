@@ -18,7 +18,7 @@ import (
 // A pattern that matches nothing is a compile error, which is the behaviour worth having: if the front end
 // has not been built, the build stops rather than producing a server that 404s its own interface.
 //
-//go:embed dist/index.html dist/favicon.svg dist/assets
+//go:embed dist/index.html dist/favicon.svg dist/sw.js dist/assets
 var embedded embed.FS
 
 // The printed manual (make manual), served at /manual like Perfuse's, so it opens in its own tab and prints.
@@ -100,6 +100,9 @@ func Handler() (http.Handler, error) {
 		// an old app against a new API.
 		if strings.HasPrefix(clean, "assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		if clean == "sw.js" {
+			w.Header().Set("Cache-Control", "no-cache") // a new interface's worker is picked up at once
 		}
 		files.ServeHTTP(w, r)
 	}), nil

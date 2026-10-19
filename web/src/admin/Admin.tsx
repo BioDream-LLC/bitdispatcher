@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, BarChart3, Layers3, Lightbulb, Network, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, Layers3, Lightbulb, Network, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -21,6 +21,7 @@ import Migrate from './Migrate'
 
 // Charts are large; they load when the report is opened.
 const Reports = lazy(() => import('./Reports'))
+const Quality = lazy(() => import('./Quality'))
 
 const PAGES = [
   { to: 'units', label: 'Units', icon: Truck, admin: true },
@@ -36,6 +37,7 @@ const PAGES = [
   { to: 'migrate', label: 'Migration', icon: FileInput, admin: true },
   { to: 'advisory', label: 'Advisory panel', icon: Lightbulb, admin: false },
   { to: 'reports', label: 'Operations report', icon: BarChart3, admin: false },
+  { to: 'quality', label: 'Quality review', icon: Award, admin: false },
   { to: 'ledger', label: 'Ledger & audit', icon: Database, admin: false },
 ]
 
@@ -83,6 +85,7 @@ export default function Admin() {
             <Route path="sites" element={<Sites />} />
             <Route path="premises" element={<Premises />} />
             <Route path="migrate" element={<Migrate />} />
+            <Route path="quality" element={<Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Quality /></Suspense>} />
             <Route path="reports" element={<Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Reports view={view} /></Suspense>} />
             <Route path="*" element={<Navigate to={pages[0].to} replace />} />
           </Routes>

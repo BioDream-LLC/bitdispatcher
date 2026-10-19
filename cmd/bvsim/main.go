@@ -52,6 +52,8 @@ type location struct {
 	Confidence int       `json:"confidence,omitempty"`
 	Method     string    `json:"method,omitempty"`
 	Time       time.Time `json:"time,omitempty"`
+	Altitude   *float64  `json:"altitude,omitempty"`
+	VRadius    float64   `json:"vRadius,omitempty"`
 }
 
 type textLine struct {
@@ -108,10 +110,15 @@ type sim struct {
 	base   string
 	push   *pusher
 	n      int
+	// What callers say: the story of each call, and the address they give.
+	story      map[string]story
+	addr       map[string]string
+	droneToken string
 }
 
 type pusher struct {
 	eidoURL, eidoToken, radioURL, radioSecret, ali string
+	hookURL, hookToken                             string // bitdispatcher's hooks: crash data, drones
 	client                                         *http.Client
 }
 
@@ -196,7 +203,7 @@ var names = []string{"Alex Example", "Sam Sample", "Jordan Demo", "Casey Test", 
 func (s *sim) newCall() {
 	s.mu.Lock()
 	s.n++
-	id := fmt.Sprintf("sim%04d", s.n)
+	id := fmt.Sprintf("sim%s-%04d", runID, s.n)
 	st := streets[mrand.IntN(len(streets))]
 	kind := []string{"wireless", "wireless", "wireless", "pots", "voip"}[mrand.IntN(5)]
 	from := fmt.Sprintf("+1540555%04d", 100+mrand.IntN(9800))
@@ -207,10 +214,22 @@ func (s *sim) newCall() {
 	}
 	lat := st.lat + (mrand.Float64()-0.5)*0.002
 	lon := st.lon + (mrand.Float64()-0.5)*0.002
+	sto := stories[mrand.IntN(len(stories))]
+	s.story[id] = sto
+	s.addr[id] = strings.Join(strings.Fields(st.num+" "+st.pre+" "+st.name+" "+st.typ+" "+st.post), " ")
+	if sto.line != "" {
+		c.To = sto.line
+	}
 	switch kind {
 	case "wireless":
 		r := 8 + mrand.Float64()*120
 		c.Emergency.Location = &location{Lat: &lat, Lon: &lon, Radius: math.Round(r), Confidence: 90, Method: "GPS", Time: time.Now().UTC()}
+		if mrand.IntN(2) == 0 {
+			// A device-based hybrid fix: the phone's own position, a few metres, in 3-D.
+			alt := 290 + float64(mrand.IntN(6))*3.2
+			c.Emergency.Location.Radius, c.Emergency.Location.Method = math.Round(3+mrand.Float64()*12), "DBH"
+			c.Emergency.Location.Altitude, c.Emergency.Location.VRadius = &alt, 3
+		}
 		c.Emergency.LocationURI = "https://lis.sim.invalid/loc/" + id
 	default:
 		la, lo := st.lat, st.lon
@@ -223,7 +242,30 @@ func (s *sim) newCall() {
 	}
 	s.calls[id] = c
 	s.mu.Unlock()
-	log.Printf("call %s from %s ringing (%s)", id, from, kind)
+	log.Printf("call %s from %s ringing (%s, %s)", id, from, kind, sto.name)
+	s.publish("call.started", c)
+	go s.lifecycle(id)
+	// Others call about the same thing, from near it.
+	for i, words := range sto.dups {
+		go func(i int, words string) {
+			time.Sleep(time.Duration(8+i*9+mrand.IntN(6)) * time.Second)
+			s.dupCall(st.lat, st.lon, words)
+		}(i, words)
+	}
+}
+
+// dupCall is another caller about the same thing, a short way off.
+func (s *sim) dupCall(lat, lon float64, words string) {
+	s.mu.Lock()
+	s.n++
+	id := fmt.Sprintf("sim%s-%04d", runID, s.n)
+	la, lo := lat+(mrand.Float64()-0.5)*0.0015, lon+(mrand.Float64()-0.5)*0.0015
+	c := &call{ID: id, State: "ringing", Direction: "in", From: fmt.Sprintf("+1540555%04d", 100+mrand.IntN(9800)), To: "911", Start: time.Now().UTC(),
+		Emergency: &emergency{ESInet: true, Additional: map[string]any{"service": map[string]any{"types": []string{"wireless"}}},
+			Location: &location{Lat: &la, Lon: &lo, Radius: math.Round(20 + mrand.Float64()*60), Confidence: 90, Method: "Cell", Time: time.Now().UTC()}}}
+	s.calls[id] = c
+	s.story[id] = story{name: "another caller", lines: []line{{1, "taker", "911, what is the address of your emergency?"}, {4, "caller", words}}}
+	s.mu.Unlock()
 	s.publish("call.started", c)
 	go s.lifecycle(id)
 }
@@ -241,6 +283,12 @@ func (s *sim) lifecycle(id string) {
 	s.mu.Unlock()
 	s.publish("call.updated", c)
 	s.publish("emergency.answered", map[string]any{"call": id, "agent": "taker1", "from": c.From})
+	s.mu.Lock()
+	sto, addr := s.story[id], s.addr[id]
+	s.mu.Unlock()
+	if !c.Emergency.TextOnly {
+		go s.transcribe(id, firstNonEmpty(addr, "the corner here"), sto, sto.lines)
+	}
 	if s.push != nil && s.push.eidoURL != "" {
 		go s.push.post(s.push.eidoURL, s.push.eidoToken, "application/emergency.eido+json", s.eido(c))
 	}
@@ -261,9 +309,20 @@ func (s *sim) lifecycle(id string) {
 	time.Sleep(time.Duration(90+mrand.IntN(120)) * time.Second)
 	s.mu.Lock()
 	delete(s.calls, id)
+	delete(s.story, id)
+	delete(s.addr, id)
 	s.mu.Unlock()
 	c.State = "ended"
 	s.publish("call.ended", c)
+}
+
+func firstNonEmpty(v ...string) string {
+	for _, x := range v {
+		if x != "" {
+			return x
+		}
+	}
+	return ""
 }
 
 func (s *sim) spill(c *call) {
@@ -299,7 +358,10 @@ func (s *sim) eido(c *call) []byte {
 			pidf.WriteString(fmt.Sprintf(`<civicAddress><country>US</country><A1>%s</A1><A3>%s</A3><HNO>%s</HNO><PRD>%s</PRD><RD>%s</RD><STS>%s</STS><PC>%s</PC></civicAddress>`,
 				cv.State, cv.City, cv.Number, cv.PreDir, html.EscapeString(cv.Street), cv.StreetType, cv.PostalCode))
 		}
-		if l.Lat != nil {
+		if l.Lat != nil && l.Altitude != nil {
+			pidf.WriteString(fmt.Sprintf(`<Ellipsoid srsName="urn:ogc:def:crs:EPSG::4979"><pos>%f %f %.1f</pos><semiMajorAxis>%.0f</semiMajorAxis><semiMinorAxis>%.0f</semiMinorAxis><verticalAxis>%.0f</verticalAxis><orientation>0</orientation></Ellipsoid><confidence>%d</confidence>`,
+				*l.Lat, *l.Lon, *l.Altitude, l.Radius, l.Radius, l.VRadius, l.Confidence))
+		} else if l.Lat != nil {
 			pidf.WriteString(fmt.Sprintf(`<Circle><pos>%f %f</pos><radius>%.0f</radius></Circle><confidence>%d</confidence>`, *l.Lat, *l.Lon, l.Radius, l.Confidence))
 		}
 		pidf.WriteString(`</location-info><method>` + l.Method + `</method></geopriv></status><timestamp>` + l.Time.Format(time.RFC3339) + `</timestamp></tuple></presence>`)
@@ -341,7 +403,7 @@ func (s *sim) radioLoop(ctx context.Context) {
 			if mrand.IntN(10) == 0 {
 				now := time.Now().UTC()
 				s.publish("radio.transmission", map[string]any{"id": fmt.Sprintf("tx%d", now.UnixNano()), "channel": "tg1", "channelName": "County dispatch", "direction": "rx",
-					"start": now.Add(-3 * time.Second), "end": now, "seconds": 3, "unit": fmt.Sprintf("bee07.ad5.%06x", u.ID), "unitName": u.Alias})
+					"start": now.Add(-3 * time.Second), "end": now, "seconds": 3, "unit": fmt.Sprintf("bee07.ad5.%06x", u.ID), "unitName": u.Alias, "text": radioText(u.Alias)})
 			}
 		}
 	}
@@ -371,11 +433,18 @@ func main() {
 	radioURL := flag.String("radio-url", "", "also push radio events here (like BitVoice's radio.cadUrl)")
 	radioSecret := flag.String("radio-secret", "", "bearer secret for -radio-url")
 	ali := flag.String("ali", "", "also send ALI spills to this host:port")
+	hookURL := flag.String("hook-url", "", "bitdispatcher's hooks (https://host/api/hooks): send crash notifications and drone reports there")
+	hookToken := flag.String("hook-token", "", "bearer token for -hook-url")
+	crashEvery := flag.Int("crash-every", 7, "every this many calls, a vehicle crash notification instead (0: none)")
+	droneAddr := flag.String("drone-addr", "", "serve a simulated drone system here (plain HTTP on this host:port; POST /launch)")
+	droneToken := flag.String("drone-token", "", "bearer token the drone system expects")
 	flag.Parse()
 	cert, fp := selfSigned()
-	s := &sim{calls: map[string]*call{}, subs: map[chan string]struct{}{}, token: *token, agency: "psap.sim.invalid", base: "https://" + *addr}
-	if *eidoURL != "" || *radioURL != "" || *ali != "" {
+	s := &sim{calls: map[string]*call{}, subs: map[chan string]struct{}{}, token: *token, agency: "psap.sim.invalid", base: "https://" + *addr,
+		story: map[string]story{}, addr: map[string]string{}, droneToken: *droneToken}
+	if *eidoURL != "" || *radioURL != "" || *ali != "" || *hookURL != "" {
 		s.push = &pusher{eidoURL: *eidoURL, eidoToken: *eidoToken, radioURL: *radioURL, radioSecret: *radioSecret, ali: *ali,
+			hookURL: strings.TrimRight(*hookURL, "/"), hookToken: *hookToken,
 			client: &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}} // a simulator talking to a local test server
 	}
 	for _, u := range []radioUnit{{101, "Medic 1", 37.26722, -79.94578, 0}, {102, "Medic 2", 37.32324, -79.96896, 90}, {103, "Medic 3", 37.25063, -79.91657, 180},
@@ -534,10 +603,31 @@ func main() {
 		if *every <= 0 {
 			return
 		}
+		n := 0
 		for range time.Tick(*every) {
+			n++
+			if *crashEvery > 0 && n%*crashEvery == 0 {
+				s.crash()
+				continue
+			}
 			s.newCall()
 		}
 	}()
+	if *droneAddr != "" {
+		d := newDrones(s)
+		dm := http.NewServeMux()
+		dm.HandleFunc("POST /launch", d.launch)
+		go d.fly()
+		go func() {
+			ds := &http.Server{Addr: *droneAddr, Handler: dm, ReadHeaderTimeout: 5 * time.Second}
+			log.Printf("bvsim: SIMULATED drone system at http://%s/launch", *droneAddr)
+			log.Fatal(ds.ListenAndServe())
+		}()
+	}
+	mux.HandleFunc("POST /sim/crash", func(w http.ResponseWriter, r *http.Request) {
+		s.crash()
+		w.Write([]byte("ok\n"))
+	})
 	srv := &http.Server{Addr: *addr, Handler: mux, TLSConfig: &tls.Config{Certificates: []tls.Certificate{cert}}, ReadHeaderTimeout: 5 * time.Second}
 	log.Printf("bvsim: SIMULATED BitVoice at https://%s  token %s  certificate sha256 %s", *addr, *token, fp)
 	log.Fatal(srv.ListenAndServeTLS("", ""))

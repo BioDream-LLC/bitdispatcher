@@ -513,6 +513,45 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 		}
 	case "radio.unit", "radio.emergency", "radio.emergency.ack", "radio.transmission", "radio.location":
 		b.Radio(env.Type, env.Data, false)
+	case "call.transcript":
+		// Live lines of what is said on a call, when the call-handling system transcribes as it goes.
+		var t struct {
+			Call  string               `json:"call"`
+			Lines []cad.TranscriptLine `json:"lines"`
+		}
+		if json.Unmarshal(env.Data, &t) == nil && t.Call != "" && len(t.Lines) > 0 {
+			b.eng.UpsertCall(cad.BitVoiceActor, t.Call, cad.CallData{Source: "bitvoice", Transcript: t.Lines})
+		}
+	case "call.summarized":
+		// BitVoice's transcript of a recorded call, after it ends: kept on the call when CAD knows it.
+		var t struct {
+			CallID     string `json:"callId"`
+			Summary    string `json:"summary"`
+			Transcript string `json:"transcript"`
+		}
+		if json.Unmarshal(env.Data, &t) == nil && t.CallID != "" && strings.TrimSpace(t.Transcript) != "" {
+			known := false
+			b.eng.Read(func(s *cad.State) { c, ok := s.Calls[t.CallID]; known = ok && len(c.Transcript) == 0 })
+			if known {
+				var lines []cad.TranscriptLine
+				for _, l := range strings.Split(t.Transcript, "\n") {
+					if l = strings.TrimSpace(l); l == "" {
+						continue
+					}
+					sp := "other"
+					if k, v, ok := strings.Cut(l, ":"); ok && len(k) < 24 {
+						switch strings.ToLower(strings.TrimSpace(k)) {
+						case "caller", "customer", "remote":
+							sp, l = "caller", strings.TrimSpace(v)
+						case "agent", "taker", "call-taker", "dispatcher", "local":
+							sp, l = "taker", strings.TrimSpace(v)
+						}
+					}
+					lines = append(lines, cad.TranscriptLine{Speaker: sp, Text: l})
+				}
+				b.eng.UpsertCall(cad.BitVoiceActor, t.CallID, cad.CallData{Source: "bitvoice", Transcript: lines})
+			}
+		}
 	}
 }
 
@@ -580,13 +619,16 @@ type Location struct {
 	Confidence int          `json:"confidence,omitempty"`
 	Method     string       `json:"method,omitempty"`
 	Time       time.Time    `json:"time,omitempty"`
+	Altitude   *float64     `json:"altitude,omitempty"` // metres, from a 3-D (z-axis) fix
+	VRadius    float64      `json:"vRadius,omitempty"`
 }
 
 func (l *Location) loc(source string) *ng911.Location {
 	if l == nil || (l.Civic == nil && (l.Lat == nil || l.Lon == nil)) {
 		return nil
 	}
-	out := &ng911.Location{Civic: l.Civic, Lat: l.Lat, Lon: l.Lon, Radius: l.Radius, Confidence: l.Confidence, Method: l.Method, Source: source, At: l.Time}
+	out := &ng911.Location{Civic: l.Civic, Lat: l.Lat, Lon: l.Lon, Radius: l.Radius, Confidence: l.Confidence, Method: l.Method, Source: source, At: l.Time,
+		Altitude: l.Altitude, VRadius: l.VRadius}
 	if l.Civic != nil {
 		out.Address = l.Civic.String()
 	}
@@ -635,6 +677,9 @@ func (b *Bridge) call(c CallInfo) {
 	d := cad.CallData{Source: "bitvoice", State: state, Callback: c.From, CallerName: c.FromName, Start: c.Start, Answer: c.Answer,
 		Location: em.Location.loc("bitvoice"), Text: em.Text, TextOnly: em.TextOnly, CanRebid: em.LocationURI != "", Problems: em.Problems,
 		Agent: firstNonEmpty(em.TakenName, em.TakenBy), Emergency: true}
+	if c.To != "" && c.To != "911" {
+		d.Line = c.To // a call on a non-emergency line BitVoice also hands to CAD
+	}
 	if d.Problems == nil {
 		d.Problems = []string{}
 	}
@@ -709,6 +754,9 @@ type Transmission struct {
 	Unit      string    `json:"unit,omitempty"`
 	UnitName  string    `json:"unitName,omitempty"`
 	Emergency bool      `json:"emergency,omitempty"`
+	// Text is what was said, when BitVoice (or the radio system) transcribes transmissions.
+	Text        string `json:"text,omitempty"`
+	ChannelName string `json:"channelName,omitempty"`
 }
 
 // Radio handles one radio event, from the webhook or the stream.
@@ -752,12 +800,18 @@ func (b *Bridge) Radio(typ string, data json.RawMessage, webhook bool) error {
 			return err
 		}
 		if ev.Direction == "rx" {
-			if unit := b.eng.UnitByRadio(0, ev.UnitName); unit != "" {
-				b.eng.Heard(unit, firstTime(ev.End, ev.Start))
-			} else if id := radioIDOf(ev.Unit); id != 0 {
-				if unit := b.eng.UnitByRadio(id, ""); unit != "" {
-					b.eng.Heard(unit, firstTime(ev.End, ev.Start))
+			unit := b.eng.UnitByRadio(0, ev.UnitName)
+			if unit == "" {
+				if id := radioIDOf(ev.Unit); id != 0 {
+					unit = b.eng.UnitByRadio(id, "")
 				}
+			}
+			if unit != "" {
+				b.eng.Heard(unit, firstTime(ev.End, ev.Start))
+			}
+			if strings.TrimSpace(ev.Text) != "" {
+				return b.eng.RadioText(cad.RadioActor, cad.RadioLine{At: firstTime(ev.Start, ev.End), Unit: unit, RadioUnit: firstNonEmpty(ev.UnitName, ev.Unit),
+					Channel: ev.Channel, ChannelName: ev.ChannelName, Text: ev.Text})
 			}
 		}
 	case "radio.location":

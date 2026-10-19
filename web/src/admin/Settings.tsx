@@ -130,6 +130,48 @@ export default function SettingsPage({ view }: { view: View }) {
           </div>
         </section>
         <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">Calls: grouping and non-emergency</h2>
+          <p className="text-xs text-slate-400">Callers this near each other within this time are shown as one group, attached to one incident in one step. Calls on a non-emergency line, or whose caller says one of the words (and nothing urgent), go to the non-emergency list; a person always decides.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Group callers within (m)" htmlFor="clm"><input id="clm" type="number" min={0} className="input font-mono" value={s.clusterMeters ?? 300} onChange={(e) => up({ clusterMeters: Number(e.target.value) })} /></Field>
+            <Field label="…and (minutes)" htmlFor="clt"><input id="clt" type="number" min={0} className="input font-mono" value={s.clusterMinutes ?? 10} onChange={(e) => up({ clusterMinutes: Number(e.target.value) })} /></Field>
+          </div>
+          <Field label="Non-emergency lines" htmlFor="nel" hint="Numbers or line names, separated by commas: +15408532121"><input id="nel" className="input font-mono" key={'nonEmergencyLines' + (s.nonEmergencyLines ?? []).join()} defaultValue={(s.nonEmergencyLines ?? []).join(', ')} onBlur={(e) => up({ nonEmergencyLines: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
+          <Field label="Non-emergency words" htmlFor="new" hint="Separated by commas; empty uses the built-in list (noise complaint, parking, power outage…)"><textarea id="new" rows={2} className="input text-xs" key={'nonEmergencyWords' + (s.nonEmergencyWords ?? []).join()} defaultValue={(s.nonEmergencyWords ?? []).join(', ')} onBlur={(e) => up({ nonEmergencyWords: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
+          <Field label="Reply to non-emergency callers" htmlFor="ner" hint="Offered as a one-press text, such as where to report online"><input id="ner" className="input" value={s.nonEmergencyReply ?? ''} onChange={(e) => up({ nonEmergencyReply: e.target.value })} /></Field>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">People: critical calls and breaks</h2>
+          <p className="text-xs text-slate-400">An incident of a call type marked critical, or where one of these words is said, puts everyone who worked it on the supervisor's care list, and tells them gently once it closes.</p>
+          <Field label="Critical words" htmlFor="crw" hint="Separated by commas; empty uses the built-in list (not breathing, CPR, officer down, infant…)"><textarea id="crw" rows={2} className="input text-xs" key={'criticalWords' + (s.criticalWords ?? []).join()} defaultValue={(s.criticalWords ?? []).join(', ')} onBlur={(e) => up({ criticalWords: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
+          <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!s.careOff} onChange={(e) => up({ careOff: !e.target.checked })} /> Listen for the critical words (critical call types always count)</label>
+          <Field label="Support line" htmlFor="sup" hint="Shown to a person after a critical call: the employee assistance programme, peer support"><input id="sup" className="input" value={s.supportLine ?? ''} onChange={(e) => up({ supportLine: e.target.value })} placeholder="Peer support: 540-555-0100" /></Field>
+          <Field label="Suggest a break after (minutes)" htmlFor="brk" hint="Worked this long without one: the supervisor board says so"><input id="brk" type="number" min={30} className="input w-32 font-mono" value={s.breakMinutes || 120} onChange={(e) => up({ breakMinutes: Number(e.target.value) })} /></Field>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">Quality review standards</h2>
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Answer within (s)" htmlFor="qaa"><input id="qaa" type="number" className="input font-mono" value={s.qa?.answerSeconds || 15} onChange={(e) => up({ qa: { ...s.qa, answerSeconds: Number(e.target.value) } })} /></Field>
+            <Field label="Enter within (s)" htmlFor="qae"><input id="qae" type="number" className="input font-mono" value={s.qa?.entrySeconds || 90} onChange={(e) => up({ qa: { ...s.qa, entrySeconds: Number(e.target.value) } })} /></Field>
+            <Field label="Dispatch P1–2 within (s)" htmlFor="qad"><input id="qad" type="number" className="input font-mono" value={s.qa?.dispatchSeconds || 60} onChange={(e) => up({ qa: { ...s.qa, dispatchSeconds: Number(e.target.value) } })} /></Field>
+          </div>
+          {['all', 'ems', 'fire', 'police'].map((d) => (
+            <Field key={d} label={`Questions to hear: ${d === 'all' ? 'every call' : d}`} htmlFor={`qq-${d}`} hint="One per line; words separated by | count as the same question. Empty lines: the built-in set">
+              <textarea id={`qq-${d}`} rows={2} className="input font-mono text-xs" key={d + (s.qa?.questions?.[d] ?? []).join()} defaultValue={(s.qa?.questions?.[d] ?? []).join('\n')}
+                onBlur={(e) => up({ qa: { ...s.qa, questions: { ...(s.qa?.questions ?? {}), [d]: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) } } })} />
+            </Field>
+          ))}
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">Crash data and line attacks</h2>
+          <p className="text-xs text-slate-400">Vehicle crash notifications are rated by delta-V, the change of speed in the crash, with rollovers and other signs. A flood of calls, one number calling again and again, or a run of silent short calls raises the denial-of-service warning.</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="High risk at (km/h)" htmlFor="chi"><input id="chi" type="number" className="input font-mono" value={s.crashHighKmh || 40} onChange={(e) => up({ crashHighKmh: Number(e.target.value) })} /></Field>
+            <Field label="Medium at (km/h)" htmlFor="cme"><input id="cme" type="number" className="input font-mono" value={s.crashMediumKmh || 20} onChange={(e) => up({ crashMediumKmh: Number(e.target.value) })} /></Field>
+            <Field label="Warn at calls a minute" htmlFor="tdp" hint="0: five times the usual (at least 12)"><input id="tdp" type="number" min={0} className="input font-mono" value={s.tdosPerMinute ?? 0} onChange={(e) => up({ tdosPerMinute: Number(e.target.value) })} /></Field>
+          </div>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
           <h2 className="font-semibold text-slate-100">NCIC and the state message switch</h2>
           <p className="text-xs text-slate-400">Inquiries go through the state's switch under its agreement; bitdispatcher logs each with its purpose and reason. The training simulator answers TEST plates, names and serials and marks every answer SIMULATED.</p>
           <div className="grid grid-cols-3 gap-2">

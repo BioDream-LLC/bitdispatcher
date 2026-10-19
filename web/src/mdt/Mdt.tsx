@@ -18,7 +18,7 @@ import { dispatchStyle } from '../console/mapStyle'
 maplibregl.setWorkerUrl(workerUrl)
 
 type MDTView = {
-  serverTime: string; unit: Unit; station?: Station; incident?: Incident; typeName?: string; partners: Unit[]; premises?: Premise[]
+  serverTime: string; unit: Unit; station?: Station; incident?: Incident; typeName?: string; summary?: string; partners: Unit[]; premises?: Premise[]
   emergency?: { key: string; raised: string; ackedBy?: string }; pending: Incident[]; statuses: string[]
   settings: { agency: string; mapCenter: [number, number]; mapZoom: number; avlStaleSeconds: number; markOuts?: MarkOutType[] }
   health: View['health']
@@ -186,6 +186,7 @@ export default function Mdt() {
                 {inc.caller?.callback && (
                   <a href={`tel:${inc.caller.callback}`} className="mt-1 flex items-center gap-2 text-sm text-slate-300"><Phone size={14} aria-hidden /> {inc.caller.name ? `${inc.caller.name} · ` : ''}{inc.caller.callback}</a>
                 )}
+                {m.summary && <p className="mt-2 rounded border border-sky-900/60 bg-sky-950/30 p-2 text-sm leading-snug text-slate-100" aria-label="Summary">{m.summary}</p>}
                 {(m.premises?.length ?? 0) > 0 && <div className="mt-2"><PremiseBox premises={m.premises} compact /></div>}
                 {m.partners.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">

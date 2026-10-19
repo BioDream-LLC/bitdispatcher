@@ -59,6 +59,7 @@ type MDTView struct {
 	Station    *cad.Station    `json:"station,omitempty"`
 	Incident   *cad.Incident   `json:"incident,omitempty"`
 	TypeName   string          `json:"typeName,omitempty"`
+	Summary    string          `json:"summary,omitempty"`   // the incident in a paragraph
 	Partners   []UnitView      `json:"partners"`            // other units on the incident
 	Premises   []*cad.Premise  `json:"premises"`            // hazards and notes at the incident's place
 	Emergency  *cad.Emergency  `json:"emergency,omitempty"` // the unit's open emergency
@@ -93,6 +94,7 @@ func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a
 			ic := *in
 			v.Incident = &ic
 			v.TypeName = in.Type
+			v.Summary = st.Summary(in)
 			if in.Location != nil && in.Location.Lat != nil && in.Location.Lon != nil {
 				for _, p := range st.PremisesNear(*in.Location.Lat, *in.Location.Lon) {
 					pc := *p

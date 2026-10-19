@@ -12,6 +12,7 @@ import { cx, typeName } from './util'
 import type { Call, Recommendation } from './types'
 import StatusBar from './console/StatusBar'
 import EmergencyBanner from './console/EmergencyBanner'
+import { CareBanner, OfflineBar, TDoSBanner, TrainingBar } from './console/Dream'
 import Queue from './console/Queue'
 import MapView from './console/MapView'
 import IncidentPanel, { UnitDetail } from './console/IncidentPanel'
@@ -173,7 +174,11 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   return (
     <div className="flex h-full min-h-[600px] flex-col overflow-hidden bg-slate-950">
       <Boundary name="status"><StatusBar view={view} screen={screen} onScreens={() => setScreens(true)} /></Boundary>
+      <Boundary name="training"><TrainingBar view={raw!} /></Boundary>
+      <Boundary name="offline"><OfflineBar view={raw!} /></Boundary>
       <Boundary name="emergency"><EmergencyBanner view={raw!} /></Boundary>
+      <Boundary name="tdos"><TDoSBanner view={raw!} /></Boundary>
+      <Boundary name="care"><CareBanner view={raw!} /></Boundary>
       {offer && screen === 'full' && layout.offer && layout.slots.length > 0 && (
         <div className="flex items-center gap-2 border-b border-sky-900 bg-sky-950/60 px-3 py-1.5 text-sm text-sky-100" role="status">
           <MonitorCheck size={15} className="text-sky-300" aria-hidden />

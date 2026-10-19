@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/biodream-llc/bitdispatcher/internal/acn"
+	"github.com/biodream-llc/bitdispatcher/internal/assist"
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
 )
 
@@ -146,6 +148,10 @@ type CallType struct {
 	Priority   int           `json:"priority"` // 1 highest .. 5
 	Discipline string        `json:"discipline"`
 	RunCard    []Requirement `json:"runCard"`
+	// Critical marks calls that are hard on the people who work them, for the supervisor's care list.
+	Critical bool `json:"critical,omitempty"`
+	// Drone asks the drone system to launch for this call type, when a drone system is configured.
+	Drone bool `json:"drone,omitempty"`
 }
 
 // Caller is who reported an incident.
@@ -235,34 +241,47 @@ type CallData struct {
 	Problems   []string        `json:"problems,omitempty"`
 	ALI        string          `json:"ali,omitempty"` // the raw spill
 	Emergency  bool            `json:"emergency,omitempty"`
+	// Transcript is new lines of what was said, added to those already known (not a replacement).
+	Transcript   []TranscriptLine  `json:"transcript,omitempty"`
+	Translations []LineTranslation `json:"translations,omitempty"`
+	Line         string            `json:"line,omitempty"` // the line it came in on: 911, or a non-emergency number
+	Crash        *acn.Crash        `json:"crash,omitempty"`
 }
 
 // Call is a call from call handling, as bitdispatcher knows it from every source.
 type Call struct {
-	ID         string          `json:"id"`
-	Sources    []string        `json:"sources"`
-	State      string          `json:"state"` // ringing, answered, ended
-	Callback   string          `json:"callback,omitempty"`
-	CallerName string          `json:"callerName,omitempty"`
-	Class      string          `json:"class,omitempty"`
-	Provider   string          `json:"provider,omitempty"`
-	Location   *ng911.Location `json:"location,omitempty"`
-	Locations  int             `json:"locations"` // how many locations have been received
-	Agent      string          `json:"agent,omitempty"`
-	Position   string          `json:"position,omitempty"`
-	Start      time.Time       `json:"start"`
-	Answer     time.Time       `json:"answer,omitzero"`
-	End        time.Time       `json:"end,omitzero"`
-	Media      []ng911.Media   `json:"media,omitempty"`
-	Video      *Video          `json:"video,omitempty"`
-	Text       []TextLine      `json:"text,omitempty"`
-	TextOnly   bool            `json:"textOnly,omitempty"`
-	Notes      []string        `json:"notes,omitempty"`
-	CanRebid   bool            `json:"canRebid,omitempty"`
-	Problems   []string        `json:"problems,omitempty"`
-	ALI        string          `json:"ali,omitempty"`
-	Incident   string          `json:"incident,omitempty"`
-	Updated    time.Time       `json:"updated"`
+	ID         string           `json:"id"`
+	Sources    []string         `json:"sources"`
+	State      string           `json:"state"` // ringing, answered, ended
+	Callback   string           `json:"callback,omitempty"`
+	CallerName string           `json:"callerName,omitempty"`
+	Class      string           `json:"class,omitempty"`
+	Provider   string           `json:"provider,omitempty"`
+	Location   *ng911.Location  `json:"location,omitempty"`
+	Locations  int              `json:"locations"` // how many locations have been received
+	Agent      string           `json:"agent,omitempty"`
+	Position   string           `json:"position,omitempty"`
+	Start      time.Time        `json:"start"`
+	Answer     time.Time        `json:"answer,omitzero"`
+	End        time.Time        `json:"end,omitzero"`
+	Media      []ng911.Media    `json:"media,omitempty"`
+	Video      *Video           `json:"video,omitempty"`
+	Text       []TextLine       `json:"text,omitempty"`
+	TextOnly   bool             `json:"textOnly,omitempty"`
+	Notes      []string         `json:"notes,omitempty"`
+	CanRebid   bool             `json:"canRebid,omitempty"`
+	Problems   []string         `json:"problems,omitempty"`
+	ALI        string           `json:"ali,omitempty"`
+	Incident   string           `json:"incident,omitempty"`
+	Updated    time.Time        `json:"updated"`
+	Transcript []TranscriptLine `json:"transcript,omitempty"`
+	Lang       string           `json:"lang,omitempty"` // the caller's language, when not English
+	Details    []assist.Detail  `json:"details,omitempty"`
+	Line       string           `json:"line,omitempty"`
+	Crash      *acn.Crash       `json:"crash,omitempty"`
+	CrashRisk  *acn.Assessment  `json:"crashRisk,omitempty"`
+	Fixes      []Fix            `json:"fixes,omitempty"`
+	Screen     *Screen          `json:"screen,omitempty"`
 }
 
 // Emergency is an emergency button or duress alert from a radio, open until a person acknowledges it.
@@ -302,6 +321,28 @@ type Settings struct {
 	NCICAddr           string        `json:"ncicAddr,omitempty"` // host:port of the switch adapter
 	UnitTypes          []UnitType    `json:"unitTypes"`
 	MarkOuts           []MarkOutType `json:"markOuts"`
+
+	// NonEmergencyLines are the numbers or line names of non-emergency lines; calls on them go to the
+	// non-emergency list. NonEmergencyWords are what callers say on calls that seldom are emergencies;
+	// empty means the defaults. NonEmergencyReply is the text offered to send such a caller.
+	NonEmergencyLines []string `json:"nonEmergencyLines,omitempty"`
+	NonEmergencyWords []string `json:"nonEmergencyWords,omitempty"`
+	NonEmergencyReply string   `json:"nonEmergencyReply,omitempty"`
+	// CriticalWords mark an incident as a critical call (empty: the defaults); CareOff stops the words
+	// (critical call types still count). SupportLine is the employee assistance number shown after one.
+	CriticalWords []string `json:"criticalWords,omitempty"`
+	CareOff       bool     `json:"careOff,omitempty"`
+	SupportLine   string   `json:"supportLine,omitempty"`
+	BreakMinutes  int      `json:"breakMinutes,omitempty"` // worked this long without a break: suggest one (0: 120)
+	// Crash data thresholds (0: the defaults, 40 and 20 km/h of delta-V).
+	CrashHighKmh   float64 `json:"crashHighKmh,omitempty"`
+	CrashMediumKmh float64 `json:"crashMediumKmh,omitempty"`
+	// TDoSPerMinute is the calls a minute that raise the denial-of-service warning (0: five times the usual, at least 12).
+	TDoSPerMinute int `json:"tdosPerMinute,omitempty"`
+	// Calls this near each other within this time are shown as one group (0: 300 m, 10 minutes).
+	ClusterMeters  float64 `json:"clusterMeters,omitempty"`
+	ClusterMinutes int     `json:"clusterMinutes,omitempty"`
+	QA             QA      `json:"qa,omitzero"`
 }
 
 // MarkOutType finds a mark-out type by its code, in any case.

@@ -16,6 +16,8 @@ export type Location = {
   method?: string
   source?: string
   at?: string
+  altitude?: number
+  vRadius?: number
 }
 
 export type Station = { id: string; name: string; address?: string; lat: number; lon: number }
@@ -35,7 +37,7 @@ export type MarkOut = { code: string; location?: Location; note?: string }
 export type MarkOutType = { code: string; name: string; minutes: number; discipline?: string; interruptible?: boolean }
 
 export type Requirement = { capability: string; count: number }
-export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null }
+export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null; critical?: boolean; drone?: boolean }
 
 export type Assignment = {
   unit: string; status: string; recommended: boolean; dispatched: string
@@ -59,7 +61,33 @@ export type Call = {
   provider?: string; location?: Location; locations: number; agent?: string; position?: string; start: string; answer?: string; end?: string
   media?: Media[]; video?: { live: boolean; viewUrl?: string; source?: string }; text?: TextLine[]; textOnly?: boolean; notes?: string[]
   canRebid?: boolean; problems?: string[]; ali?: string; incident?: string; updated: string
+  transcript?: TranscriptLine[]; lang?: string; details?: Detail[]; line?: string; crash?: Crash; crashRisk?: CrashRisk; fixes?: Fix[]; screen?: Screen
 }
+
+export type TranscriptLine = { at: string; speaker: 'caller' | 'taker' | 'other'; text: string; lang?: string; english?: string; by?: string; gist?: boolean }
+export type Detail = { kind: string; text: string; quote?: string; urgent?: boolean }
+export type Fix = { lat: number; lon: number; radius?: number; altitude?: number; method?: string; at: string }
+export type Screen = { nonEmergency: boolean; reason?: string; by?: string }
+export type Crash = {
+  provider?: string; at?: string; lat?: number; lon?: number; heading?: number; deltaVKmh?: number; direction?: string; rollover?: boolean; multipleImpacts?: boolean
+  airbags?: string[]; occupants?: number; belted?: boolean; speedKmh?: number; fuel?: string; voiceConnected?: boolean; callback?: string
+  vehicle: { year?: number; make?: string; model?: string; color?: string; vin?: string; plate?: string }
+}
+export type CrashRisk = { risk: 'high' | 'medium' | 'low' | 'unknown'; reasons: string[]; suggest: string[]; summary: string }
+export type Drone = { id: string; name?: string; status: string; lat?: number; lon?: number; altM?: number; battery?: number; incident?: string; videoUrl?: string; pilot?: string; updated: string }
+export type RadioLine = { at: string; unit?: string; radioUnit?: string; channel?: string; channelName?: string; text: string; incident?: string }
+export type CareNote = { at: string; by: string; action: string; user?: string; note?: string }
+export type CareCase = { incident: string; reason: string; at: string; people: string[]; takers?: string[]; status: 'open' | 'debrief' | 'closed'; offered?: string[]; actions?: CareNote[] }
+export type Break = { on: boolean; since?: string; lastEnd?: string; count: number }
+export type TDoS = { active: boolean; since?: string; last?: string; reasons: string[] | null; perMin: number; baseline: number; repeats?: string[]; ackedBy?: string; ackedAt?: string }
+export type TrainingView = { scenario?: string; name?: string; started?: string; steps: number; played: number }
+export type Phrase = { key: string; en: string; es: string }
+export type Workload = {
+  username: string; name: string; role: string; console: string; signedIn: string; calls: number; incidents: number; actions: number
+  critical: string[]; onBreak: boolean; sinceBreak: number; level: 'ok' | 'watch' | 'relieve'; reasons: string[]
+}
+export type Check = { name: string; ok: boolean; skip?: boolean; detail: string }
+export type Review = { incident: string; type: string; priority: number; created: string; taker?: string; score: number; checks: Check[]; critical?: string }
 
 export type Emergency = {
   key: string; unit?: string; radioUnit?: string; radioId?: number; alias?: string; channel?: string; channelName?: string
@@ -70,6 +98,9 @@ export type Settings = {
   agency: string; incidentPrefix: string; timers: Record<string, number>; avlStaleSeconds: number; locationStaleSeconds: number
   roadFactor: number; speedKmh: number; mapTiles: string; mapAttribution: string; mapCenter: [number, number]; mapZoom: number
   dispositions: string[]; unitTypes: UnitType[]; markOuts?: MarkOutType[]; shifts?: string[]; photosRecordedOnly?: boolean; ori?: string; ncicMode?: string; ncicAddr?: string
+  nonEmergencyLines?: string[]; nonEmergencyWords?: string[]; nonEmergencyReply?: string; criticalWords?: string[]; careOff?: boolean; supportLine?: string
+  breakMinutes?: number; crashHighKmh?: number; crashMediumKmh?: number; tdosPerMinute?: number; clusterMeters?: number; clusterMinutes?: number
+  qa?: { answerSeconds?: number; entrySeconds?: number; dispatchSeconds?: number; questions?: Record<string, string[]> }
 }
 
 export type Failure = { at: string; what: string; call?: string; error: string }
@@ -90,6 +121,7 @@ export type Health = {
   advisory?: AdvisoryStatus
   site?: string
   sites?: { name: string; url: string; ok: boolean; last?: string; error?: string; copied: number }[]
+  drone?: boolean; hooks?: boolean; model?: boolean
 }
 
 export type PhotoHealth = { available: boolean; recorded: boolean; attribution: string; job?: string; jobFrac?: number }
@@ -117,12 +149,13 @@ export type View = {
   serverTime: string; seq: number; settings: Settings; stations: Station[]; units: Unit[]; callTypes: CallType[]
   incidents: Incident[]; calls: Call[]; emergencies: Emergency[]; health: Health; verbs: Verb[]; statuses: string[]
   premises?: Record<string, Premise[]>; prior?: Record<string, History[]>
+  summaries?: Record<string, string>; drones?: Drone[]; radio?: RadioLine[]; care?: CareCase[]; breaks?: Record<string, Break>; tdos?: TDoS; training?: TrainingView
 }
 
 export type Premise = { id: string; name?: string; address: string; lat: number; lon: number; hazards?: string[]; notes?: string; contacts?: string[]; expires?: string; source?: string; updated: string; by: string }
 export type History = { number: string; type?: string; address?: string; lat: number; lon: number; at: string; disposition?: string; note?: string; source?: string }
 
-export type Session = { username: string; name: string; role: 'viewer' | 'field' | 'dispatcher' | 'supervisor' | 'admin'; console: string; from: string; created: string; last: string }
+export type Session = { username: string; name: string; role: 'viewer' | 'field' | 'dispatcher' | 'supervisor' | 'admin'; console: string; from: string; created: string; last: string; training?: boolean }
 
 export type Candidate = { unit: string; type: string; capability: string; metres?: number; seconds?: number; from: string; routed?: boolean; reasons: string[] }
 export type RecLine = { capability: string; count: number; covered: string[]; units: Candidate[]; short: number; next: Candidate[] }

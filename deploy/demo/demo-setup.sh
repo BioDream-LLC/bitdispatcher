@@ -15,6 +15,11 @@ api PUT /admin/users/demo '{"name":"Demo dispatcher","role":"dispatcher","passwo
 FP=$(api POST /admin/integrations/bitvoice/fingerprint '{"url":"https://127.0.0.1:9444"}' | jq -r .fingerprint)
 api PUT /admin/integrations "{\"bitvoiceUrl\":\"https://127.0.0.1:9444\",\"bitvoiceFingerprint\":\"$FP\",\"aliListen\":\"127.0.0.1:5001\"}" >/dev/null
 echo "simulated BitVoice pinned at $FP"
+# The hooks the simulator sends crash data and drone reports to, its drone system, and the demo's
+# non-emergency line and support number.
+api PUT /admin/connections '{"hookToken":"bd_hook_demo","droneUrl":"http://127.0.0.1:9445/launch","droneToken":"bd_drone_demo","droneAuto":true}' >/dev/null
+S=$(api GET /state | jq -c '.settings | .nonEmergencyLines = ["+15408532121"] | .supportLine = "Employee assistance: 540-555-0199 (demo number)"')
+api PUT /admin/settings "$S" >/dev/null
 
 if [ "$(api GET /state | jq '[.incidents[] | select(.status != "closed")] | length')" = "0" ]; then
   cmd() { api POST /command "$(jq -nc --arg l "$1" --arg i "${2:-}" '{line: $l, incident: $i}')"; }

@@ -27,7 +27,8 @@ export default async function setup() {
   const [, password] = await waitFor(bd, /sign in as\s+admin\s+with password\s+(\S+)/)
   await waitFor(bd, /serving/)
   const sim = spawn(join(root, 'bin/bvsim'), ['-addr', '127.0.0.1:9644', '-every', '8s', '-calls', '2', '-eido-url', 'https://127.0.0.1:9643/api/ng911/eido', '-eido-token', 'bd_eido_e2e',
-    '-radio-url', 'https://127.0.0.1:9643/api/radio/events', '-radio-secret', 'bd_radio_e2e'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    '-radio-url', 'https://127.0.0.1:9643/api/radio/events', '-radio-secret', 'bd_radio_e2e',
+    '-hook-url', 'https://127.0.0.1:9643/api/hooks', '-hook-token', 'bd_hook_e2e', '-crash-every', '0'], { stdio: ['ignore', 'pipe', 'pipe'] })
   await new Promise((r) => setTimeout(r, 1500))
   writeFileSync(state, JSON.stringify({ data, password, pids: [bd.pid, sim.pid] }))
   bd.unref()

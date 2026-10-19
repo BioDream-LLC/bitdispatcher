@@ -461,6 +461,12 @@ func changes(c *Call, d CallData) bool {
 	if d.Problems != nil && !slices.Equal(d.Problems, c.Problems) {
 		return true
 	}
+	if len(d.Transcript) > 0 || len(d.Translations) > 0 || d.Crash != nil || d.Line != "" && d.Line != c.Line {
+		return true
+	}
+	if d.Location != nil && d.Location.Altitude != nil && (c.Location == nil || c.Location.Altitude == nil || *c.Location.Altitude != *d.Location.Altitude) {
+		return true
+	}
 	return false
 }
 

@@ -72,6 +72,18 @@ Where something has been tested only against simulators or sample data rather th
 - An advisory panel: deterministic evidence rules from a versioned codebook (possible duplicate, a call near an open incident, fire described on a non-fire call, hazards at the address), in shadow or live mode, tested against recorded incidents first.
 - Agency scripts in JavaScript or Lua, sandboxed and time-limited, for incidents, recommendations and reports; advice only.
 
+**The call, without the typing**
+- A live transcript of each call (from BitVoice or any speech-to-text engine), with the address, weapons, vehicles, plates, direction of travel, people and injuries pulled out by rules; urgent ones in red, the address placed with one press.
+- Spanish callers translated line by line by a built-in emergency phrasebook (it says when it has only the gist), ready reply phrases in the caller's language, texted or spoken aloud; an optional language model of the agency's choosing for the rest.
+- The phone's own device location and floor (altitude), and a trail for a caller on the move; several callers about one fire grouped and attached in one step; non-emergency calls kept to one side, with a person always deciding.
+- Vehicle crash notifications rated for injury risk by delta-V and rollover, with the response to consider (an electric car flagged for the fire crews); drones launched by rule or by a press, flying on the map; radio transmissions' words on the incident; every incident summarised in a paragraph for the crews.
+
+**Looking after the people**
+- Critical calls (a cardiac arrest, a child, an officer down) put everyone who worked them on the supervisor's care list: a break offered, a debrief arranged, and a quiet word on their own console afterwards.
+- Breaks and workload on the supervisor board, with who is free to relieve; a quality review of every incident against the centre's standards and the questions heard on the transcript.
+- A training environment with scripted scenarios on the agency's own map and units, scored, never touching the live board.
+- Working through an outage from the last board with an offline log sent when the server is back, and a warning of telephony denial-of-service floods.
+
 **Built to keep running**
 - An append-only, SHA-256 hash-chained event ledger, verified and searched from the browser.
 - Several sites active-active, each keeping a verified copy of the others' ledgers; each keeps working when cut off.
@@ -157,6 +169,7 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 - **Not certified.** Not CJIS-audited, no VCIN certification yet, and the Virginia IBR file has not yet been accepted by the State Police.
 - **Tested against simulators and samples:** NCIC (training simulator), BitVoice (its simulator and its encoder's output, not yet a live BitVoice), ALI (sample spills).
 - **Multiple monitors** tested with Chrome's emulated monitors, not yet on a real console's monitors.
+- **Transcripts, crash data and drones** tested with the simulator's callers, crash notifications and drone system, not yet a live speech-to-text engine, telematics provider or drone system. The phrasebook translates the language of emergencies, not everything; the injury-risk rating and the quality review are aids, not judgements.
 - **Open decisions:** when an ALI-only call (no hang-up signal) should end; whether agency scripts may reach outside the sandbox; VGIN's terms for its data outside Virginia.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design, the rules and the phases, and [docs/OPERATIONS.md](docs/OPERATIONS.md) for the ledger and how reports count.

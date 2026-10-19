@@ -1,3 +1,5 @@
+import PeoplePanel from './People'
+import { TDoSBanner } from './Dream'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -374,6 +376,7 @@ export default function Board() {
           <Siren size={16} aria-hidden /> {emergencies.length} EMERGENCY {emergencies.map((e) => e.unit || e.alias || e.radioId).join(', ')}: not acknowledged
         </div>
       )}
+      <TDoSBanner view={raw} />
       <div className="grid shrink-0 grid-cols-7 gap-2 p-2">
         <Kpi icon={<Phone size={13} aria-hidden />} label="911 calls" value={calls.length} tone={ringing ? 'rose' : calls.length ? 'sky' : 'slate'} alarm={ringing > 0}
           sub={ringing ? <span className="font-bold text-rose-200">{ringing} ringing</span> : calls.length ? `${calls.length} not yet on an incident` : 'none waiting'} />
@@ -422,6 +425,7 @@ export default function Board() {
         </div>
         <div className="flex min-h-0 flex-col gap-2">
           {discs.map((d) => <DisciplineCard key={d.d} view={view} d={d} units={view.units.filter((u) => discipline(view, u) === d.d)} />)}
+          <PeoplePanel view={raw} />
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70">
             <div className="flex items-center gap-2 border-b border-slate-800 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               <ShieldAlert size={12} aria-hidden /> Busiest areas

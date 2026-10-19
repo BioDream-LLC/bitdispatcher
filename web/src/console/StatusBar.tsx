@@ -1,3 +1,4 @@
+import { BreakButton } from './Dream'
 import { Link } from 'react-router-dom'
 import { Activity, CircleHelp, Cog, LogOut, Moon, Radio, Server, Siren, Sun, Phone, FileText, Database, MapIcon, MonitorCheck, LayoutDashboard } from 'lucide-react'
 import { DISCIPLINES, lensName } from '../lens'
@@ -176,6 +177,7 @@ export default function StatusBar({ view, screen = 'full', onScreens }: { view: 
             {h.ledger}
           </span>
         </Tip>
+        <BreakButton view={view} />
         {onScreens && (
           <button className="btn btn-ghost px-1.5" onClick={onScreens} aria-label="Screens: spread this position over monitors" title="Screens: spread this position over monitors (Ctrl+Shift+S)">
             <MonitorCheck size={14} aria-hidden />

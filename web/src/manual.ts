@@ -11,6 +11,8 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
     ids: ['start', 'console', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger'] },
+  { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
+    ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'quality', 'offline', 'tdos', 'hooks'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
     ids: ['admin-units', 'admin-stations', 'admin-calltypes', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-sites', 'admin-premises', 'admin-migrate', 'help'] },
 ]
@@ -126,6 +128,7 @@ Mark-outs are also on every unit's right-click menu and in the unit details, and
 - **Where the work is**: the map shaded by how much is open in each area (open incidents plus twice those waiting), with each area's open, waiting and available units. Areas are the county's emergency service zones or beats when they are loaded (Admin › County GIS); otherwise each station's area, the part of the map nearest it. An area with incidents waiting and no unit free, or two waiting, is **SWAMPED**.
 - **By discipline**: a ring of every status with the number free, and each kind of unit available out of its total.
 - **Busiest areas**, worst first, and **new incidents** over the last six hours by priority.
+- **People**: each signed-in position's workload and breaks, and the care list after critical calls. See [Breaks and workload](#breaks) and [Critical calls and care](#care). A possible line attack shows across the top ([TDoS](#tdos)).
 
 Choose the disciplines across the top, or open it from Screens with them. **Full screen** is beside the clock.`,
   },
@@ -136,7 +139,8 @@ Choose the disciplines across the top, or open it from Screens with them. **Full
 - **Ringing** calls show before they are answered, so the dispatcher sees what is coming.
 - **Location**: the caller's position and uncertainty circle, the address when there is one, and **STALE** when the location is older than the setting in Admin › Settings. Rebid asks for a new one (BitVoice).
 - **+ Incident** on a call creates an incident from it, with the location and callback filled in. Calls already attached show their incident.
-- Text to the caller, a video link and live video are on the call when BitVoice offers them.`,
+- Text to the caller, a video link and live video are on the call when BitVoice offers them.
+- Its [transcript](#transcript) and what was heard, [translation](#translation), the [device location and floor](#caller-location), [crash data](#crash), callers [grouped](#grouping) and [non-emergency](#nonemergency) calls are described in their own chapters.`,
   },
   {
     id: 'incidents', title: 'Incidents', keys: 'incident create new close reopen priority note narrative timeline disposition',
@@ -337,7 +341,9 @@ An incident script sees the number, type and its name, priority, status, address
   },
   {
     id: 'admin-calltypes', title: 'Call types and run cards', route: '/admin/calltypes', keys: 'call types run cards priority capability requirement',
-    body: `A call type is a kind of incident (\`SF\` structure fire, \`CHEST\` chest pain) with a default priority, a discipline and a run card: how many units of each capability it needs (\"3 × engine, 1 × ladder, 1 × als\"). Recommendations fill the run card. Capabilities come from unit types (Admin › Settings) and units.`,
+    body: `A call type is a kind of incident (\`SF\` structure fire, \`CHEST\` chest pain) with a default priority, a discipline and a run card: how many units of each capability it needs (\"3 × engine, 1 × ladder, 1 × als\"). Recommendations fill the run card. Capabilities come from unit types (Admin › Settings) and units.
+
+**Critical call** puts the people who work one on the supervisor's [care list](#care); **Send a drone** has the drone launch rule ask for a [drone](#drones).`,
   },
   {
     id: 'admin-map', title: 'Recording the map', route: '/admin/map', keys: 'map record openstreetmap geofabrik radius centre photos imagery offline',
@@ -381,6 +387,9 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 - **Stale** ages for AVL and caller locations.
 - **Shift changes** (\`07:00 19:00\`) for the operations report's shift periods.
 - **Travel estimates** outside the recorded map: road factor and average speed.
+- **Calls**: how near and how soon callers are [grouped](#grouping); the [non-emergency](#nonemergency) lines, words and reply.
+- **People**: the [critical-call](#care) words, the support line, and when to suggest a [break](#breaks).
+- **Quality review** standards and the questions to listen for ([Quality review](#quality)); **crash data** thresholds ([Vehicle crash data](#crash)); the [line-attack](#tdos) warning level.
 - **Map beyond the recorded area**: the online tile source (fetched and cached by the server, never by browsers), and the map's starting centre and zoom.
 - **Unit types**: code, name, discipline, capabilities, and whether stations keep them covered (move-up suggestions).
 - **Dispositions** an incident can be closed with.`,
@@ -392,7 +401,8 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 - **BitVoice**: its address and API token, and its certificate pinned with Read it. See [BitVoice](#bitvoice).
 - **EIDO**: the token a call-handling system uses to push EIDO to \`/api/ng911/eido\`.
 - **Radio**: the secret for radio webhooks to \`/api/radio/events\`.
-- **ALI spill**: the TCP address bitdispatcher listens on, and Test.`,
+- **ALI spill**: the TCP address bitdispatcher listens on, and Test.
+- **Hooks, drones and translation**: the hook token for transcripts, crash data, drone reports and radio words, the drone system, and the optional language model. See [Hooks and connections](#hooks).`,
   },
   {
     id: 'bitvoice', title: 'BitVoice', keys: 'bitvoice call handling integration hooks sse eido radio rebid text video',
@@ -466,6 +476,149 @@ Importing the same file again replaces what it brought (premises by their id, ca
     id: 'help', title: 'This manual', route: '/help', keys: 'help manual documentation guide search',
     body: `This manual is built into bitdispatcher, so it is there wherever it runs, with no internet. Every screen's Help link opens its chapter; the palette (\`Ctrl K\`) finds chapters by name. The same chapters are printed as docs/manual/index.html and a PDF by \`make manual\`.`,
   },
+  {
+    id: 'transcript', title: 'Transcripts and what was heard', keys: 'transcript speech text details extraction address weapon vehicle plate typing',
+    body: `When call handling transcribes calls, each call shows its **transcript** live, the caller in white and the call-taker in blue, and **Heard on the call**: the details pulled out of it, so the call-taker types less.
+
+- **What is pulled out**: the address, weapons, vehicles, plates, the direction someone went, how many people, injuries (not breathing, unconscious, bleeding), hazards (fire, trapped, gas, a dog, an electric car) and the caller's name. Urgent ones are red and come first, and show on the call in the queue.
+- **Use**: on an address, places the call's incident there (a map search, exact when the map knows the number; check it on the map). Before there is an incident it copies the address.
+- **Where transcripts come from**: BitVoice's live transcript when it sends one, its transcript of a recorded call afterwards, or any speech-to-text engine posting to the transcript hook ([Hooks](#hooks)).
+- Rules, not a model, pull out the details: the same words always give the same details, and each shows the words it came from.
+
+> A transcript is what a machine heard. The call-taker's own judgement and questions still decide.`,
+  },
+  {
+    id: 'translation', title: 'Callers in another language', keys: 'translation spanish language interpreter phrasebook reply speak model',
+    body: `A caller speaking Spanish is translated line by line on the transcript, marked **Spanish · translated**; **Show original** shows what was said.
+
+- **The phrasebook** built into bitdispatcher translates the words of emergencies between Spanish and English, offline. When it knows too few of a line's words it says **gist only**: get an interpreter.
+- **Say it in Spanish**: press a ready phrase (Help is on the way, Is the person breathing?, Get out of the house now…) or type in English; the translation shows as you type. It is kept on the transcript, texted when **also text it** is ticked (BitVoice), and the speaker button says it aloud on this console.
+- **A language model** (optional, Admin › Integrations) translates what the phrasebook cannot, on an OpenAI-compatible chat API: one on your own server, or a service under your agency's agreement. What callers say is sent to it, so it is off until an administrator switches it on.`,
+  },
+  {
+    id: 'caller-location', title: 'Where the caller is: device location and floor', keys: 'location dbh device hybrid gps floor altitude z-axis trail fixes',
+    body: `Each call says how its position was found: **device location** (the phone's own fix, often a few metres, the FCC's dispatchable location), GPS, cell sector or on file.
+
+- **Floor**: a civic floor from call handling, and the **altitude** of a 3-D fix with its uncertainty, which tells which floor of a tall building.
+- **Trail**: a caller who moves leaves a dotted trail on the map of every position received, the selected call's brighter.
+- **Rebid** asks for a new position; **STALE** marks an old one (Admin › Settings).`,
+  },
+  {
+    id: 'grouping', title: 'Many callers, one incident', keys: 'duplicate callers group cluster attach all same fire',
+    body: `When several people call about the same thing, the queue groups them under **N callers about one place**: calls near each other (300 m by default) within a short time (10 minutes).
+
+- Make the incident from one call; the group then offers **Attach N to** that incident, one press for the rest.
+- With an incident selected, the group offers to attach all of them to it.
+- Calls already on different incidents are never grouped together. Change the distance and time in [Admin › Settings](#/admin/settings).`,
+  },
+  {
+    id: 'nonemergency', title: 'Non-emergency calls', keys: 'non-emergency screening noise complaint parking admin line deflection',
+    body: `Calls on a **non-emergency line**, or whose caller says something that is seldom an emergency (a noise complaint, parking, a power outage), go to the **Non-emergency** list under the 911 calls, with the reason.
+
+- Anything urgent said on the call (a weapon, not breathing, fire) keeps it an emergency, whatever else was said; so does crash data.
+- **It is an emergency** moves it back; a person's decision always stands and is recorded.
+- **Send the usual reply** texts the reply set in Settings, such as where to report online.
+- Set the lines, the words and the reply in [Admin › Settings](#/admin/settings).`,
+  },
+  {
+    id: 'crash', title: 'Vehicle crash data', keys: 'acn aacn crash telematics delta-v rollover airbag injury risk electric vehicle onstar',
+    body: `A vehicle's automatic crash notification arrives as a call with **CRASH DATA**: the vehicle, delta-V (the change of speed in the crash), the direction of the impact, rollover, airbags, occupants and belts, and its power (electric, hybrid).
+
+- **Injury risk** is high for delta-V of 40 km/h (25 mph) or more, a rollover, or 20 km/h with no belt, several impacts or a side impact; medium for 20 km/h or any airbag. Suggestions follow: ALS, extrication, air medical, more than one ambulance, and for an electric car a word to the fire crews.
+- It is a rule of thumb from field-triage criteria to help pick the response, not a diagnosis. Change the thresholds in [Admin › Settings](#/admin/settings).
+- Crash notifications reach bitdispatcher through the crash hook ([Hooks](#hooks)).`,
+  },
+  {
+    id: 'drones', title: 'Drones', keys: 'drone dfr first responder launch aerial skydio brinc video',
+    body: `With a drone system connected ([Admin › Integrations](#/admin/integrations)), an incident on the map shows **Send a drone**. bitdispatcher sends the drone system the incident, its type, priority, position and summary; the drone system decides which drone flies.
+
+- **Launch rule**: incidents of call types marked **Send a drone** (Call types) ask by themselves, once each.
+- The drone reports back to the drone hook: its status, position, battery and live picture. It flies on the map, its status goes on the incident's timeline, and **Live picture** opens its video.`,
+  },
+  {
+    id: 'radio-text', title: 'Radio transcripts', keys: 'radio transcription speech words transmission timeline',
+    body: `When BitVoice or the radio system transcribes transmissions, a unit's words go on its incident's timeline in italics (\`E1: on scene, smoke showing\`), so the record holds what was said on the air. The words come with BitVoice's radio events, or through the radio-words hook ([Hooks](#hooks)).`,
+  },
+  {
+    id: 'summary', title: 'Incident summaries', keys: 'summary paragraph handoff crews mdt',
+    body: `Every open incident has a **Summary**: what and where, what the callers said that matters (the urgent first), the priority notes, the hazards on file at the place, who is on scene and who is responding, and a drone over it.
+
+- It is built from the record by rules, so it says nothing the record does not; it changes as the incident does.
+- It shows on the incident panel (Copy puts it on the clipboard) and at the top of the crews' [mobile terminal](#mdt).`,
+  },
+  {
+    id: 'care', title: 'Critical calls and care', keys: 'critical call trauma wellness peer support debrief break cism eap',
+    body: `Some calls stay with the people who take them. An incident is a **critical call** when its call type is marked critical (cardiac arrest, shooting and stabbing to begin with) or when words such as not breathing, CPR, officer down or infant are said on it.
+
+- Everyone who worked it (the call-taker and the dispatchers who entered, sent or noted) goes on the **care list** on the [supervisor board](#board), with the reason.
+- The supervisor **offers a break** to each person, **arranges a debrief** (with a note of when and where) and marks it **Done**. Each is recorded.
+- Once the incident closes, each person sees a quiet line on their own console: that was a hard call, take a moment, and the support line set in Settings. **Take a break** puts them on a break.
+- Set the words, the support line and the call types in [Admin › Settings](#/admin/settings) and [Call types](#/admin/calltypes).`,
+  },
+  {
+    id: 'breaks', title: 'Breaks and workload', keys: 'break workload fatigue relief supervisor people overtime',
+    body: `The cup on the status bar puts you **on a break** and back; the supervisor board shows it.
+
+The board's **People** panel lists every signed-in position: calls in the last hour, actions, time since the last break, critical calls in four hours, and a state:
+
+- **watch**: two hours without a break (Settings), a critical call, or a very busy hour;
+- **relieve**: three hours without a break, or two critical calls.
+
+It names the least busy positions free to relieve someone.`,
+  },
+  {
+    id: 'training', title: 'Training', keys: 'training scenario simulation practice trainee score reset',
+    body: `Tick **Training** when signing in. The console opens a board of its own, marked TRAINING in violet: the agency's units, stations, call types, premises and map, on a ledger of its own. Nothing done there reaches the live board, and administration is closed.
+
+- **Scenarios** play calls, transcripts, crash data and radio traffic into it on the agency's own map: a house fire with three callers, a cardiac arrest in Spanish, an interstate crash with crash data, an armed robbery, and a flood of calls on the line.
+- **Score** checks what was done: every caller on an incident, the call type, the units sent, a reply in the caller's language, and each incident's [quality review](#quality).
+- **Reset** empties the board for the next trainee.`,
+  },
+  {
+    id: 'quality', title: 'Quality review', route: '/admin/quality', keys: 'quality assurance qa review score coaching standards questions',
+    body: `Every incident checked against the centre's standards:
+
+| Check | Standard (Settings) |
+|---|---|
+| Answered in time | 15 s, NENA's call-answering standard |
+| Entered in time | answer to incident, 90 s |
+| Dispatched in time | entry to the first unit, 60 s, priority 1 and 2 |
+| Location verified, callback, disposition | captured |
+| Questions asked | heard on the transcript: the address, the callback, and by discipline (breathing and awake for EMS; anyone inside for fire; weapons, description and direction for police) |
+
+Each incident gets a score over the checks that applied; the page lists them for a period, each call-taker's average and each check's pass rate. Press an incident for its checks. A review is a coaching aid: a missed question may simply not be on the transcript.`,
+  },
+  {
+    id: 'offline', title: 'Working through an outage', keys: 'offline outage server down network failover paper outbox service worker',
+    body: `Each console keeps the last board it had. When the server cannot be reached, an amber bar says so and the console shows that board, as it was, with the time. A console reloaded during the outage still opens.
+
+- **Offline log**: new incidents, notes and unit statuses are kept in this browser, in order.
+- When the server is back the bar offers **Send them now**: each goes in marked "entered offline at 14:02 by jlee"; anything the server refuses stays, with the reason.
+- For a server that never goes away, run bitdispatcher at two sites ([Several sites](#admin-sites)): each keeps working when the other is cut off.`,
+  },
+  {
+    id: 'tdos', title: 'Line attacks (TDoS)', keys: 'tdos denial of service flood robocall repeat caller silent calls attack',
+    body: `A telephony denial-of-service fills the lines so real callers cannot get through. bitdispatcher watches the calls and raises **Possible telephony denial-of-service** on every console and the supervisor board when:
+
+- far more calls arrive in a minute than usual (five times the last hour's rate, at least 12, or the number set in Settings);
+- one number calls five times or more in ten minutes (shown as ×5 on its calls);
+- eight or more silent or very short calls arrive in five minutes.
+
+A supervisor **acknowledges** it; it clears after ten quiet minutes. Keep answering: a real emergency can be among them.`,
+  },
+  {
+    id: 'hooks', title: 'Hooks and connections', keys: 'hooks api transcript acn drone radio token connections webhook',
+    body: `Other systems send to bitdispatcher with \`Authorization: Bearer\` and the hook token set in [Admin › Integrations](#/admin/integrations). Without a token the hooks are off.
+
+| Hook | Sends |
+|---|---|
+| \`/api/hooks/transcript\` | \`{"call": "id", "speaker": "caller", "text": "…", "lang": "es"}\`, or \`lines\`: a call's words |
+| \`/api/hooks/acn\` | a crash notification: JSON or key=value, common telematics names (delta_v_mph, pdof, rollover, airbag_deployed…) |
+| \`/api/hooks/drone\` | \`{"id", "status", "lat", "lon", "battery", "incident", "videoUrl"}\` |
+| \`/api/hooks/radio-text\` | \`{"unit" or "radioId", "channel", "text"}\` |
+
+The drone system's launch address and token, the launch rule, and the optional translation model are set on the same screen.`,
+  }
 ]
 
 /** The chapter for a screen, if it has one. */

@@ -145,8 +145,14 @@ type State struct {
 	Advisory    AdvisoryState         `json:"advisory"`
 	Reports     map[string]*RMSReport `json:"reports"`
 	Premises    map[string]*Premise   `json:"premises"`
-	History     []History             `json:"-"` // incidents from an earlier system
-	rptCount    map[string]int        // "site prefix|yy"
+	Drones      map[string]*Drone     `json:"drones"`
+	Radio       []RadioLine           `json:"radio"`
+	Care        map[string]*CareCase  `json:"care"`
+	Breaks      map[string]*Break     `json:"breaks"`
+	TDoS        TDoS                  `json:"tdos"`
+	tdos        tdosTrack
+	History     []History      `json:"-"` // incidents from an earlier system
+	rptCount    map[string]int // "site prefix|yy"
 	premCount   int
 	premGrid    grid
 	premIDs     []string
@@ -162,6 +168,7 @@ func newState() *State {
 		Emergencies: map[string]*Emergency{}, Users: map[string]*UserInfo{}, yearCount: map[string]int{},
 		Reports: map[string]*RMSReport{}, rptCount: map[string]int{},
 		Premises: map[string]*Premise{}, premGrid: grid{}, premIdx: map[string]int{}, histGrid: grid{},
+		Drones: map[string]*Drone{}, Care: map[string]*CareCase{}, Breaks: map[string]*Break{},
 	}
 }
 
@@ -178,6 +185,20 @@ func decode[T any](e ledger.Event) (T, error) {
 // an error, because the ledger was written by commands that validated it.
 func (s *State) apply(e ledger.Event) error {
 	s.Seq++ // events applied: the ledger's sequence on one site, the merged count on several
+	if ok, err := s.applyDream(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
+	if err := s.applyCore(e); err != nil {
+		return err
+	}
+	s.afterApply(e)
+	return nil
+}
+
+func (s *State) applyCore(e ledger.Event) error {
 	switch e.Type {
 	case EvSettings:
 		v, err := decode[Settings](e)
@@ -655,6 +676,7 @@ func (s *State) mergeCall(id string, d CallData, at time.Time) {
 	if d.Problems != nil {
 		c.Problems = d.Problems
 	}
+	s.mergeDream(c, d, at)
 	c.Updated = at
 }
 

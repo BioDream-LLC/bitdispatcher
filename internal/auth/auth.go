@@ -75,6 +75,8 @@ type Session struct {
 	From     string    `json:"from"`
 	Created  time.Time `json:"created"`
 	Last     time.Time `json:"last"`
+	// Training sessions work in the training environment: its own board and ledger, never the live one.
+	Training bool `json:"training,omitempty"`
 }
 
 // Store is the user file and the live sessions.
@@ -401,6 +403,15 @@ func (s *Store) SetConsole(id, console string) {
 	defer s.mu.Unlock()
 	if se, ok := s.sessions[id]; ok {
 		se.Console = console
+	}
+}
+
+// SetTraining puts a session in the training environment.
+func (s *Store) SetTraining(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if se, ok := s.sessions[id]; ok {
+		se.Training = true
 	}
 }
 

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { api } from './api'
 import type { Health, Notice, Session, View } from './types'
 import { parseLens, type Lens } from './lens'
+import { loadSnapshot, saveSnapshot } from './offline'
 
 // One store for the whole interface: the server's state document, refreshed when the event stream says
 // something changed, plus what this dispatcher has selected. Nothing polls.
@@ -21,11 +22,12 @@ type Store = {
   pick: string[] // units chosen for the next dispatch
   loadError: string | null
   lens: Lens // the disciplines this window shows; empty for all
+  offline: number // when the board shown was kept, while the server cannot be reached; 0 when live
 }
 
 let s: Store = {
   me: null, meChecked: false, view: null, offset: 0, stream: 'connecting', activity: [], selected: null, selectedCall: null,
-  selectedUnit: null, pick: [], loadError: null, lens: initialLens(),
+  selectedUnit: null, pick: [], loadError: null, lens: initialLens(), offline: 0,
 }
 
 // initialLens is this window's lens: from its address (a screen opened with ?d=police), or what this
@@ -106,7 +108,16 @@ export async function checkMe() {
   try {
     const r = await api.get<{ signedIn: boolean; session?: Session }>('/auth/me')
     set({ me: r.signedIn ? r.session! : null, meChecked: true })
+    if (r.signedIn) localStorage.setItem('bd.me', JSON.stringify(r.session))
+    else localStorage.removeItem('bd.me')
   } catch {
+    // The server cannot be reached: a console that was signed in keeps working from its last board.
+    const last = localStorage.getItem('bd.me')
+    if (last) {
+      set({ me: JSON.parse(last) as Session, meChecked: true })
+      await goOffline()
+      return
+    }
     set({ meChecked: true })
   }
 }
@@ -124,9 +135,11 @@ export async function load() {
       again = false
       try {
         const v = await api.get<View>('/state')
-        set({ view: v, offset: new Date(v.serverTime).getTime() - Date.now(), loadError: null })
+        set({ view: v, offset: new Date(v.serverTime).getTime() - Date.now(), loadError: null, offline: 0 })
+        saveSnapshot(v)
       } catch (e) {
         set({ loadError: e instanceof Error ? e.message : String(e) })
+        await goOffline()
       }
     } while (again)
   })()
@@ -164,7 +177,20 @@ export function connect() {
     disconnect()
     set({ me: null })
   })
-  es.onerror = () => set({ stream: 'down' })
+  es.onerror = () => {
+    set({ stream: 'down' })
+    // The stream drops for a moment on any restart; a server that stays away puts the console offline.
+    window.setTimeout(() => {
+      if (s.stream === 'down') fetch('./api/health', { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error() }).catch(() => goOffline())
+    }, 4000)
+  }
+}
+
+// goOffline shows the last board this browser kept, when the server cannot be reached.
+async function goOffline() {
+  if (s.offline) return
+  const snap = s.view ? { at: Date.now(), view: s.view } : await loadSnapshot()
+  if (snap) set({ view: s.view ?? snap.view, offline: snap.at })
 }
 
 export function disconnect() {
@@ -173,6 +199,7 @@ export function disconnect() {
 }
 
 window.addEventListener('bd:signedout', () => {
+  localStorage.removeItem('bd.me')
   disconnect()
   set({ me: null, view: null })
 })

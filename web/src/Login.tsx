@@ -10,6 +10,7 @@ export default function Login() {
   const [console_, setConsole] = useState(localStorage.getItem('bd-console') ?? '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [training, setTraining] = useState(false)
   // The public demonstration account, when this server has one: one button signs a visitor in.
   const [demo, setDemo] = useState<{ name: string; role: string } | null>(null)
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function Login() {
     setBusy(true)
     setError('')
     try {
-      await api.post('/auth/demo', { console: console_.trim() })
+      await api.post('/auth/demo', { console: console_.trim(), training })
       await checkMe()
     } catch (err) {
       setError(errText(err))
@@ -32,7 +33,7 @@ export default function Login() {
     setBusy(true)
     setError('')
     try {
-      await api.post('/auth/login', { username, password, console: console_ })
+      await api.post('/auth/login', { username, password, console: console_, training })
       localStorage.setItem('bd-console', console_)
       await checkMe()
     } catch (err) {
@@ -77,6 +78,10 @@ export default function Login() {
           <input id="c" className="input font-mono" placeholder="D1, Fire 2, or a unit: E1" value={console_} onChange={(e) => setConsole(e.target.value)} />
           <p className="mt-1 text-xs text-slate-500">The console you are at, or on a mobile terminal your unit. Every action you take is recorded with it.</p>
         </div>
+        <label className="flex items-start gap-2 text-sm text-slate-300">
+          <input type="checkbox" className="mt-1" checked={training} onChange={(e) => setTraining(e.target.checked)} />
+          <span>Training<span className="block text-xs text-slate-500">A board of its own with practice scenarios. Nothing reaches the live board.</span></span>
+        </label>
         {error && (
           <p role="alert" className="rounded-md border border-rose-800 bg-rose-950/50 px-3 py-2 text-sm text-rose-200">
             {error}

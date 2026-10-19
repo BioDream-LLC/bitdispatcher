@@ -281,6 +281,26 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
         else lines.push({ type: 'Feature', properties: { kind, road: 0 }, geometry: { type: 'LineString', coordinates: [[p.lon, p.lat], [inc.location.lon, inc.location.lat]] } })
       }
     }
+    // A moving caller's trail: every position received, oldest faint.
+    const trails: GeoJSON.Feature[] = []
+    for (const c of view.calls) {
+      if (c.state === 'ended' || !show.calls) continue
+      // The last quarter hour only, and only positions the caller could have moved between (not a far jump
+      // between two sources' fixes).
+      const fx = (c.fixes ?? []).filter((f) => now - Date.parse(f.at) < 15 * 60000)
+      const path: [number, number][] = []
+      for (const f of fx) {
+        const prev = path[path.length - 1]
+        if (prev && Math.abs(prev[0] - f.lon) + Math.abs(prev[1] - f.lat) > 0.03) continue
+        path.push([f.lon, f.lat])
+      }
+      if (path.length < 2) continue
+      trails.push({ type: 'Feature', properties: { sel: c.id === selCall ? 1 : 0 }, geometry: { type: 'LineString', coordinates: path } })
+    }
+    ensure('trails', { type: 'FeatureCollection', features: trails }, () => {
+      m.addLayer({ id: 'trails', type: 'line', source: 'trails', layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#e879f9', 'line-width': ['case', ['==', ['get', 'sel'], 1], 3, 2], 'line-dasharray': [1, 1.5], 'line-opacity': 0.85 } })
+    })
     if (found) circles.push({ type: 'Feature', properties: { sel: 1 }, geometry: { type: 'Point', coordinates: [found.lon, found.lat] } })
     ensure('lines', { type: 'FeatureCollection', features: lines }, () => {
       // Road routes: a dark casing under a bright line, so they read over any map.
@@ -390,6 +410,12 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
           40,
         )
       }
+    }
+    for (const d of view.drones ?? []) {
+      if (d.lat == null || d.lon == null || d.status === 'docked') continue
+      put('d:' + d.id, d.lat, d.lon, `<span>✈ ${d.name ?? d.id}</span>`,
+        cx('bd-mk rounded-full border border-cyan-300 px-1.5 py-px text-[10px] font-bold shadow-lg whitespace-nowrap', d.status === 'onscene' ? 'bg-cyan-400 text-slate-950' : 'bg-slate-950/90 text-cyan-200'),
+        `Drone ${d.name ?? d.id}: ${d.status}${d.incident ? ' for ' + d.incident : ''}`, () => d.incident && store.select(d.incident), 35)
     }
     if (found) {
       put('f:found', found.lat, found.lon, `<span class="block h-3.5 w-3.5 rotate-45 border-2 border-white bg-fuchsia-500 shadow-lg"></span>`, 'bd-mk', `Search: ${found.label}`,

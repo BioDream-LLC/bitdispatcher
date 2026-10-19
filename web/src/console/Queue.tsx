@@ -1,13 +1,14 @@
 import { useDroppable } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { MapPin, MessageSquareText, Phone, PhoneIncoming, Plus, Video, Link2, AlertTriangle, Image as ImageIcon } from 'lucide-react'
+import { MapPin, MessageSquareText, Phone, PhoneIncoming, Plus, Video, Link2, AlertTriangle, Image as ImageIcon, Car, Languages, Layers, Repeat, PhoneOff, ShieldAlert, Siren } from 'lucide-react'
+import { clusters, floorText, langName, methodText, repeats, type Cluster } from '../dream'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
 import { Priority, StatusChip, Tip } from '../ui'
 import { ago, clock, cx, hasPoint, locText, locationStale, ms, phone, prio, typeName, uncertainty, useNow, overdue } from '../util'
 import type { Call, Incident, View } from '../types'
 
-function CallCard({ c, view, now, onCreate }: { c: Call; view: View; now: number; onCreate: (c: Call) => void }) {
+function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: View; now: number; onCreate: (c: Call) => void; rep?: number; grouped?: boolean }) {
   const me = useStore((s) => s.me)
   const selected = useStore((s) => s.selected)
   const selCall = useStore((s) => s.selectedCall)
@@ -24,6 +25,7 @@ function CallCard({ c, view, now, onCreate }: { c: Call; view: View; now: number
         onKeyDown={(e) => e.key === 'Enter' && onCreate(c)}
         className={cx(
           'group relative cursor-pointer border-l-4 px-2.5 py-1.5 text-xs outline-none hover:bg-slate-800/60 focus-visible:bg-slate-800/60',
+          grouped && 'ml-2',
           ringing ? 'border-rose-500 bg-rose-500/10' : c.state === 'ended' ? 'border-slate-700 opacity-60' : 'border-sky-500 bg-sky-500/5',
           selCall === c.id && 'bg-slate-800',
         )}
@@ -43,7 +45,13 @@ function CallCard({ c, view, now, onCreate }: { c: Call; view: View; now: number
           {c.location && <span className="font-mono">{uncertainty(c.location) || 'no uncertainty given'}</span>}
           {stale && <span className="chip bg-amber-500/20 text-amber-300">STALE {ago(c.location?.at, now)}</span>}
           {c.locations > 1 && <span className="chip bg-slate-800 text-slate-300">{c.locations} fixes</span>}
+          {c.location?.method && <span className={cx('chip', c.location.method.toUpperCase() === 'DBH' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400')}>{methodText(c.location.method)}</span>}
+          {floorText(c) && <span className="chip bg-emerald-500/15 text-emerald-300"><Layers size={10} aria-hidden /> {floorText(c)}</span>}
           {c.callerName && <span className="truncate text-slate-300">{c.callerName}</span>}
+          {c.lang && c.lang !== 'en' && <span className="chip bg-fuchsia-500/20 text-fuchsia-200"><Languages size={10} aria-hidden /> {langName[c.lang] ?? c.lang.toUpperCase()}</span>}
+          {c.crashRisk && <span className={cx('chip', c.crashRisk.risk === 'high' ? 'bg-rose-500 text-white' : c.crashRisk.risk === 'medium' ? 'bg-amber-500/25 text-amber-200' : 'bg-slate-800 text-slate-300')}><Car size={10} aria-hidden /> CRASH DATA · {c.crashRisk.risk.toUpperCase()}</span>}
+          {(c.details ?? []).filter((d) => d.urgent).slice(0, 3).map((d) => <span key={d.kind + d.text} className="chip bg-rose-500/20 text-rose-200"><ShieldAlert size={10} aria-hidden /> {d.text}</span>)}
+          {rep && rep >= 3 ? <span className="chip bg-orange-500/25 text-orange-200" title="Calls from this number in the last ten minutes"><Repeat size={10} aria-hidden /> ×{rep}</span> : null}
           {c.text?.length ? <span className="chip bg-violet-500/20 text-violet-300"><MessageSquareText size={10} aria-hidden /> {c.text.length}</span> : null}
           {c.textOnly && <span className="chip bg-violet-500 text-white">TEXT ONLY</span>}
           {c.video && <span className={cx('chip', c.video.live ? 'bg-rose-500/25 text-rose-200' : 'bg-slate-800 text-slate-300')}><Video size={10} aria-hidden /> {c.video.live ? 'LIVE' : 'video'}</span>}
@@ -136,6 +144,62 @@ function IncidentRow({ i, view, now }: { i: Incident; view: View; now: number })
   )
 }
 
+// ClusterHead is the line over a group of callers about one place: the others are attached in one step.
+function ClusterHead({ g }: { g: Cluster }) {
+  const me = useStore((s) => s.me)
+  const selected = useStore((s) => s.selected)
+  const loose = g.calls.filter((c) => !c.incident).map((c) => c.id)
+  const target = g.incident ?? selected
+  return (
+    <li className="flex items-center gap-1.5 whitespace-nowrap bg-indigo-950/40 px-2.5 py-1 text-[11px] text-indigo-200" aria-label={`${g.calls.length} callers about one place`}>
+      <Siren size={12} className="shrink-0" aria-hidden /> <span className="min-w-0 truncate"><b>{g.calls.length} callers</b> about one place{g.incident ? <> · on <span className="font-mono">{g.incident}</span></> : null}</span>
+      {can.dispatch(me) && target && loose.length > 0 && (
+        <button className="btn ml-auto h-5 shrink-0 px-1.5 py-0 text-[10px]" title={`Attach the ${loose.length} calls to ${target}`} aria-label={`Attach the ${loose.length} calls to ${target}`} onClick={async () => {
+          try {
+            const r = await api.post<{ attached: number; errors?: string[] }>('/calls/attach-all', { calls: loose, incident: target })
+            toast.success(`${r.attached} call${r.attached === 1 ? '' : 's'} attached to ${target}`)
+          } catch (e) {
+            toast.error(errText(e))
+          }
+        }}><Link2 size={11} aria-hidden /> {loose.length} → {target.slice(-6)}</button>
+      )}
+      {!target && <span className="ml-auto truncate text-[10px] text-indigo-300/70" title="Make the incident from one; the rest follow in one step">make the incident from one, then attach the rest</span>}
+    </li>
+  )
+}
+
+// NonEmergency is the calls screened as non-emergency: kept apart, a person decides.
+function NonEmergency({ calls, view }: { calls: Call[]; view: View }) {
+  const me = useStore((s) => s.me)
+  const reply = view.settings.nonEmergencyReply
+  return (
+    <>
+      <li className="bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400"><PhoneOff size={10} className="mr-1 inline" aria-hidden />Non-emergency · {calls.length}</li>
+      {calls.map((c) => (
+        <li key={c.id} className="border-l-4 border-slate-600 px-2.5 py-1 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono font-bold text-slate-200">{phone(c.callback) || 'No callback'}</span>
+            <span className="truncate text-[11px] text-slate-400">{c.screen?.reason}</span>
+          </div>
+          {can.dispatch(me) && (
+            <div className="mt-1 flex gap-1">
+              <button className="btn h-6 px-2 py-0 text-[11px]" onClick={() => api.post(`/calls/${encodeURIComponent(c.id)}/screen`, { emergency: true }).catch((e) => toast.error(errText(e)))}>
+                <AlertTriangle size={11} aria-hidden /> It is an emergency
+              </button>
+              <button className="btn h-6 px-2 py-0 text-[11px]" onClick={() => store.selectCall(c.id)}>Open</button>
+              {reply && view.health.bitvoice.configured && c.state !== 'ended' && (
+                <button className="btn h-6 px-2 py-0 text-[11px]" title={reply} onClick={() => api.post(`/calls/${encodeURIComponent(c.id)}/text`, { text: reply }).then(() => toast.success('Sent the non-emergency reply')).catch((e) => toast.error(errText(e)))}>
+                  <MessageSquareText size={11} aria-hidden /> Send the usual reply
+                </button>
+              )}
+            </div>
+          )}
+        </li>
+      ))}
+    </>
+  )
+}
+
 export default function Queue({ view, onCreateFromCall, onNew }: { view: View; onCreateFromCall: (c: Call) => void; onNew: () => void }) {
   const now = useNow()
   const me = useStore((s) => s.me)
@@ -147,6 +211,14 @@ export default function Queue({ view, onCreateFromCall, onNew }: { view: View; o
     .sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1) || a.priority - b.priority || ms(a.created) - ms(b.created))
   const closed = view.incidents.filter((i) => i.status === 'closed').slice(0, 8)
   const avail = view.units.filter((u) => u.status === 'available').length
+  const live = view.calls.filter((c) => c.state !== 'ended' || now - ms(c.end) < 10 * 60000)
+  const groups = clusters(live, view.settings)
+  const groupOf = new Map<string, Cluster>()
+  groups.forEach((g) => g.calls.forEach((c) => groupOf.set(c.id, g)))
+  const rep = repeats(view.calls, now)
+  const emergency = calls.filter((c) => !c.screen?.nonEmergency)
+  const nonEmergency = calls.filter((c) => c.screen?.nonEmergency)
+  const headed = new Set<string>()
   return (
     <aside className="panel flex min-h-0 flex-1 flex-col" aria-label="Calls and incidents">
       <div className="panel-head">
@@ -165,8 +237,17 @@ export default function Queue({ view, onCreateFromCall, onNew }: { view: View; o
               : 'Connect call handling in Admin › Integrations.'}
           </li>
         ) : (
-          calls.map((c) => <CallCard key={c.id} c={c} view={view} now={now} onCreate={onCreateFromCall} />)
+          emergency.map((c) => {
+            const g = groupOf.get(c.id)
+            const head = g && !headed.has(g.key)
+            if (g) headed.add(g.key)
+            return [
+              head ? <ClusterHead key={'g' + g!.key} g={g!} /> : null,
+              <CallCard key={c.id} c={c} view={view} now={now} onCreate={onCreateFromCall} rep={c.callback ? rep.get(c.callback) : 0} grouped={!!g} />,
+            ]
+          })
         )}
+        {nonEmergency.length > 0 && <NonEmergency calls={nonEmergency} view={view} />}
       </ul>
       <div className="panel-head border-t">
         Incidents <span className="font-mono text-slate-300">{open.length}</span>

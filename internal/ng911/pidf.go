@@ -62,15 +62,19 @@ func (c Civic) String() string {
 
 // Location is where a caller is, as their network, device or a person said, with where it came from.
 type Location struct {
-	Address    string    `json:"address,omitempty"` // one line, for display
-	Civic      *Civic    `json:"civic,omitempty"`
-	Lat        *float64  `json:"lat,omitempty"`
-	Lon        *float64  `json:"lon,omitempty"`
-	Radius     float64   `json:"radius,omitempty"`     // metres of uncertainty
-	Confidence int       `json:"confidence,omitempty"` // percent
-	Method     string    `json:"method,omitempty"`     // GPS, Cell, Manual, ...
-	Source     string    `json:"source,omitempty"`     // eido, ali, rebid, bitvoice, dispatcher
-	At         time.Time `json:"at,omitzero"`          // when the location was determined
+	Address    string   `json:"address,omitempty"` // one line, for display
+	Civic      *Civic   `json:"civic,omitempty"`
+	Lat        *float64 `json:"lat,omitempty"`
+	Lon        *float64 `json:"lon,omitempty"`
+	Radius     float64  `json:"radius,omitempty"`     // metres of uncertainty
+	Confidence int      `json:"confidence,omitempty"` // percent
+	Method     string   `json:"method,omitempty"`     // GPS, Cell, DBH (device-based hybrid), Manual, ...
+	// Altitude is metres above the WGS 84 ellipsoid, when the caller's device gave a 3-D fix (the z-axis
+	// FCC rule): with VRadius, its uncertainty, it tells a dispatcher which floor of a tall building.
+	Altitude *float64  `json:"altitude,omitempty"`
+	VRadius  float64   `json:"vRadius,omitempty"`
+	Source   string    `json:"source,omitempty"` // eido, ali, rebid, bitvoice, dispatcher
+	At       time.Time `json:"at,omitzero"`      // when the location was determined
 }
 
 // HasPoint reports a geodetic position.
@@ -131,6 +135,11 @@ func ParsePIDF(doc []byte) (*Location, error) {
 						if e1 == nil && e2 == nil {
 							loc.Lat, loc.Lon, sawPoint = &la, &lo, true
 						}
+						if len(f) >= 3 {
+							if alt, err := strconv.ParseFloat(f[2], 64); err == nil {
+								loc.Altitude = &alt
+							}
+						}
 					}
 				}
 			case "posList":
@@ -143,6 +152,10 @@ func ParsePIDF(doc []byte) (*Location, error) {
 			case "radius", "semiMajorAxis":
 				if r, err := strconv.ParseFloat(v, 64); err == nil && loc.Radius == 0 {
 					loc.Radius = r
+				}
+			case "verticalAxis", "height":
+				if r, err := strconv.ParseFloat(v, 64); err == nil && loc.VRadius == 0 {
+					loc.VRadius = r
 				}
 			case "confidence":
 				if c, err := strconv.Atoi(v); err == nil {
