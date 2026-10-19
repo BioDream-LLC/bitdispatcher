@@ -54,7 +54,7 @@ export function Modal({ open, onClose, title, icon, children, footer, wide, xl }
               <X size={16} aria-hidden />
             </Dialog.Close>
           </div>
-          <div className={cx('overflow-y-auto p-4', xl ? 'max-h-[72vh]' : 'max-h-[66vh]')}>{children}</div>
+          <div className={cx('overflow-y-auto overflow-x-hidden p-4', xl ? 'max-h-[72vh]' : 'max-h-[66vh]')}>{children}</div>
           {footer && <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-4 py-3">{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>

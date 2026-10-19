@@ -84,7 +84,7 @@ export default function NewIncident({ view, seed, onClose }: { view: View; seed:
     <Modal
       open={!!seed}
       onClose={onClose}
-      wide
+      xl
       title={call ? `New incident from ${phone(call.callback)}` : 'New incident'}
       icon={<FilePlus2 size={16} className="text-rose-300" aria-hidden />}
       footer={
@@ -95,8 +95,8 @@ export default function NewIncident({ view, seed, onClose }: { view: View; seed:
         </>
       }
     >
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr]" onKeyDown={(e) => e.key === 'Enter' && e.ctrlKey && submit()}>
-        <div className="flex min-h-0 flex-col">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]" onKeyDown={(e) => e.key === 'Enter' && e.ctrlKey && submit()}>
+        <div className="flex min-h-0 min-w-0 flex-col">
           <label className="label" htmlFor="ct">Call type</label>
           <input
             id="ct"
@@ -125,14 +125,14 @@ export default function NewIncident({ view, seed, onClose }: { view: View; seed:
                 >
                   <span className={cx('chip font-mono', prio(c.priority).bg, prio(c.priority).fg)}>P{c.priority}</span>
                   <span className="w-16 font-mono font-bold text-slate-300">{c.code}</span>
-                  <span className="truncate text-slate-100">{c.name}</span>
-                  <span className="ml-auto truncate text-[10px] text-slate-500">{(c.runCard ?? []).map((r) => `${r.count}×${r.capability}`).join(' ')}</span>
+                  <span className="min-w-0 truncate text-slate-100">{c.name}</span>
+                  <span className="ml-auto min-w-0 truncate text-[10px] text-slate-500">{(c.runCard ?? []).map((r) => `${r.count}×${r.capability}`).join(' ')}</span>
                 </button>
               </li>
             ))}
           </ul>
         </div>
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           {call && (
             <div className="rounded border border-sky-900 bg-sky-950/30 p-2 text-xs">
               <div className="flex items-center gap-1 font-semibold text-sky-300"><Phone size={12} aria-hidden /> {phone(call.callback)} {call.class}</div>
@@ -143,12 +143,12 @@ export default function NewIncident({ view, seed, onClose }: { view: View; seed:
           )}
           <div>
             <span className="label">Priority</span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               <button type="button" className={cx('btn', priority === 0 && 'ring-1 ring-sky-400')} onClick={() => setPriority(0)}>
                 Type’s {chosen ? `(P${chosen.priority})` : ''}
               </button>
               {[1, 2, 3, 4, 5].map((p) => (
-                <button key={p} type="button" aria-pressed={priority === p} className={cx('btn w-9 font-mono', priority === p && cx(prio(p).bg, prio(p).fg))} onClick={() => setPriority(p)}>
+                <button key={p} type="button" aria-pressed={priority === p} className={cx('btn min-w-9 flex-1 justify-center font-mono', priority === p && cx(prio(p).bg, prio(p).fg))} onClick={() => setPriority(p)}>
                   P{p}
                 </button>
               ))}
@@ -190,11 +190,11 @@ export default function NewIncident({ view, seed, onClose }: { view: View; seed:
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label" htmlFor="lat">Latitude</label>
-              <input id="lat" className="input font-mono" value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" />
+              <input id="lat" className="input w-full min-w-0 font-mono" value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" />
             </div>
             <div>
               <label className="label" htmlFor="lon">Longitude</label>
-              <input id="lon" className="input font-mono" value={lon} onChange={(e) => setLon(e.target.value)} inputMode="decimal" />
+              <input id="lon" className="input w-full min-w-0 font-mono" value={lon} onChange={(e) => setLon(e.target.value)} inputMode="decimal" />
             </div>
           </div>
           <p className="text-[10px] text-slate-500">Without a position units cannot be ranked by distance. Right-click the map to place an incident.</p>
