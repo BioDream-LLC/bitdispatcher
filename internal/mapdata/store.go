@@ -180,8 +180,9 @@ func (s *Store) Search(ctx context.Context, q string, nearLat, nearLon float64, 
 		}
 	}
 	num, rest := splitNumber(q)
+	rest, unit := splitUnit(rest)
 	if num != "" && rest != "" {
-		rs, err := s.addresses(ctx, num, rest)
+		rs, err := s.addresses(ctx, num, rest, unit)
 		if err != nil {
 			return nil, err
 		}
@@ -285,9 +286,10 @@ func (s *Store) intersections(ctx context.Context, a, b string) ([]Result, error
 	return out, rows.Err()
 }
 
-// addresses finds a house number on a street; a town written after the street narrows it. When the
-// number is not on file, the nearest numbers on that street are offered, marked as not exact.
-func (s *Store) addresses(ctx context.Context, num, rest string) ([]Result, error) {
+// addresses finds a house number on a street; a town written after the street narrows it, and a unit
+// ("#B", "Suite 300") puts that unit first. When the number is not on file, the nearest numbers on that
+// street are offered, marked as not exact.
+func (s *Store) addresses(ctx context.Context, num, rest, unit string) ([]Result, error) {
 	words := strings.Fields(Normalize(rest))
 	var out []Result
 	for drop := 0; drop <= 3 && drop < len(words); drop++ {
@@ -319,6 +321,29 @@ func (s *Store) addresses(ctx context.Context, num, rest string) ([]Result, erro
 		}
 		rows.Close()
 		if len(out) > 0 {
+			if unit != "" {
+				// The unit asked for first, then the building's own point, then its other units.
+				order := func(r Result) int {
+					i := strings.LastIndex(r.Label, " #")
+					switch {
+					case i >= 0 && unitKey(r.Label[i+2:]) == unit:
+						return 0
+					case i < 0:
+						return 1
+					}
+					return 2
+				}
+				sort.SliceStable(out, func(i, j int) bool { return order(out[i]) < order(out[j]) })
+				if order(out[0]) != 0 {
+					// The unit itself is not on file: placed at the building, still written with its unit.
+					base := out[0].Label
+					if i := strings.LastIndex(base, " #"); i >= 0 {
+						base = base[:i]
+					}
+					out[0].Label = base + " #" + strings.ToUpper(unit)
+					out[0].Note = "Unit " + strings.ToUpper(unit) + " is not on file: placed at the building"
+				}
+			}
 			return out, nil
 		}
 	}

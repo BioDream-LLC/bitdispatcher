@@ -1,0 +1,6 @@
+[Unit]
+Description=Reset the bitdispatcher demo to its demonstration data
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bitdispatcher/demo-reset.sh

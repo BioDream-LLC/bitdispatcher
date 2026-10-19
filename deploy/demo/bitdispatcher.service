@@ -1,0 +1,21 @@
+[Unit]
+Description=bitdispatcher public demo (Roanoke, VA; demonstration data)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=bitdispatcher
+Group=bitdispatcher
+ExecStart=/opt/bitdispatcher/bin/bitdispatcher -data /var/lib/bitdispatcher -addr 127.0.0.1:8443 -demo
+# The 100-mile recorded map's road graph is most of the memory; the instance has 1 GB and 2 GB of swap.
+Environment=GOMEMLIMIT=800MiB
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/bitdispatcher
+
+[Install]
+WantedBy=multi-user.target

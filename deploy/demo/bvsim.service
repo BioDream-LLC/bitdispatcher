@@ -1,0 +1,20 @@
+[Unit]
+Description=Simulated BitVoice feeding the bitdispatcher demo (911 calls, ALI, radio; all SIMULATED)
+After=bitdispatcher.service
+BindsTo=bitdispatcher.service
+
+[Service]
+User=bitdispatcher
+Group=bitdispatcher
+ExecStart=/opt/bitdispatcher/bin/bvsim -addr 127.0.0.1:9444 -every 35s -calls 3 -eido-url https://127.0.0.1:8443/api/ng911/eido -eido-token bd_eido_demo -radio-url https://127.0.0.1:8443/api/radio/events -radio-secret bd_radio_demo -ali 127.0.0.1:5001
+# bvsim makes a new certificate each start: pin it, keep the demo account, and seed an empty board.
+ExecStartPost=+/opt/bitdispatcher/demo-setup.sh
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -129,6 +129,19 @@ func TestSearch(t *testing.T) {
 			t.Errorf("%q: got %+v, want %s (%s, exact %v)", c.q, r, c.label, c.kind, c.exact)
 		}
 	}
+	// A unit typed after the street is a unit, not a town; one not on file is placed at the building.
+	for _, q := range []string{"100 main st #4", "100 Main Street Apt 4", "100 main st suite 4"} {
+		r, err := s.Search(ctx, q, 0, 0, 5)
+		if err != nil || len(r) == 0 || r[0].Label != "100 Main Street #4" || !r[0].Exact || !strings.Contains(r[0].Note, "not on file") {
+			t.Errorf("%q: got %+v %v", q, r, err)
+		}
+	}
+	for q, want := range map[string][2]string{"Old Cave Spring Rd #B": {"Old Cave Spring Rd", "b"}, "Crystal Spring Ave SW Ste 300": {"Crystal Spring Ave SW", "300"},
+		"Main St": {"Main St", ""}, "Apt Lane": {"Apt Lane", ""}, "Main St #STE 300": {"Main St", "300"}} {
+		if st, u := splitUnit(q); st != want[0] || u != want[1] {
+			t.Errorf("splitUnit(%q) = %q, %q", q, st, u)
+		}
+	}
 	if r, _ := s.Search(ctx, "far away", 0, 0, 5); len(r) != 0 {
 		t.Errorf("a place outside the area was recorded: %+v", r)
 	}

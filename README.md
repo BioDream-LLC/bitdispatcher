@@ -13,7 +13,11 @@
 [![Works with](https://img.shields.io/badge/works%20with-BitVoice-3b82f6.svg)](https://github.com/biodream-llc/bitvoice)
 [![CI](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml)
 
-**[Build bitdispatcher from source](#build-and-run)** · No release yet. Launch state: **Virginia**; demonstration area: **Roanoke, Virginia**.
+**[[Try bitdispatcher now: the live demonstration, no install]](https://bitdispatcher.perfuse.health)**
+
+**Sign in as** `demo` **with password** `try-bitdispatcher-demo` · any position name, such as `D1` · a dispatcher's console on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
+
+**[Build bitdispatcher from source](#build-and-run)** · No release yet. Launch state: **Virginia**.
 
 [**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq)
 
@@ -179,6 +183,9 @@ No. The map, routing, address search, aerial photos and county GIS are recorded 
 
 **Do I need a database or an application server?**
 No. One binary; the ledger is a file and the recorded map is SQLite, both in its data directory.
+
+**What is the demonstration running on?**
+One Lightsail instance with 1 GB of memory, with the 100-mile recorded map, Virginia's address points and the aerial photos; the BitVoice simulator beside it sends the 911 calls, ALI and radio traffic. See [deploy/demo](deploy/demo/README.md).
 
 **Can we use it in a live 911 centre today?**
 Not yet: see [Status](#status). It is ready for a centre to try beside its current CAD, on training positions, with simulated and recorded traffic.

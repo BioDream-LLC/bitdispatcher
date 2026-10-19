@@ -64,3 +64,34 @@ func splitNumber(q string) (num, rest string) {
 	}
 	return strings.ToUpper(strings.Trim(q[:j], "-")), strings.TrimSpace(q[j:])
 }
+
+// unitWords introduce a unit within an address: "#B", "Apt 4", "Suite 300", "Ste 300", "Unit 2".
+var unitWords = map[string]bool{"apt": true, "apartment": true, "unit": true, "ste": true, "suite": true, "rm": true, "room": true,
+	"bldg": true, "building": true, "lot": true, "fl": true, "floor": true, "trlr": true, "spc": true, "space": true}
+
+// splitUnit takes the unit off the end of an address's street part: "Old Cave Spring Rd #B" is the street
+// "Old Cave Spring Rd" and unit "B"; "Crystal Spring Ave SW Ste 300" is unit "300". The unit is returned in
+// unitKey's form, so it compares with what the county wrote ("STE 300", "#300", "300").
+func splitUnit(rest string) (street, unit string) {
+	if i := strings.Index(rest, "#"); i >= 0 {
+		return strings.TrimSpace(rest[:i]), unitKey(rest[i+1:])
+	}
+	f := strings.Fields(rest)
+	for i := len(f) - 2; i >= 1; i-- {
+		if unitWords[strings.ToLower(strings.Trim(f[i], ".,"))] {
+			return strings.Join(f[:i], " "), unitKey(strings.Join(f[i+1:], " "))
+		}
+	}
+	return rest, ""
+}
+
+// unitKey is a unit without the words that introduce it: "STE 300", "Suite 300" and "#300" are all "300".
+func unitKey(u string) string {
+	var out []string
+	for _, w := range strings.FieldsFunc(strings.ToLower(u), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if !unitWords[w] {
+			out = append(out, w)
+		}
+	}
+	return strings.Join(out, " ")
+}
