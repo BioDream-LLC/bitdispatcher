@@ -1,4 +1,6 @@
-bitdispatcher.perfuse.health {
+# demo.bitdispatcher.com is the demonstration's address; bitdispatcher.perfuse.health, where it started,
+# still works for links already given out.
+demo.bitdispatcher.com, bitdispatcher.perfuse.health {
 	reverse_proxy https://127.0.0.1:8443 {
 		# The live screens are a server-sent event stream: pass it through as it comes.
 		flush_interval -1

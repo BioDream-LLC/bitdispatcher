@@ -22,3 +22,4 @@
 .DS_Store
 /web/playwright-report/
 /web/tsconfig.tsbuildinfo
+/dist-site/

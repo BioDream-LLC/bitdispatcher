@@ -13,13 +13,13 @@
 [![Works with](https://img.shields.io/badge/works%20with-BitVoice-3b82f6.svg)](https://github.com/biodream-llc/bitvoice)
 [![CI](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml)
 
-**[[Try bitdispatcher now: the live demonstration, no install]](https://bitdispatcher.perfuse.health)**
+**[[Try bitdispatcher now: the live demonstration, no install]](https://demo.bitdispatcher.com)** · **[bitdispatcher.com](https://bitdispatcher.com)**: the website, the manual and this page
 
 **Sign in as** `demo` **with password** `try-bitdispatcher-demo` · any position name, such as `D1` · a dispatcher's console on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
 
 **[Build bitdispatcher from source](#build-and-run)** · No release yet. Launch state: **Virginia**.
 
-[**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq)
+[**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq) · [**bitdispatcher.com**](https://bitdispatcher.com)
 
 ---
 

@@ -1,0 +1,27 @@
+<section class="hero small"><div class="wrap">
+  <p class="eyebrow">Proof</p>
+  <h1>How bitdispatcher is tested, and what has not been tested</h1>
+  <p class="lede">Dispatch software sends help to people in emergencies. This page says what every change must pass, and plainly
+    what bitdispatcher has not yet been tried with.</p>
+</div></section>
+
+<section class="band"><div class="wrap prose-lite">
+  <h2>On every change</h2>
+{{TESTED}}
+  <p>Every check runs in <a href="https://github.com/BioDream-LLC/bitdispatcher/actions/workflows/ci.yml">continuous integration</a>
+    on every push.</p>
+
+  <h2 style="margin-top:56px">Status</h2>
+  <div class="lab-note">{{STATUS}}</div>
+
+  <h2 style="margin-top:56px">The rules it is built to</h2>
+  <ul class="ticks">
+    <li><b>The dispatcher decides.</b> Recommendations, advisory checks and agency scripts advise; nothing dispatches, closes or
+      changes the priority of an incident on its own.</li>
+    <li><b>Every part of the screen shows something the dispatcher acts on.</b> No decoration, no empty space.</li>
+    <li><b>Everything from the browser.</b> A setting reachable only from a file or the command line is a bug.</li>
+    <li><b>A record that cannot quietly change.</b> Every event is appended to a hash-chained ledger, and the live state is
+      rebuilt from it in the tests to prove they agree.</li>
+  </ul>
+  <p>The design, its rules and its phases: <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/docs/DESIGN.md">docs/DESIGN.md</a>.</p>
+</div></section>

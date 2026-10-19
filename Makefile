@@ -6,7 +6,7 @@ PKG     := ./cmd/bitdispatcher
 VERSION ?= v0.0.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build sim test vet fmt check web web-test manual e2e clean
+.PHONY: all build sim test vet fmt check web web-test manual e2e site clean
 
 all: check build
 
@@ -51,3 +51,8 @@ check: vet test
 
 clean:
 	rm -rf bin
+
+# The bitdispatcher.com website, built from README.md, docs/manual and docs/screenshots (site/ holds its
+# pages). Publish it with deploy/site.sh.
+site:
+	$(GO) run ./cmd/bitdispatchersite -out dist-site -base https://bitdispatcher.com

@@ -1,0 +1,35 @@
+<section class="hero small"><div class="wrap">
+  <p class="eyebrow">Get it</p>
+  <h1>Try it in your browser, or build it yourself</h1>
+  <p class="lede">There is no release yet: bitdispatcher is built and tested, not yet in service. Try the live demonstration, or
+    build it from source with Go and run it on your own computer.</p>
+</div></section>
+
+<section class="band"><div class="wrap prose-lite">
+  <h2>The live demonstration</h2>
+  <p><a class="btn btn-primary" href="{{DEMO}}">ICON:play Open the demo</a></p>
+  <p>Sign in as <code>demo</code> with password <code>try-bitdispatcher-demo</code>, at any position name (such as <code>D1</code>).
+    It is a dispatcher's console: everything on the console, the screens and the mobile terminal, but not the administration.
+    The data is invented, around Roanoke, Virginia; simulated 911 calls arrive every 35 seconds; it goes back to the morning's
+    incidents every night.</p>
+
+  <h2 style="margin-top:48px">Build and run</h2>
+  <p>Go 1.26 or newer, and Node 24 with corepack (pnpm) for the web interface.</p>
+  <pre><code>git clone https://github.com/BioDream-LLC/bitdispatcher &amp;&amp; cd bitdispatcher
+make web build sim
+./bin/bitdispatcher -demo      # https://localhost:8443; the first start prints the admin password once
+./bin/bvsim                    # optional: a simulated BitVoice with 911 calls and radio traffic</code></pre>
+  <p><code>-demo</code> adds fictional stations and units around Roanoke, labelled as demo data. Then, in the browser:</p>
+  <ul class="ticks">
+    <li><b>Admin › Map:</b> record the map for your area; the centre and radius are chosen on the map</li>
+    <li><b>Admin › Units, Stations, Call types &amp; run cards:</b> your agency</li>
+    <li><b>Admin › Integrations:</b> BitVoice or another call-handling system; for the simulator,
+      <code>https://127.0.0.1:9444</code> with the token <code>bv_simulated</code>, then <b>Read it</b> to pin its certificate</li>
+  </ul>
+  <p>The program is pure Go with no C libraries, built for Linux, macOS and Windows on Intel and Arm.</p>
+
+  <h2 style="margin-top:48px">Licence</h2>
+  <p>Apache License 2.0: use, change and redistribute it, commercially or not, with no fee. See
+    <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/LICENSE">LICENSE</a> and
+    <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/NOTICE">NOTICE</a>.</p>
+</div></section>
