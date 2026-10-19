@@ -1,0 +1,30 @@
+# Every push and pull request: Go checks, the web build and unit tests, and the browser suite against a
+# real bitdispatcher with demo data and the BitVoice simulator.
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: make check
+      - run: make web
+      - name: The committed web build matches the source
+        run: git diff --exit-code -- internal/web/dist
+      - run: make web-test
+      - run: cd web && corepack pnpm exec playwright install --with-deps chromium
+      - run: make e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: web/test-results

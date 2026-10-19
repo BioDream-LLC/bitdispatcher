@@ -1,0 +1,23 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+// Built into the Go package that embeds it, so `go build` alone produces a binary with the interface in it.
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  base: './',
+  build: {
+    outDir: '../internal/web/dist',
+    emptyOutDir: true,
+    sourcemap: process.env.BD_SOURCEMAP === "1",
+    minify: process.env.BD_SOURCEMAP !== "1",
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: { manualChunks: { map: ['maplibre-gl'], react: ['react', 'react-dom', 'react-router-dom'] } },
+    },
+  },
+  server: {
+    proxy: { '/api': { target: 'https://127.0.0.1:8443', changeOrigin: false, secure: false } },
+  },
+  test: { environment: 'happy-dom', exclude: ['e2e/**', 'node_modules/**'] },
+})

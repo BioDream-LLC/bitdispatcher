@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<presence xmlns="urn:ietf:params:xml:ns:pidf" xmlns:gp="urn:ietf:params:xml:ns:pidf:geopriv10" xmlns:ca="urn:ietf:params:xml:ns:pidf:geopriv10:civicAddr" xmlns:gml="http://www.opengis.net/gml" xmlns:gs="http://www.opengis.net/pidflo/1.0" xmlns:con="urn:ietf:params:xml:ns:geopriv:conf" entity="pres:caller@example.net">
+<tuple id="t1"><status><gp:geopriv><gp:location-info>
+<ca:civicAddress><ca:country>US</ca:country><ca:A1>PA</ca:A1><ca:A3>Harrisburg</ca:A3><ca:PRD>N</ca:PRD><ca:RD>Front</ca:RD><ca:STS>St</ca:STS><ca:HNO>123</ca:HNO><ca:FLR>2</ca:FLR><ca:PC>17101</ca:PC></ca:civicAddress>
+<gs:Circle srsName="urn:ogc:def:crs:EPSG::4326"><gml:pos>40.2633 -76.8823</gml:pos><gs:radius uom="urn:ogc:def:uom:EPSG::9001">35</gs:radius></gs:Circle>
+<con:confidence pdf="normal">90</con:confidence>
+</gp:location-info><gp:usage-rules/><gp:method>GPS</gp:method></gp:geopriv></status><timestamp>2026-10-12T13:00:20Z</timestamp></tuple></presence>

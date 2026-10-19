@@ -1,0 +1,156 @@
+import { ArrowLeft, BookOpenText, CircleHelp, Search } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { figures } from './figures'
+import { articleFor, manual, parts, type Article } from './manual'
+import { Logo } from './ui'
+
+/** Inline markdown: `code`, **bold** and [text](#/route) links. Everything else is plain text. */
+function inline(s: string, key = 0): ReactNode[] {
+  const out: ReactNode[] = []
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)]+\))/g
+  let last = 0
+  for (const m of s.matchAll(re)) {
+    if (m.index! > last) out.push(s.slice(last, m.index))
+    const t = m[0]
+    if (t.startsWith('`')) out.push(<code key={key++} className="rounded bg-slate-800 px-1 font-mono text-[0.9em] text-amber-200">{t.slice(1, -1)}</code>)
+    else if (t.startsWith('**')) out.push(<strong key={key++} className="font-semibold text-slate-100">{t.slice(2, -2)}</strong>)
+    else {
+      const [, text, href] = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(t)!
+      // [text](#/route) opens a screen; [text](#article) another chapter of this manual.
+      out.push(href.startsWith('#/')
+        ? <Link key={key++} to={href.slice(1)} className="text-sky-300 underline underline-offset-2">{text}</Link>
+        : href.startsWith('#')
+          ? <Link key={key++} to={`/help?a=${href.slice(1)}`} className="text-violet-300 underline underline-offset-2">{text}</Link>
+          : <a key={key++} href={href} target="_blank" rel="noreferrer" className="text-sky-300 underline underline-offset-2">{text}</a>)
+    }
+    last = m.index! + t.length
+  }
+  if (last < s.length) out.push(s.slice(last))
+  return out
+}
+
+/** Block markdown: ## and ### headings, paragraphs, - and 1. lists, ``` code blocks, > notes, | tables, and
+ * ::figure lines that show one of the manual's illustrations. */
+export function Markdown({ text }: { text: string }) {
+  const blocks: ReactNode[] = []
+  const lines = text.split('\n')
+  const special = (l: string) => l.startsWith('## ') || l.startsWith('### ') || l.startsWith('```') || l.startsWith('> ') || l.startsWith('|') || l.startsWith('::figure ')
+  for (let i = 0; i < lines.length;) {
+    const l = lines[i]
+    if (!l.trim()) { i++; continue }
+    if (l.startsWith('```')) {
+      const code: string[] = []
+      for (i++; i < lines.length && !lines[i].startsWith('```'); i++) code.push(lines[i])
+      i++
+      blocks.push(<pre key={i} className="overflow-x-auto rounded-lg bg-slate-950 p-3 font-mono text-xs text-emerald-200">{code.join('\n')}</pre>)
+      continue
+    }
+    if (l.startsWith('::figure ')) {
+      const f = figures[l.slice(9).trim()]
+      // Figures are BitVoice's own fixed drawings, not anything a user typed.
+      if (f) blocks.push(<figure key={i} className="space-y-2"><div className="[&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: f.svg }} /><figcaption className="text-center text-xs text-slate-500">{f.title}</figcaption></figure>)
+      i++
+      continue
+    }
+    if (l.startsWith('> ')) {
+      const note: string[] = []
+      for (; i < lines.length && lines[i].startsWith('> '); i++) note.push(lines[i].slice(2))
+      blocks.push(<aside key={i} className="rounded-lg border-l-4 border-amber-400 bg-amber-950/30 px-4 py-2 text-amber-100">{inline(note.join(' '))}</aside>)
+      continue
+    }
+    if (l.startsWith('|')) {
+      const rows: string[][] = []
+      for (; i < lines.length && lines[i].startsWith('|'); i++) {
+        const cells = lines[i].replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+        if (!cells.every((c) => /^:?-+:?$/.test(c))) rows.push(cells)
+      }
+      const [head, ...body] = rows
+      blocks.push(
+        <div key={i} className="overflow-x-auto"><table className="w-full text-left text-sm">
+          <thead><tr className="border-b border-slate-700 text-xs text-slate-400">{head.map((c, j) => <th key={j} className="py-1.5 pr-4 font-medium">{inline(c)}</th>)}</tr></thead>
+          <tbody className="divide-y divide-slate-800">{body.map((r, k) => <tr key={k}>{r.map((c, j) => <td key={j} className="py-1.5 pr-4 align-top">{inline(c)}</td>)}</tr>)}</tbody>
+        </table></div>)
+      continue
+    }
+    if (l.startsWith('### ')) { blocks.push(<h4 key={i} className="pt-1 text-sm font-semibold text-sky-300">{inline(l.slice(4))}</h4>); i++; continue }
+    if (l.startsWith('## ')) { blocks.push(<h3 key={i} className="pt-2 text-sm font-semibold text-violet-300">{inline(l.slice(3))}</h3>); i++; continue }
+    const bullet = /^(- |\d+\. )/
+    if (bullet.test(l)) {
+      const ordered = /^\d/.test(l)
+      const items: string[] = []
+      for (; i < lines.length && bullet.test(lines[i]); i++) items.push(lines[i].replace(bullet, ''))
+      const List = ordered ? 'ol' : 'ul'
+      blocks.push(<List key={i} className={`${ordered ? 'list-decimal' : 'list-disc'} space-y-1 pl-5`}>{items.map((it, j) => <li key={j}>{inline(it)}</li>)}</List>)
+      continue
+    }
+    const para: string[] = []
+    for (; i < lines.length && lines[i].trim() && !bullet.test(lines[i]) && !special(lines[i]); i++) para.push(lines[i])
+    blocks.push(<p key={i}>{inline(para.join(' '))}</p>)
+  }
+  return <div className="space-y-3 text-sm leading-relaxed text-slate-300">{blocks.map((b, i) => <Fragment key={i}>{b}</Fragment>)}</div>
+}
+
+const plain = (a: Article) => `${a.title} ${a.keys} ${a.body}`.toLowerCase().replace(/[`*#[\]()]/g, ' ')
+
+/** Help: the manual, built into the product. Every screen's Help link opens its chapter here. */
+export function Help() {
+  const [params, setParams] = useSearchParams()
+  const [q, setQ] = useState('')
+  const id = params.get('a') ?? 'start'
+  const found = useMemo(() => {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+    if (!words.length) return manual
+    return manual
+      .map((a) => ({ a, score: words.every((w) => plain(a).includes(w)) ? words.reduce((s, w) => s + (a.title.toLowerCase().includes(w) ? 3 : a.keys.includes(w) ? 2 : 1), 0) : 0 }))
+      .filter((x) => x.score > 0).sort((x, y) => y.score - x.score).map((x) => x.a)
+  }, [q])
+  const current = manual.find((a) => a.id === id) ?? manual[0]
+  useEffect(() => { document.getElementById('help-article')?.focus() }, [id])
+  return (
+    <div className="flex h-full bg-slate-950">
+      <nav aria-label="Manual" className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-r border-slate-800 bg-slate-900 p-2">
+        <Link to="/" className="flex items-center gap-2 rounded px-2 py-1.5 text-sm font-semibold text-slate-200 hover:bg-slate-800">
+          <ArrowLeft size={14} aria-hidden /> <Logo size={18} /> Dispatch
+        </Link>
+        <label className="relative block">
+          <span className="sr-only">Search the manual</span>
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden />
+          <input type="search" className="input pl-9" placeholder="Search the manual" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        </label>
+        {found.length === 0 ? <p className="px-2 text-sm text-slate-500">Nothing matches “{q}”.</p> : (
+          <ul className="space-y-0.5">
+            {(q ? found : parts.flatMap((p) => p.ids.map((id) => manual.find((a) => a.id === id)!))).map((a, i) => (<Fragment key={a.id}>
+              {!q && parts.some((p) => p.ids[0] === a.id) && <li className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-violet-300 ${i ? 'pt-3' : ''}`}>{parts.find((p) => p.ids[0] === a.id)!.title}</li>}
+              <li>
+                <button className={`w-full rounded-lg px-3 py-1.5 text-left text-sm ${a.id === current.id ? 'bg-slate-800 text-sky-200' : 'text-slate-300 hover:bg-slate-800/60'}`}
+                  aria-current={a.id === current.id ? 'page' : undefined} onClick={() => setParams({ a: a.id })}>{a.title}</button>
+              </li>
+            </Fragment>))}
+          </ul>
+        )}
+      </nav>
+      <main className="min-w-0 flex-1 overflow-y-auto p-6">
+        <article id="help-article" tabIndex={-1} className="panel mx-auto max-w-4xl rounded-lg p-6 outline-none" aria-labelledby="help-title">
+          <div className="mb-1 flex items-center gap-2 text-xs text-slate-500"><BookOpenText size={14} className="text-sky-300" aria-hidden /> bitdispatcher manual
+            <a className="ml-auto text-sky-300 underline" href="manual" target="_blank" rel="noreferrer">Whole manual</a>
+            <a className="text-sky-300 underline" href="manual/bitdispatcher-manual.pdf" target="_blank" rel="noreferrer">PDF</a></div>
+          <h1 id="help-title" className="mb-4 text-xl font-semibold text-slate-100">{current.title}</h1>
+          <Markdown text={current.body} />
+          {current.route && current.route !== '/help' && <p className="mt-6 text-sm"><Link to={current.route} className="text-sky-300 underline">Go to {current.title}</Link></p>}
+        </article>
+      </main>
+    </div>
+  )
+}
+
+/** Opens a screen's chapter of the manual, when it has one. */
+export function HelpLink({ path }: { path: string }) {
+  const a = articleFor(path)
+  if (!a) return null
+  return (
+    <Link to={`/help?a=${a.id}`} className="btn text-slate-300" aria-label={`Help: ${a.title}`} title={`Help: ${a.title}`}>
+      <CircleHelp size={14} className="text-sky-300" aria-hidden /> Help
+    </Link>
+  )
+}

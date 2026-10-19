@@ -1,0 +1,28 @@
+bitdispatcher
+Copyright 2026 BioDream LLC
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The web interface bundles third-party packages under their own permissive licences: React and
+React Router (MIT), MapLibre GL JS (BSD-3-Clause), Radix UI (MIT), cmdk (MIT), sonner (MIT),
+lucide-react (ISC), clsx (MIT), Tailwind CSS (MIT). internal/web/embed.go, the manual's Help
+screen, figure helpers and printing script (web/src/Help.tsx, web/src/figures.ts, web/scripts/manual.mjs) are
+adapted from BitVoice (Apache-2.0, BioDream LLC). Charts use Apache ECharts (Apache-2.0); drag and drop uses
+dnd-kit (MIT), CodeMirror and @uiw/react-codemirror (MIT); station areas use d3-delaunay and delaunator (ISC)
+with robust-predicates (Unlicense).
+
+The Go program uses modernc.org/sqlite (BSD-3-Clause) and its modernc.org dependencies (BSD-3-Clause).
+It reads Overture Maps GeoParquet files with github.com/parquet-go/parquet-go (Apache-2.0) and its
+dependencies: github.com/parquet-go/bitpack (Apache-2.0), github.com/parquet-go/jsonlite (MIT),
+github.com/klauspost/compress (BSD-3-Clause and Apache-2.0), github.com/andybalholm/brotli (MIT),
+github.com/pierrec/lz4 (BSD-3-Clause), github.com/twpayne/go-geom (BSD-2-Clause) and
+google.golang.org/protobuf (BSD-3-Clause).
+Scripts run in github.com/dop251/goja (MIT, with github.com/dlclark/regexp2 (MIT) and
+github.com/go-sourcemap/sourcemap (BSD-2-Clause)) and github.com/yuin/gopher-lua (MIT).
+Overture Maps address data is published under its sources' open licences (see each release's
+attribution); bitdispatcher records which source each address point came from.
+It embeds Noto Sans glyphs (SIL Open Font License 1.1, internal/mapdata/fonts/OFL.txt) prepared by
+Protomaps basemaps-assets.
+
+Map data recorded by bitdispatcher comes from OpenStreetMap: © OpenStreetMap contributors, available
+under the Open Database License (https://www.openstreetmap.org/copyright). The map shows this credit.

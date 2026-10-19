@@ -1,0 +1,157 @@
+{
+  "$id": "urn:emergency:uid:incidentid:abc123:bitvoice.psap.example.gov",
+  "@context": {
+    "@vocab": "./JSON-LD_Contexts/EmergencyIncidentDataObjectType.jsonld"
+  },
+  "additionalDataComponent": [
+    {
+      "$id": "additional-abc123",
+      "additionalDataByValue": "{\"providers\":[{\"name\":\"Example Wireless\"}],\"service\":{\"types\":[\"wireless\"]},\"subscriber\":{\"name\":\"Jordan Example\"}}",
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      }
+    },
+    {
+      "$id": "media-abc123-1",
+      "additionalDataByReferenceUrl": "https://psap.example.gov/m/tok/1",
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      },
+      "urlPurpose": "caller-photo"
+    },
+    {
+      "$id": "media-abc123-live",
+      "additionalDataByReferenceUrl": "https://psap.example.gov/whep/tok",
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      },
+      "urlPurpose": "caller-video-live"
+    }
+  ],
+  "agencyComponent": [
+    {
+      "$id": "psap.example.gov",
+      "agencyRoleDescriptionRegistryText": [
+        "CallReceiving"
+      ],
+      "agencyType": [
+        "psap"
+      ],
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      }
+    }
+  ],
+  "agentComponent": [
+    {
+      "$id": "jlee@psap.example.gov",
+      "agencyReference": {
+        "$ref": "psap.example.gov"
+      },
+      "agentRoleRegistryText": [
+        "Call Taking"
+      ],
+      "agentWorkstationPositionIdentification": "101",
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      }
+    }
+  ],
+  "callComponent": [
+    {
+      "$id": "urn:emergency:uid:callid:abc123:bitvoice.psap.example.gov",
+      "additionalDataReference": [
+        {
+          "$ref": "additional-abc123"
+        },
+        {
+          "$ref": "media-abc123-1"
+        },
+        {
+          "$ref": "media-abc123-live"
+        }
+      ],
+      "agentReference": [
+        {
+          "$ref": "jlee@psap.example.gov"
+        }
+      ],
+      "answerDate": "2026-10-12T13:00:30.000Z",
+      "callBackReference": {
+        "$ref": "callback-abc123"
+      },
+      "callStartTimestamp": "2026-10-12T13:00:20.000Z",
+      "callStateRegistryText": "callAnswered",
+      "direction": "incoming",
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "locationReference": [
+        {
+          "$ref": "location-abc123"
+        }
+      ],
+      "notesReference": [
+        {
+          "$ref": "note-abc123-1"
+        }
+      ],
+      "queueIdentifier": "911",
+      "standardPrimaryCallType": "emergency",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      },
+      "updatedByAgentReference": {
+        "$ref": "jlee@psap.example.gov"
+      }
+    }
+  ],
+  "callbackComponent": [
+    {
+      "$id": "callback-abc123",
+      "callBackInformationUri": [
+        "tel:+17175550100"
+      ],
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      }
+    }
+  ],
+  "eidoVersion": "1.0",
+  "issuingElementIdentification": "bitvoice.psap.example.gov",
+  "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+  "locationComponent": [
+    {
+      "$id": "location-abc123",
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "locationByValue": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\"?\u003e\n\u003cpresence xmlns=\"urn:ietf:params:xml:ns:pidf\" xmlns:gp=\"urn:ietf:params:xml:ns:pidf:geopriv10\" xmlns:ca=\"urn:ietf:params:xml:ns:pidf:geopriv10:civicAddr\" xmlns:gml=\"http://www.opengis.net/gml\" xmlns:gs=\"http://www.opengis.net/pidflo/1.0\" xmlns:con=\"urn:ietf:params:xml:ns:geopriv:conf\" entity=\"pres:caller@example.net\"\u003e\n\u003ctuple id=\"t1\"\u003e\u003cstatus\u003e\u003cgp:geopriv\u003e\u003cgp:location-info\u003e\n\u003cca:civicAddress\u003e\u003cca:country\u003eUS\u003c/ca:country\u003e\u003cca:A1\u003ePA\u003c/ca:A1\u003e\u003cca:A3\u003eHarrisburg\u003c/ca:A3\u003e\u003cca:PRD\u003eN\u003c/ca:PRD\u003e\u003cca:RD\u003eFront\u003c/ca:RD\u003e\u003cca:STS\u003eSt\u003c/ca:STS\u003e\u003cca:HNO\u003e123\u003c/ca:HNO\u003e\u003cca:FLR\u003e2\u003c/ca:FLR\u003e\u003cca:PC\u003e17101\u003c/ca:PC\u003e\u003c/ca:civicAddress\u003e\n\u003cgs:Circle srsName=\"urn:ogc:def:crs:EPSG::4326\"\u003e\u003cgml:pos\u003e40.2633 -76.8823\u003c/gml:pos\u003e\u003cgs:radius uom=\"urn:ogc:def:uom:EPSG::9001\"\u003e35\u003c/gs:radius\u003e\u003c/gs:Circle\u003e\n\u003ccon:confidence pdf=\"normal\"\u003e90\u003c/con:confidence\u003e\n\u003c/gp:location-info\u003e\u003cgp:usage-rules/\u003e\u003cgp:method\u003eGPS\u003c/gp:method\u003e\u003c/gp:geopriv\u003e\u003c/status\u003e\u003ctimestamp\u003e2026-10-12T13:00:20Z\u003c/timestamp\u003e\u003c/tuple\u003e\u003c/presence\u003e",
+      "locationTypeDescriptionRegistryText": "Caller",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      }
+    }
+  ],
+  "notesComponent": [
+    {
+      "$id": "note-abc123-1",
+      "agentReference": {
+        "$ref": "jlee@psap.example.gov"
+      },
+      "lastUpdateTimeStamp": "2026-10-12T13:01:00.000Z",
+      "notesActionComments": "caller on 2nd floor \u0026lt;smoke\u0026gt;",
+      "updatedByAgencyReference": {
+        "$ref": "psap.example.gov"
+      }
+    }
+  ],
+  "updatedByAgencyReference": {
+    "$ref": "psap.example.gov"
+  },
+  "updatedByAgentReference": {
+    "$ref": "jlee@psap.example.gov"
+  }
+}
