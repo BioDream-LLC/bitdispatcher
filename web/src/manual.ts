@@ -411,7 +411,7 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 Delivery failures BitVoice reports show on the Situation panel.`,
   },
   {
-    id: 'admin-users', title: 'Users and positions', route: '/admin/users', keys: 'users roles password viewer field dispatcher supervisor admin positions sessions',
+    id: 'admin-users', title: 'Users and positions', route: '/admin/users', keys: 'users roles password viewer field dispatcher supervisor admin positions sessions demo demonstration public',
     body: `| Role | Can |
 |---|---|
 | Viewer | See everything, change nothing |
@@ -420,7 +420,9 @@ Delivery failures BitVoice reports show on the Situation panel.`,
 | Supervisor | Also reopen incidents, read the ledger and reports, certify reports |
 | Administrator | Also change configuration and users |
 
-Passwords are generated or at least 12 characters. Five wrong passwords lock an account for 15 minutes. The positions list shows who is signed in where.`,
+Passwords are generated or at least 12 characters. Five wrong passwords lock an account for 15 minutes. The positions list shows who is signed in where.
+
+**A public demonstration account.** Tick **Public demonstration account** on a viewer, dispatcher or supervisor and the sign-in page offers **Sign in as the demo user**: one press signs a visitor in, with no password, at a position of their own (WEB- and four letters) unless they typed one. One account at most, never an administrator or a field crew, and wrong passwords typed for it do not lock the button out. Use it only on a demonstration server: anyone who can reach the server can then work as that user.`,
   },
   {
     id: 'admin-sites', title: 'Several sites', route: '/admin/sites', keys: 'sites multi-site backup failover active active replication peer survivable',

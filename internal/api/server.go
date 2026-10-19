@@ -267,6 +267,7 @@ func (s *Server) routes() {
 	})
 	m.HandleFunc("POST /api/auth/login", s.login)
 	m.HandleFunc("POST /api/auth/logout", s.logout)
+	m.HandleFunc("POST /api/auth/demo", s.loginDemo)
 	m.HandleFunc("GET /api/auth/me", s.me)
 	// Integration endpoints BitVoice (or any EIDO / radio-data sender) posts to; bearer-authenticated.
 	m.Handle("POST /api/ng911/eido", s.BV.EIDOHandler())
@@ -395,9 +396,43 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, err.Error())
 		return
 	}
-	s.Eng.Record(cad.Actor{User: se.Username, Role: se.Role, Session: se.Hash, Console: se.Console}, cad.EvSignIn, map[string]string{"from": se.From})
+	s.signedIn(w, se, nil)
+}
+
+// signedIn records a sign-in and gives the browser its session.
+func (s *Server) signedIn(w http.ResponseWriter, se *auth.Session, extra map[string]string) {
+	data := map[string]string{"from": se.From}
+	for k, v := range extra {
+		data[k] = v
+	}
+	s.Eng.Record(cad.Actor{User: se.Username, Role: se.Role, Session: se.Hash, Console: se.Console}, cad.EvSignIn, data)
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: se.ID, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	writeJSON(w, 200, se)
+}
+
+// loginDemo signs in as the public demonstration account, when an administrator has named one: the sign-in
+// page's "Sign in as the demo user" button. Without a position, the visitor gets one of their own.
+func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get(csrfHeader) == "" {
+		fail(w, http.StatusForbidden, "missing "+csrfHeader+" header")
+		return
+	}
+	var b struct {
+		Console string `json:"console"`
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	console := strings.TrimSpace(b.Console)
+	if console == "" || len(console) > 24 {
+		console = "WEB-" + strings.ToUpper(auth.RandomToken(3))[:4]
+	}
+	se, err := s.Auth.LoginDemo(console, clientIP(r))
+	if err != nil {
+		fail(w, http.StatusNotFound, err.Error())
+		return
+	}
+	s.signedIn(w, se, map[string]string{"demo": "true"})
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -418,7 +453,12 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, 200, map[string]any{"signedIn": false})
+	out := map[string]any{"signedIn": false}
+	// The sign-in page offers the public demonstration account, when there is one.
+	if d, ok := s.Auth.Demo(); ok {
+		out["demo"] = map[string]string{"name": d.Name, "role": d.Role}
+	}
+	writeJSON(w, 200, out)
 }
 
 // ---- the state and its stream ----
@@ -1140,6 +1180,7 @@ func (s *Server) saveUser(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 		Password string `json:"password"`
 		Disabled bool   `json:"disabled"`
 		Generate bool   `json:"generate"`
+		Demo     *bool  `json:"demo"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -1152,11 +1193,32 @@ func (s *Server) saveUser(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 	if b.Generate {
 		b.Password = auth.GeneratePassword()
 	}
+	demo := false
+	for _, u := range s.Auth.List() {
+		if u.Username == name {
+			demo = u.Demo
+		}
+	}
+	// Stopping it being the demonstration account comes first, so the same save can make it an administrator.
+	if b.Demo != nil && !*b.Demo && demo {
+		if err := s.Auth.SetDemo(name, false); err != nil {
+			fail(w, 422, err.Error())
+			return
+		}
+		demo = false
+	}
 	if err := s.Auth.Save(name, b.Name, b.Role, b.Password, b.Disabled); err != nil {
 		fail(w, 422, err.Error())
 		return
 	}
-	s.Eng.Record(a, cad.EvUserSaved, cad.UserInfo{Username: name, Name: b.Name, Role: b.Role, Disabled: b.Disabled})
+	if b.Demo != nil && *b.Demo && !demo {
+		if err := s.Auth.SetDemo(name, true); err != nil {
+			fail(w, 422, err.Error())
+			return
+		}
+		demo = true
+	}
+	s.Eng.Record(a, cad.EvUserSaved, cad.UserInfo{Username: name, Name: b.Name, Role: b.Role, Disabled: b.Disabled, Demo: demo})
 	out := map[string]string{}
 	if b.Generate {
 		out["password"] = b.Password // shown once, to the administrator who made it

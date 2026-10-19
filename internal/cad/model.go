@@ -343,4 +343,5 @@ type UserInfo struct {
 	Name     string `json:"name"`
 	Role     string `json:"role"` // admin, supervisor, dispatcher, viewer
 	Disabled bool   `json:"disabled,omitempty"`
+	Demo     bool   `json:"demo,omitempty"` // the public demonstration account, signed in without a password
 }

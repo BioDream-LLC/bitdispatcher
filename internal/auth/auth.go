@@ -45,6 +45,7 @@ type User struct {
 	Name     string    `json:"name"`
 	Role     string    `json:"role"`
 	Disabled bool      `json:"disabled,omitempty"`
+	Demo     bool      `json:"demo,omitempty"` // the public demonstration account: signed in from the sign-in page, no password
 	Salt     string    `json:"salt"`
 	Hash     string    `json:"hash"`
 	Iter     int       `json:"iter"`
@@ -58,6 +59,7 @@ type Public struct {
 	Name     string    `json:"name"`
 	Role     string    `json:"role"`
 	Disabled bool      `json:"disabled,omitempty"`
+	Demo     bool      `json:"demo,omitempty"`
 	Created  time.Time `json:"created"`
 	LastIn   time.Time `json:"lastIn,omitzero"`
 }
@@ -199,6 +201,9 @@ func (s *Store) Save(username, name, role, password string, disabled bool) error
 		}
 		u = &User{Username: username, Created: s.now().UTC()}
 	}
+	if u.Demo && !demoRole(role) {
+		return errors.New("the public demonstration account cannot be an administrator or a field crew: stop it being the demonstration account first")
+	}
 	if !disabled && role != Admin && u.Role == Admin && s.countAdmins() == 1 {
 		return errors.New("keep at least one administrator")
 	}
@@ -266,7 +271,7 @@ func (s *Store) List() []Public {
 	defer s.mu.Unlock()
 	out := []Public{}
 	for _, u := range s.users {
-		out = append(out, Public{Username: u.Username, Name: u.Name, Role: u.Role, Disabled: u.Disabled, Created: u.Created, LastIn: u.LastIn})
+		out = append(out, Public{Username: u.Username, Name: u.Name, Role: u.Role, Disabled: u.Disabled, Demo: u.Demo, Created: u.Created, LastIn: u.LastIn})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Username < out[j].Username })
 	return out
@@ -306,6 +311,62 @@ func (s *Store) Login(username, password, console, from string) (*Session, error
 		return nil, ErrBadLogin
 	}
 	delete(s.fails, username)
+	return s.open(u, console, from), nil
+}
+
+// demoRole is whether a role may be the public demonstration account's: never an administrator (anyone could
+// change the configuration) nor a field crew (it signs in as a unit).
+func demoRole(role string) bool { return role != Admin && role != Field && ValidRole(role) }
+
+// SetDemo makes a user the public demonstration account, or stops it being one. There is one at most: making
+// one user it stops any other.
+func (s *Store) SetDemo(username string, on bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.users[strings.ToLower(username)]
+	if !ok {
+		return errors.New("no such user")
+	}
+	if on && !demoRole(u.Role) {
+		return errors.New("an administrator or a field crew cannot be the public demonstration account")
+	}
+	for _, o := range s.users {
+		if on && o != u {
+			o.Demo = false
+		}
+	}
+	u.Demo = on
+	return s.save()
+}
+
+// Demo is the public demonstration account, when there is one that may sign in.
+func (s *Store) Demo() (Public, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.users {
+		if u.Demo && !u.Disabled && demoRole(u.Role) {
+			return Public{Username: u.Username, Name: u.Name, Role: u.Role, Demo: true}, true
+		}
+	}
+	return Public{}, false
+}
+
+// LoginDemo signs in as the public demonstration account, without its password. Wrong passwords typed for it
+// elsewhere never lock this out.
+func (s *Store) LoginDemo(console, from string) (*Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.users {
+		if u.Demo && !u.Disabled && demoRole(u.Role) {
+			return s.open(u, console, from), nil
+		}
+	}
+	return nil, errors.New("there is no demonstration account here")
+}
+
+// open starts a session for a user who has proved who they are. The caller holds s.mu.
+func (s *Store) open(u *User, console, from string) *Session {
+	now := s.now()
 	u.LastIn = now.UTC()
 	s.save()
 	id := RandomToken(32)
@@ -313,7 +374,7 @@ func (s *Store) Login(username, password, console, from string) (*Session, error
 	se := &Session{ID: id, Hash: hex.EncodeToString(sum[:8]), Username: u.Username, Name: u.Name, Role: u.Role,
 		Console: strings.TrimSpace(console), From: from, Created: now, Last: now}
 	s.sessions[id] = se
-	return se, nil
+	return se
 }
 
 // Session returns the live session for a token, extending it.

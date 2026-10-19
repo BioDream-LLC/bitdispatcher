@@ -8,8 +8,8 @@ import { ago, useNow } from '../util'
 import type { Session } from '../types'
 import { Page, Table } from './Admin'
 
-type U = { username: string; name: string; role: string; disabled?: boolean; created: string; lastIn?: string }
-type Draft = { username: string; name: string; role: string; password: string; disabled: boolean; isNew: boolean }
+type U = { username: string; name: string; role: string; disabled?: boolean; demo?: boolean; created: string; lastIn?: string }
+type Draft = { username: string; name: string; role: string; password: string; disabled: boolean; demo: boolean; isNew: boolean }
 
 const ROLES = [
   ['dispatcher', 'Dispatcher: works incidents and units'],
@@ -37,7 +37,7 @@ export default function Users() {
   const save = async (generate: boolean) => {
     if (!d) return
     try {
-      const r = await api.put<{ password?: string }>(`/admin/users/${encodeURIComponent(d.username.trim().toLowerCase())}`, { name: d.name, role: d.role, password: d.password, disabled: d.disabled, generate })
+      const r = await api.put<{ password?: string }>(`/admin/users/${encodeURIComponent(d.username.trim().toLowerCase())}`, { name: d.name, role: d.role, password: d.password, disabled: d.disabled, demo: d.demo, generate })
       if (r.password) setShown(`${d.username}: ${r.password}`)
       toast.success(`${d.username} saved`)
       setD(null)
@@ -50,7 +50,7 @@ export default function Users() {
     <Page
       title="Users and positions"
       intro="Who can sign in, and with what role. Each sign-in names the position (console) it is at, and every action is recorded with both."
-      actions={<button className="btn btn-go" onClick={() => setD({ username: '', name: '', role: 'dispatcher', password: '', disabled: false, isNew: true })}><Plus size={14} aria-hidden /> Add user</button>}
+      actions={<button className="btn btn-go" onClick={() => setD({ username: '', name: '', role: 'dispatcher', password: '', disabled: false, demo: false, isNew: true })}><Plus size={14} aria-hidden /> Add user</button>}
     >
       {shown && (
         <div role="status" className="mb-3 rounded-lg border border-emerald-800 bg-emerald-950/40 p-3 text-sm text-emerald-200">
@@ -60,8 +60,8 @@ export default function Users() {
       )}
       <Table head={['Username', 'Name', 'Role', 'Last sign-in', 'State']}>
         {items.map((u) => (
-          <tr key={u.username} className="cursor-pointer hover:bg-slate-800/50" onClick={() => setD({ username: u.username, name: u.name, role: u.role, password: '', disabled: !!u.disabled, isNew: false })}>
-            <td className="px-3 py-1.5 font-mono text-slate-100">{u.username}{u.username === me?.username && <span className="ml-1 text-xs text-slate-500">(you)</span>}</td>
+          <tr key={u.username} className="cursor-pointer hover:bg-slate-800/50" onClick={() => setD({ username: u.username, name: u.name, role: u.role, password: '', disabled: !!u.disabled, demo: !!u.demo, isNew: false })}>
+            <td className="px-3 py-1.5 font-mono text-slate-100">{u.username}{u.username === me?.username && <span className="ml-1 text-xs text-slate-500">(you)</span>}{u.demo && <span className="chip ml-2 bg-sky-500/20 px-1.5 text-[10px] font-bold uppercase text-sky-200" title="Offered on the sign-in page: Sign in as the demo user">demo</span>}</td>
             <td className="px-3 text-slate-200">{u.name}</td>
             <td className="px-3 text-slate-300">{u.role}</td>
             <td className="px-3 text-xs text-slate-400">{u.lastIn ? `${ago(u.lastIn, now)} ago` : 'never'}</td>
@@ -112,6 +112,12 @@ export default function Users() {
             <Field label={d.isNew ? 'Password' : 'New password'} htmlFor="pw" hint="At least 12 characters. Leave empty to keep the current one.">
               <input id="pw" type="password" autoComplete="new-password" className="input" value={d.password} onChange={(e) => setD({ ...d, password: e.target.value })} />
             </Field>
+            {d.role !== 'admin' && d.role !== 'field' && (
+              <label className="flex items-start gap-2 text-sm text-slate-300">
+                <input type="checkbox" className="mt-1" checked={d.demo} onChange={(e) => setD({ ...d, demo: e.target.checked })} />
+                <span>Public demonstration account<span className="block text-xs text-slate-500">The sign-in page offers <b>Sign in as the demo user</b>, with no password. For a public demonstration only: anyone who can reach this server can then work as this user. One account at most.</span></span>
+              </label>
+            )}
             {!d.isNew && d.username !== me?.username && (
               <label className="flex items-center gap-2 text-sm text-slate-300">
                 <input type="checkbox" checked={d.disabled} onChange={(e) => setD({ ...d, disabled: e.target.checked })} /> Disabled (signs them out at once)

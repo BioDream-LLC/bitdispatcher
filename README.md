@@ -15,7 +15,7 @@
 
 **[[Try bitdispatcher now: the live demonstration, no install]](https://demo.bitdispatcher.com)** · **[bitdispatcher.com](https://bitdispatcher.com)**: the website, the manual and this page
 
-**Sign in as** `demo` **with password** `try-bitdispatcher-demo` · any position name, such as `D1` · a dispatcher's console on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
+**Press Sign in as the demo user**, or sign in as `demo` with password `try-bitdispatcher-demo` · a dispatcher's console on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
 
 **[Build bitdispatcher from source](#build-and-run)** · No release yet. Launch state: **Virginia**.
 
@@ -183,6 +183,9 @@ No. The map, routing, address search, aerial photos and county GIS are recorded 
 
 **Do I need a database or an application server?**
 No. One binary; the ledger is a file and the recorded map is SQLite, both in its data directory.
+
+**Can a demonstration server let visitors in with one click?**
+Yes: tick **Public demonstration account** on a viewer, dispatcher or supervisor in Admin › Users, and the sign-in page offers **Sign in as the demo user**, with no password. Never an administrator; only for a server that is meant to be public.
 
 **What is the demonstration running on?**
 One Lightsail instance with 1 GB of memory, with the 100-mile recorded map, Virginia's address points and the aerial photos; the BitVoice simulator beside it sends the 911 calls, ALI and radio traffic. See [deploy/demo](deploy/demo/README.md).

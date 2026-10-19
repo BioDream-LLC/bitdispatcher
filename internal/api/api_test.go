@@ -215,3 +215,48 @@ func TestALISpillBecomesCall(t *testing.T) {
 	}
 	t.Fatal("the test spill did not become a call")
 }
+
+// The sign-in page's demo button: offered only once an administrator names the account, signs in without a
+// password with a position of its own, and the account cannot be an administrator.
+func TestDemoSignIn(t *testing.T) {
+	ts, _, pw := newServer(t)
+	anon := &client{t: t, base: ts.URL, c: ts.Client()}
+	if _, b := anon.do("GET", "/api/auth/me", nil, false); strings.Contains(string(b), `"demo"`) {
+		t.Fatalf("demo offered before there is one: %s", b)
+	}
+	if code, _ := anon.do("POST", "/api/auth/demo", map[string]string{}, true); code != 404 {
+		t.Fatalf("demo sign-in with no account: %d", code)
+	}
+	admin := login(t, ts, "admin", pw["admin"])
+	if code, _ := admin.do("PUT", "/api/admin/users/admin", map[string]any{"name": "admin", "role": "admin", "demo": true}, true); code != 422 {
+		t.Fatalf("an administrator became the demo account: %d", code)
+	}
+	if code, b := admin.do("PUT", "/api/admin/users/d1", map[string]any{"name": "Demo dispatcher", "role": "dispatcher", "demo": true}, true); code != 200 {
+		t.Fatalf("naming the demo account: %d %s", code, b)
+	}
+	if _, b := anon.do("GET", "/api/auth/me", nil, false); !strings.Contains(string(b), `"demo":{"name":"Demo dispatcher","role":"dispatcher"}`) {
+		t.Fatalf("demo not offered: %s", b)
+	}
+	if code, _ := anon.do("POST", "/api/auth/demo", map[string]string{}, false); code != 403 {
+		t.Fatalf("demo sign-in without the CSRF header: %d", code)
+	}
+	jar, _ := cookiejar.New(nil)
+	v := &client{t: t, base: ts.URL, c: &http.Client{Transport: ts.Client().Transport, Jar: jar}}
+	code, b := v.do("POST", "/api/auth/demo", map[string]string{}, true)
+	if code != 200 || !strings.Contains(string(b), `"username":"d1"`) || !strings.Contains(string(b), `"console":"WEB-`) {
+		t.Fatalf("demo sign-in: %d %s", code, b)
+	}
+	if code, _ := v.do("GET", "/api/state", nil, false); code != 200 {
+		t.Fatalf("the demo session cannot see the board: %d", code)
+	}
+	if code, _ := v.do("GET", "/api/admin/users", nil, false); code != 403 {
+		t.Fatalf("the demo session reached administration: %d", code)
+	}
+	// Turning it off and making it an administrator in one save works; the button goes.
+	if code, b := admin.do("PUT", "/api/admin/users/d1", map[string]any{"name": "d1", "role": "admin", "demo": false}, true); code != 200 {
+		t.Fatalf("%d %s", code, b)
+	}
+	if _, b := anon.do("GET", "/api/auth/me", nil, false); strings.Contains(string(b), `"demo"`) {
+		t.Fatalf("demo still offered: %s", b)
+	}
+}

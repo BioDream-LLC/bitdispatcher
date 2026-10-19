@@ -72,3 +72,49 @@ func TestRoles(t *testing.T) {
 		t.Fatal("role order")
 	}
 }
+
+// The public demonstration account signs in without its password, never as an administrator or a field crew,
+// and wrong passwords typed for it do not lock the button out.
+func TestDemoAccount(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	s.Save("admin", "Admin", Admin, GeneratePassword(), false)
+	s.Save("demo", "Demo dispatcher", Dispatcher, GeneratePassword(), false)
+	s.Save("other", "Other", Viewer, GeneratePassword(), false)
+	if _, ok := s.Demo(); ok {
+		t.Fatal("a demonstration account before one was named")
+	}
+	if _, err := s.LoginDemo("", ""); err == nil {
+		t.Fatal("signed in as a demonstration account that does not exist")
+	}
+	if err := s.SetDemo("admin", true); err == nil {
+		t.Fatal("an administrator became the demonstration account")
+	}
+	if err := s.SetDemo("other", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetDemo("demo", true); err != nil {
+		t.Fatal(err)
+	}
+	if d, ok := s.Demo(); !ok || d.Username != "demo" {
+		t.Fatalf("demo %+v %v", d, ok)
+	}
+	for _, u := range s.List() {
+		if u.Username == "other" && u.Demo {
+			t.Fatal("two demonstration accounts")
+		}
+	}
+	for i := 0; i < 6; i++ {
+		s.Login("demo", "wrong-password-xx", "", "")
+	}
+	se, err := s.LoginDemo("WEB-1", "203.0.113.9")
+	if err != nil || se.Username != "demo" || se.Role != Dispatcher || se.Console != "WEB-1" {
+		t.Fatalf("%+v %v", se, err)
+	}
+	if err := s.Save("demo", "Demo", Admin, "", false); err == nil {
+		t.Fatal("the demonstration account was made an administrator")
+	}
+	s.Save("demo", "Demo", Dispatcher, "", true)
+	if _, err := s.LoginDemo("", ""); err == nil {
+		t.Fatal("a disabled demonstration account signed in")
+	}
+}

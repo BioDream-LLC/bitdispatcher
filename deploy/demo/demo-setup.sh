@@ -11,7 +11,7 @@ for i in $(seq 1 30); do curl -sk https://127.0.0.1:9444/ -o /dev/null 2>&1 && b
 curl -skf -c "$J" -H 'X-BitDispatcher: 1' -H 'Content-Type: application/json' \
   -d "{\"username\":\"admin\",\"password\":\"$PW\",\"console\":\"SETUP\"}" "$B/auth/login" >/dev/null
 api() { curl -skf -b "$J" -X "$1" -H 'X-BitDispatcher: 1' -H 'Content-Type: application/json' ${3:+-d "$3"} "$B$2"; }
-api PUT /admin/users/demo '{"name":"Demo dispatcher","role":"dispatcher","password":"try-bitdispatcher-demo","disabled":false}' >/dev/null
+api PUT /admin/users/demo '{"name":"Demo dispatcher","role":"dispatcher","password":"try-bitdispatcher-demo","disabled":false,"demo":true}' >/dev/null
 FP=$(api POST /admin/integrations/bitvoice/fingerprint '{"url":"https://127.0.0.1:9444"}' | jq -r .fingerprint)
 api PUT /admin/integrations "{\"bitvoiceUrl\":\"https://127.0.0.1:9444\",\"bitvoiceFingerprint\":\"$FP\",\"aliListen\":\"127.0.0.1:5001\"}" >/dev/null
 echo "simulated BitVoice pinned at $FP"

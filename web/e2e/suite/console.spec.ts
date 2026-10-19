@@ -67,3 +67,26 @@ test('a unit is sent by dragging it onto an incident, and changed by right-click
   await page.getByRole('menuitem', { name: /Out of service/ }).click()
   await expect.poll(async () => (await api.get('/state')).units.find((u: { id: string }) => u.id === 'E2').status).toBe('oos')
 })
+
+test('a public demonstration account: one button on the sign-in page', async ({ browser, request }) => {
+  const api = await adminAPI(request)
+  expect((await api.put('/admin/users/demo', { name: 'Demo dispatcher', role: 'dispatcher', password: 'try-the-e2e-demo-pw', disabled: false, demo: true })).ok()).toBeTruthy()
+  const ctx = await browser.newContext()
+  const page = await ctx.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Sign in as the demo user' }).click()
+  await expect(page.getByText('911 CALLS')).toBeVisible()
+  await expect(page.getByText(/Demo dispatcher · WEB-/)).toBeVisible()
+  await ctx.close()
+  // Taken away, the button goes.
+  expect((await api.put('/admin/users/demo', { name: 'Demo dispatcher', role: 'dispatcher', password: '', disabled: false, demo: false })).ok()).toBeTruthy()
+  const ctx2 = await browser.newContext()
+  const p2 = await ctx2.newPage()
+  await p2.goto('/')
+  await expect(p2.getByLabel('Username')).toBeVisible()
+  await expect(p2.getByRole('button', { name: 'Sign in as the demo user' })).toHaveCount(0)
+  await ctx2.close()
+  expect(errors).toEqual([])
+})

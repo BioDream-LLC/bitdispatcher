@@ -1,6 +1,6 @@
 # The public demonstration
 
-[demo.bitdispatcher.com](https://demo.bitdispatcher.com) (bitdispatcher.perfuse.health, where it started, still works): sign in as `demo` with password
+[demo.bitdispatcher.com](https://demo.bitdispatcher.com) (bitdispatcher.perfuse.health, where it started, still works): press **Sign in as the demo user**, or sign in as `demo` with password
 `try-bitdispatcher-demo` (a dispatcher: everything on the console, no administration). Demonstration data
 around Roanoke, Virginia; every 911 call, ALI record and radio event comes from the BitVoice simulator and is
 marked SIMULATED. It goes back to the demonstration data every night at 09:00 UTC.
