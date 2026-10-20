@@ -76,7 +76,20 @@ func login(t *testing.T, ts *httptest.Server, user, pw string) *client {
 	jar, _ := cookiejar.New(nil)
 	hc := &http.Client{Transport: ts.Client().Transport, Jar: jar}
 	c := &client{t: t, base: ts.URL, c: hc}
-	if code, b := c.do("POST", "/api/auth/login", map[string]string{"username": user, "password": pw, "console": "D1"}, true); code != 200 {
+	code, b := c.do("POST", "/api/auth/login", map[string]string{"username": user, "password": pw, "console": "D1"}, true)
+	if code == 202 {
+		// Several duties: work the first (the highest) one.
+		var need struct {
+			Need struct {
+				Duties []string `json:"duties"`
+			} `json:"need"`
+		}
+		json.Unmarshal(b, &need)
+		if len(need.Need.Duties) > 0 {
+			code, b = c.do("POST", "/api/auth/login", map[string]string{"username": user, "password": pw, "console": "D1", "duty": need.Need.Duties[0]}, true)
+		}
+	}
+	if code != 200 {
 		t.Fatalf("login %s: %d %s", user, code, b)
 	}
 	return c
@@ -234,7 +247,7 @@ func TestDemoSignIn(t *testing.T) {
 	if code, b := admin.do("PUT", "/api/admin/users/d1", map[string]any{"name": "Demo dispatcher", "role": "dispatcher", "demo": true}, true); code != 200 {
 		t.Fatalf("naming the demo account: %d %s", code, b)
 	}
-	if _, b := anon.do("GET", "/api/auth/me", nil, false); !strings.Contains(string(b), `"demo":{"name":"Demo dispatcher","role":"dispatcher"}`) {
+	if _, b := anon.do("GET", "/api/auth/me", nil, false); !strings.Contains(string(b), `"name":"Demo dispatcher"`) || !strings.Contains(string(b), `"role":"dispatcher"`) {
 		t.Fatalf("demo not offered: %s", b)
 	}
 	if code, _ := anon.do("POST", "/api/auth/demo", map[string]string{}, false); code != 403 {

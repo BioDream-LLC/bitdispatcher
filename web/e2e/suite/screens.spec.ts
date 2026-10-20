@@ -61,7 +61,7 @@ test('screens open on their own monitors, share the selection and are offered at
   const { targetInfo } = await cdp.send('Target.getTargetInfo')
   await cdp.send('Browser.grantPermissions', { permissions: ['windowManagement'], origin: new URL(test.info().project.use.baseURL!).origin, browserContextId: targetInfo.browserContextId })
   for (const left of [1920, 3840]) await cdp.send('Emulation.addScreen' as never, { left, top: 0, width: 1920, height: 1080, label: 'DELL U2422H', isInternal: false } as never)
-  const errors = await signIn(page, undefined, undefined, 'D5')
+  const errors = await signIn(page)
   await page.getByRole('button', { name: /^Screens/ }).click()
   const dlg = page.getByRole('dialog', { name: /Screens/ })
   await expect(dlg.getByRole('img', { name: '3 monitors' })).toBeVisible()
@@ -88,6 +88,6 @@ test('screens open on their own monitors, share the selection and are offered at
   // The next sign-in at this position offers them.
   const again = await context.newPage()
   await again.goto('/')
-  await expect(again.getByRole('status').filter({ hasText: 'Position D5 has 2 screens' })).toBeVisible()
+  await expect(again.getByRole('status').filter({ hasText: /Position \S+ has 2 screens/ })).toBeVisible()
   expect(errors).toEqual([])
 })

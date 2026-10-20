@@ -6,7 +6,8 @@ import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
 import { Priority, StatusChip, Tip } from '../ui'
 import { ago, clock, cx, hasPoint, locText, locationStale, ms, phone, prio, typeName, uncertainty, useNow, overdue } from '../util'
-import type { Call, Incident, View } from '../types'
+import type { Call, Incident, Recommendation, View } from '../types'
+import { dispatchUnits } from './ask'
 
 function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: View; now: number; onCreate: (c: Call) => void; rep?: number; grouped?: boolean }) {
   const me = useStore((s) => s.me)
@@ -26,7 +27,7 @@ function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: Vie
         className={cx(
           'group relative cursor-pointer border-l-4 px-2.5 py-1.5 text-xs outline-none hover:bg-slate-800/60 focus-visible:bg-slate-800/60',
           grouped && 'ml-2',
-          ringing ? 'border-rose-500 bg-rose-500/10' : c.state === 'ended' ? 'border-slate-700 opacity-60' : 'border-sky-500 bg-sky-500/5',
+          ringing ? 'border-rose-500 bg-rose-500/10' : c.state === 'data' ? 'border-amber-500 bg-amber-500/5' : c.state === 'ended' ? 'border-slate-700 opacity-60' : 'border-sky-500 bg-sky-500/5',
           selCall === c.id && 'bg-slate-800',
         )}
       >
@@ -34,7 +35,7 @@ function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: Vie
           {ringing ? <PhoneIncoming size={13} className="text-rose-300 live-dot" aria-hidden /> : <Phone size={13} className="text-sky-300" aria-hidden />}
           <span className="font-mono text-[13px] font-bold text-slate-50">{phone(c.callback) || 'No callback'}</span>
           {c.class && <span className="chip bg-slate-800 font-mono text-slate-300">{c.class}</span>}
-          <span className={cx('chip uppercase', ringing ? 'bg-rose-500 text-white' : c.state === 'ended' ? 'bg-slate-700 text-slate-300' : 'bg-sky-500/20 text-sky-300')}>{c.state}</span>
+          <span className={cx('chip uppercase', ringing ? 'bg-rose-500 text-white' : c.state === 'data' ? 'bg-amber-500/25 text-amber-200' : c.state === 'ended' ? 'bg-slate-700 text-slate-300' : 'bg-sky-500/20 text-sky-300')} title={c.state === 'data' ? 'Data only (no voice): a vehicle crash notification. Attaching it to an incident ends it.' : undefined}>{c.state === 'data' ? 'crash data only' : c.state}</span>
           <span className="ml-auto font-mono font-semibold text-slate-300 tnum">{clock(c.start, now)}</span>
         </div>
         <div className="mt-0.5 flex items-start gap-1">
@@ -103,8 +104,16 @@ function IncidentRow({ i, view, now }: { i: Incident; view: View; now: number })
   const late = i.status === 'pending' && pendingFor > (i.priority <= 1 ? 60000 : i.priority === 2 ? 180000 : 600000)
   // A unit tile dropped here is dispatched to this incident.
   const drop = useDroppable({ id: 'inc:' + i.number, disabled: i.status === 'closed' })
+  const me = useStore((s) => s.me)
+  // Dispatch straight from the queue: the recommendation, in one press (it asks to confirm warnings).
+  const sendRec = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const r = await api.get<Recommendation>(`/incidents/${i.number}/recommend`).catch(() => null)
+    if (!r?.units.length) return toast.error(r?.notes.join('; ') || 'Nothing to recommend: choose units by hand')
+    dispatchUnits(i.number, r.units, r.units)
+  }
   return (
-    <li ref={drop.setNodeRef} className={cx(drop.isOver && 'outline outline-2 -outline-offset-2 outline-rose-400 bg-rose-500/10')}>
+    <li ref={drop.setNodeRef} className={cx('relative', drop.isOver && 'outline outline-2 -outline-offset-2 outline-rose-400 bg-rose-500/10')}>
       <button
         type="button"
         onClick={() => store.select(selected === i.number ? null : i.number)}
@@ -140,6 +149,9 @@ function IncidentRow({ i, view, now }: { i: Incident; view: View; now: number })
         )}
         {i.status === 'closed' && <div className="mt-0.5 text-[10px] text-slate-500">Closed {ago(i.closed, now)} ago · {i.disposition}</div>}
       </button>
+      {i.status === 'pending' && can.dispatch(me) && me?.duty !== 'calltaker' && (
+        <button className="btn absolute bottom-1 right-1 z-10 h-5 px-1.5 py-0 text-[10px]" onClick={sendRec} title="Dispatch the recommended units now">Send rec</button>
+      )}
     </li>
   )
 }
@@ -200,12 +212,12 @@ function NonEmergency({ calls, view }: { calls: Call[]; view: View }) {
   )
 }
 
-export default function Queue({ view, onCreateFromCall, onNew }: { view: View; onCreateFromCall: (c: Call) => void; onNew: () => void }) {
+export default function Queue({ view, onCreateFromCall, onNew, callsOnly }: { view: View; onCreateFromCall: (c: Call) => void; onNew: () => void; callsOnly?: boolean }) {
   const now = useNow()
   const me = useStore((s) => s.me)
   const calls = view.calls
     .filter((c) => !c.incident && (c.state !== 'ended' || now - ms(c.end) < 10 * 60000))
-    .sort((a, b) => (a.state === 'ringing' ? 0 : 1) - (b.state === 'ringing' ? 0 : 1) || ms(a.start) - ms(b.start))
+    .sort((a, b) => (a.state === 'ringing' ? 0 : a.state === 'data' ? 1 : 2) - (b.state === 'ringing' ? 0 : b.state === 'data' ? 1 : 2) || ms(a.start) - ms(b.start))
   const open = view.incidents
     .filter((i) => i.status !== 'closed')
     .sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1) || a.priority - b.priority || ms(a.created) - ms(b.created))
@@ -226,7 +238,7 @@ export default function Queue({ view, onCreateFromCall, onNew }: { view: View; o
         <span className="font-mono text-slate-300">{calls.filter((c) => c.state !== 'ended').length}</span>
         <span className="ml-auto normal-case tracking-normal text-slate-500">{view.health.bitvoice.connected ? 'from BitVoice' : view.health.ali.listening ? 'from ALI' : 'no call feed'}</span>
       </div>
-      <ul className="max-h-[42%] shrink-0 overflow-y-auto divide-y divide-slate-800/70" aria-label="911 calls">
+      <ul className={cx('overflow-y-auto divide-y divide-slate-800/70', callsOnly ? 'min-h-0 flex-1' : 'max-h-[42%] shrink-0')} aria-label="911 calls">
         {calls.length === 0 ? (
           <li className="px-3 py-2 text-[11px] text-slate-500">
             No 911 call waiting.{' '}
@@ -249,6 +261,7 @@ export default function Queue({ view, onCreateFromCall, onNew }: { view: View; o
         )}
         {nonEmergency.length > 0 && <NonEmergency calls={nonEmergency} view={view} />}
       </ul>
+      {!callsOnly && <>
       <div className="panel-head border-t">
         Incidents <span className="font-mono text-slate-300">{open.length}</span>
         {can.dispatch(me) && (
@@ -271,6 +284,7 @@ export default function Queue({ view, onCreateFromCall, onNew }: { view: View; o
           <IncidentRow key={i.number} i={i} view={view} now={now} />
         ))}
       </ul>
+      </>}
     </aside>
   )
 }

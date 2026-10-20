@@ -11,6 +11,8 @@ import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
 import { run as runLine } from './UnitBoard'
 import { api, errText } from '../api'
+import EntryFacts, { AckCell } from './Entry'
+import { dispatchUnits } from './ask'
 import { can, store, useStore } from '../store'
 import { Modal, Priority, StatusChip, Tip } from '../ui'
 import { activity, checkDue, ago, clock, cx, hasPoint, hhmm, mi, locText, locationStale, mins, ms, overdue, phone, prio, statusMeta, typeName, uncertainty, useNow, avl } from '../util'
@@ -207,16 +209,27 @@ function RecommendBox({ inc, rec, reload }: { inc: Incident; rec: Recommendation
     if (!pick.length) return
     setBusy(true)
     try {
-      await api.post(`/incidents/${inc.number}/dispatch`, { units: pick, recommended: rec?.units ?? [] })
-      toast.success(`Dispatched ${pick.join(' ')} to ${inc.number}`)
-      store.setPick([])
-      reload()
-    } catch (e) {
-      toast.error(errText(e))
+      if (await dispatchUnits(inc.number, pick, rec?.units ?? [])) {
+        store.setPick([])
+        reload()
+      }
     } finally {
       setBusy(false)
     }
   }
+  // What changed since the last recommendation: units in and out, marked so the dispatcher sees it.
+  const prev = useRef<{ inc: string; units: string[] } | null>(null)
+  const [diff, setDiff] = useState<{ added: string[]; gone: string[] } | null>(null)
+  useEffect(() => {
+    if (!rec) return
+    const p = prev.current
+    if (p && p.inc === inc.number) {
+      const added = rec.units.filter((u) => !p.units.includes(u))
+      const gone = p.units.filter((u) => !rec.units.includes(u) && !inc.units.some((a) => a.unit === u && !a.cleared))
+      if (added.length || gone.length) setDiff({ added, gone })
+    } else setDiff(null)
+    prev.current = { inc: inc.number, units: rec.units }
+  }, [rec, inc.number, inc.units])
   if (!rec) return <div className="px-2 py-1 text-xs text-slate-500">Working out the recommendation…</div>
   const allRec = rec.units
   const same = pick.length === allRec.length && pick.every((u) => allRec.includes(u))
@@ -241,6 +254,27 @@ function RecommendBox({ inc, rec, reload }: { inc: Incident; rec: Recommendation
           </div>
         )}
       </div>
+      {(rec.warnings ?? []).length > 0 && (
+        <div className="border-b border-slate-800 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200" role="alert">
+          {rec.warnings.map((w) => <div key={w}>⚠ {w} — you will be asked to confirm</div>)}
+        </div>
+      )}
+      {rec.plan && (
+        <div className="border-b border-slate-800 px-2 py-1 text-[11px]">
+          <span className="text-slate-400">Plan</span> <b className="text-slate-100">{rec.plan}</b>
+          <span className="ml-1.5 inline-flex flex-wrap gap-1 align-middle">
+            {(rec.planned ?? []).map((p) => (
+              <span key={p.unit} className={cx('chip font-mono', p.can ? 'bg-lime-500/15 text-lime-200' : 'bg-slate-800 text-slate-500 line-through')} title={p.why ? `${p.unit}: ${p.why}` : `${p.unit}: ${p.due} due`}>{p.due}·{p.unit}</span>
+            ))}
+          </span>
+        </div>
+      )}
+      {diff && (
+        <div className="border-b border-slate-800 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-200" role="status">
+          Changed: {diff.added.length > 0 && <>now <b className="font-mono">{diff.added.join(' ')}</b></>} {diff.gone.length > 0 && <>no longer <span className="font-mono line-through">{diff.gone.join(' ')}</span></>}
+          <button className="ml-1 underline" onClick={() => setDiff(null)}>seen</button>
+        </div>
+      )}
       <ul className="divide-y divide-slate-800/70 text-xs">
         {rec.lines.map((l) => (
           <li key={l.capability} className="px-2 py-1">
@@ -281,7 +315,7 @@ function RecommendBox({ inc, rec, reload }: { inc: Incident; rec: Recommendation
           {rec.notes.map((n) => <li key={n}>• {n}</li>)}
         </ul>
       )}
-      {pick.some((u) => !allRec.includes(u)) && <div className="border-t border-slate-800 px-2 py-1 text-[10px] text-slate-400">Your choice differs from the recommendation; the ledger records both.</div>}
+      {pick.some((u) => !allRec.includes(u)) && <div className="border-t border-slate-800 px-2 py-1 text-[10px] text-slate-400">Your choice differs from the recommendation: you will be asked why, and the ledger records both.</div>}
     </section>
   )
 }
@@ -295,7 +329,7 @@ function UnitsOn({ inc, view, now }: { inc: Incident; view: View; now: number })
         <thead>
           <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
             <th className="px-1 font-semibold">Unit</th><th className="font-semibold">Status</th><th className="font-semibold">In status</th>
-            <th className="font-semibold">DP</th><th className="font-semibold">ER</th><th className="font-semibold">OS</th><th />
+            <th className="font-semibold">DP</th><th className="font-semibold">ACK</th><th className="font-semibold">ER</th><th className="font-semibold">OS</th><th />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800/60">
@@ -312,6 +346,7 @@ function UnitsOn({ inc, view, now }: { inc: Incident; view: View; now: number })
                 <td>{cleared ? <span className="text-[10px] text-slate-500">cleared {hhmm(a.cleared)}</span> : <StatusChip status={u?.status ?? a.status} />}</td>
                 <td className={cx('font-mono tnum', over > 0 ? 'font-bold text-amber-300' : 'text-slate-300')}>{!cleared && u ? clock(u.statusAt, now) : ''}</td>
                 <td className="font-mono text-[10px] text-slate-400">{hhmm(a.dispatched).slice(0, 5)}</td>
+                <td>{!cleared && <AckCell inc={inc.number} unit={a.unit} status={u?.status ?? a.status} dispatched={a.dispatched} acked={a.acked || a.enroute || a.onScene} ackSeconds={view.settings.ackSeconds || 60} now={now} />}</td>
                 <td className="font-mono text-[10px] text-slate-400">{a.enroute ? hhmm(a.enroute).slice(0, 5) : ''}</td>
                 <td className="font-mono text-[10px] text-slate-400">{a.onScene ? hhmm(a.onScene).slice(0, 5) : ''}</td>
                 <td className="text-right">
@@ -459,6 +494,7 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
             {closed && <span className="text-emerald-300">closed {hhmm(inc.closed)} · {inc.disposition}</span>}
           </div>
         </div>
+        <EntryFacts inc={inc} view={view} />
         {!closed && view.summaries?.[inc.number] && <SummaryBox inc={inc} text={view.summaries[inc.number]} />}
         <PremiseBox premises={view.premises?.[inc.number]} prior={view.prior?.[inc.number]} />
         <DroneBox inc={inc} view={view} />

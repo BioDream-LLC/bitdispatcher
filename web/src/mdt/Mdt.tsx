@@ -12,14 +12,14 @@ import { signOut, useStore } from '../store'
 import { Logo, StatusChip } from '../ui'
 import PremiseBox from '../console/PremiseBox'
 import { clock, cx, mi, prio, statusMeta, useNow } from '../util'
-import type { MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, View } from '../types'
+import type { BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, View } from '../types'
 import { dispatchStyle } from '../console/mapStyle'
 
 maplibregl.setWorkerUrl(workerUrl)
 
 type MDTView = {
   serverTime: string; unit: Unit; station?: Station; incident?: Incident; typeName?: string; summary?: string; partners: Unit[]; premises?: Premise[]
-  emergency?: { key: string; raised: string; ackedBy?: string }; pending: Incident[]; statuses: string[]
+  emergency?: { key: string; raised: string; ackedBy?: string }; pending: Incident[]; statuses: string[]; bolos?: BOLO[]
   settings: { agency: string; mapCenter: [number, number]; mapZoom: number; avlStaleSeconds: number; markOuts?: MarkOutType[] }
   health: View['health']
 }
@@ -187,6 +187,7 @@ export default function Mdt() {
                   <a href={`tel:${inc.caller.callback}`} className="mt-1 flex items-center gap-2 text-sm text-slate-300"><Phone size={14} aria-hidden /> {inc.caller.name ? `${inc.caller.name} · ` : ''}{inc.caller.callback}</a>
                 )}
                 {m.summary && <p className="mt-2 rounded border border-sky-900/60 bg-sky-950/30 p-2 text-sm leading-snug text-slate-100" aria-label="Summary">{m.summary}</p>}
+                <MdtEntry inc={inc} unit={m.unit.id} />
                 {(m.premises?.length ?? 0) > 0 && <div className="mt-2"><PremiseBox premises={m.premises} compact /></div>}
                 {m.partners.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -194,6 +195,12 @@ export default function Mdt() {
                   </div>
                 )}
               </div>
+              {(m.bolos?.length ?? 0) > 0 && (
+                <div className="rounded-lg border border-rose-900/70 bg-rose-950/20 p-2">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-rose-300">BOLOs</div>
+                  <ul className="space-y-0.5 text-sm">{m.bolos!.map((b) => <li key={b.id} className="text-slate-100"><b className="font-mono text-rose-200">{b.id}</b> {b.text}{b.plate && <span className="ml-1 font-mono text-amber-200">{b.plate}</span>}</li>)}</ul>
+                </div>
+              )}
               <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
                 <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Notes from dispatch</div>
                 <ul className="space-y-1 text-base">
@@ -372,6 +379,25 @@ function MdtMap({ m, route, here }: { m: MDTView; route: RouteView | null; here?
           <ImageIcon size={14} aria-hidden /> Photos
         </button>
       )}
+    </div>
+  )
+}
+
+/** What call entry recorded, for the crew: acknowledge the assignment, a changed location, the talkgroup,
+ * modifiers, people and vehicles. */
+function MdtEntry({ inc, unit }: { inc: Incident; unit: string }) {
+  const a = inc.units.find((x) => x.unit === unit && !x.cleared)
+  const changed = inc.changed && Date.now() - Date.parse(inc.changed.at) < 30 * 60_000
+  return (
+    <div className="mt-2 space-y-1 text-sm">
+      {a && a.status === 'dispatched' && !a.acked && (
+        <button className="btn btn-go w-full py-2 text-base" onClick={() => api.post(`/units/${unit}/ack`).catch(() => {})}>Acknowledge the assignment</button>
+      )}
+      {changed && <p className="rounded border border-amber-600 bg-amber-950/40 p-1.5 font-semibold text-amber-100" role="alert">Location changed at {new Date(inc.changed!.at).toLocaleTimeString()}: now {inc.location?.address || `${inc.location?.lat?.toFixed(5)}, ${inc.location?.lon?.toFixed(5)}`}</p>}
+      {inc.talkgroup && <p className="text-slate-300">Talkgroup <b className="font-mono text-slate-50">{inc.talkgroup}</b></p>}
+      {(inc.modifiers?.length ?? 0) > 0 && <p className="text-rose-200">{inc.modifiers!.join(' · ')}</p>}
+      {(inc.persons ?? []).filter((p) => !p.removed).map((p) => <p key={p.id} className={p.safety ? 'font-semibold text-rose-200' : 'text-slate-300'}>{p.role}: {p.name || '—'} {[p.dob, p.clothing].filter(Boolean).join(' · ')}</p>)}
+      {(inc.vehicles ?? []).filter((v) => !v.removed).map((v) => <p key={v.id} className="text-slate-300">{v.role}: {[v.color, v.make, v.model].filter(Boolean).join(' ')} <span className="font-mono text-amber-200">{v.state} {v.plate}</span>{v.direction ? ` → ${v.direction}` : ''}</p>)}
     </div>
   )
 }

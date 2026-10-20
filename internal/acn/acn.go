@@ -193,7 +193,7 @@ func anyAirbag(c Crash) bool {
 // added when relevant, regardless of risk level. The result is a rule of thumb
 // to guide the response, not a diagnosis.
 func Assess(c Crash, t Thresholds) Assessment {
-	var a Assessment
+	a := Assessment{Reasons: []string{}, Suggest: []string{}} // never null in JSON: the console reads them as lists
 
 	hasData := c.DeltaVKmh > 0 || c.Rollover || c.MultipleImpacts ||
 		anyAirbag(c) || c.Direction != "" || c.Belted != nil

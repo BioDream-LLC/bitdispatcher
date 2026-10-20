@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { adminAPI, signIn } from './helpers'
+import { adminAPI, answerAsk, signIn } from './helpers'
 
 test('the dispatcher screen shows every panel', async ({ page }) => {
   const errors = await signIn(page)
@@ -22,6 +22,7 @@ test('a call to a closed incident from the keyboard', async ({ page }) => {
   // The new incident is selected for the next command: its recommendation is already picked.
   await expect(page.getByRole('complementary', { name: `Incident ${number}` }).getByText('Recommended', { exact: true })).toBeVisible()
   await page.keyboard.press('Control+Enter')
+  await answerAsk(page)
   await expect(page.getByText(/Dispatched/).first()).toBeVisible()
   await page.keyboard.type('CL Handled')
   await page.keyboard.press('Enter')
@@ -39,8 +40,8 @@ test('911 calls from the BitVoice simulator reach the queue', async ({ page, req
 })
 
 test('every administration screen opens without an error', async ({ page }) => {
-  const errors = await signIn(page)
-  for (const p of ['units', 'stations', 'calltypes', 'map', 'gis', 'settings', 'integrations', 'users', 'sites', 'premises', 'migrate', 'advisory', 'reports', 'ledger']) {
+  const errors = await signIn(page, undefined, undefined, 'admin')
+  for (const p of ['units', 'stations', 'calltypes', 'map', 'gis', 'settings', 'integrations', 'users', 'workstations', 'plans', 'facilities', 'guidance', 'disclosure', 'sites', 'premises', 'migrate', 'advisory', 'reports', 'ledger']) {
     await page.goto(`/#/admin/${p}`)
     await expect(page.locator('h1').first()).toBeVisible()
   }
@@ -63,6 +64,7 @@ test('a unit is sent by dragging it onto an incident, and changed by right-click
   const box = (await row.boundingBox())!
   await page.mouse.move(box.x + 40, box.y + 10, { steps: 12 })
   await page.mouse.up()
+  await answerAsk(page)
   await expect.poll(async () => (await api.get('/state')).units.find((u: { id: string }) => u.id === 'M2').incident).toBe(inc.number)
   await board.getByRole('button', { name: /^E2/ }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: /Out of service/ }).click()

@@ -184,7 +184,7 @@ export default function Integrations({ view }: { view: View }) {
   )
 }
 
-type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean }
+type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean; foiaModel?: boolean }
 
 // Connections are the wishlist's: the hooks other systems send to (transcripts, crash data, drones, radio
 // words), the drone system, and the optional language model for translation.
@@ -198,6 +198,7 @@ function Connections({ view }: { view: View }) {
   const [modelKey, setModelKey] = useState('')
   const [modelName, setModelName] = useState('')
   const [modelOn, setModelOn] = useState(false)
+  const [foiaModel, setFoiaModel] = useState(false)
   const fill = (v: XV) => {
     setX(v)
     setDroneUrl(v.droneUrl)
@@ -205,13 +206,14 @@ function Connections({ view }: { view: View }) {
     setModelUrl(v.modelUrl)
     setModelName(v.modelName)
     setModelOn(v.modelOn)
+    setFoiaModel(!!v.foiaModel)
   }
   useEffect(() => {
     api.get<XV>('/admin/connections').then(fill).catch((e) => toast.error(errText(e)))
   }, [])
   const save = async () => {
     try {
-      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn }))
+      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn, foiaModel }))
       setHook('')
       setDroneToken('')
       setModelKey('')
@@ -255,6 +257,7 @@ function Connections({ view }: { view: View }) {
           <Field label={`Key ${x.modelKeySet ? '(set)' : ''}`} htmlFor="mk"><input id="mk" type="password" className="input font-mono" value={modelKey} onChange={(e) => setModelKey(e.target.value)} placeholder={x.modelKeySet ? '••••••••' : 'none for a local model'} /></Field>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={modelOn} onChange={(e) => setModelOn(e.target.checked)} /> Use it for translation</label>
+        <label className="flex items-start gap-2 text-sm text-slate-300"><input type="checkbox" className="mt-1" checked={foiaModel} onChange={(e) => setFoiaModel(e.target.checked)} /><span>Use it to suggest redactions in records requests<span className="block text-xs text-amber-300">The record's text is sent to the model. Its suggestions are proposals for a person to decide, marked as the model's.</span></span></label>
         <div className="flex justify-end"><button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save connections</button></div>
       </section>
     </div>

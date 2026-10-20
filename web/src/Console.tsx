@@ -20,6 +20,7 @@ import Situation from './console/Situation'
 import UnitBoard from './console/UnitBoard'
 import CommandLine, { type CommandLineHandle } from './console/CommandLine'
 import NewIncident, { type NewSeed } from './console/NewIncident'
+import { AskHost, dispatchUnits } from './console/ask'
 import Boundary from './Boundary'
 import StationBoard from './console/StationBoard'
 import PoliceBoard from './console/PoliceBoard'
@@ -50,8 +51,10 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   const nav = useNavigate()
   // A small movement first, so a click on a unit is still a click.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-  const dispatchUnit = (unit: string, inc: string) => api.post<{ ok: boolean; message: string }>('/command', { line: `D ${unit} #${inc}`, incident: inc })
-    .then((r) => (r.ok ? toast.success(r.message) : toast.error(r.message))).catch((e) => toast.error(errText(e)))
+  const dispatchUnit = async (unit: string, inc: string) => {
+    const r = await api.get<Recommendation>(`/incidents/${inc}/recommend`).catch(() => null)
+    dispatchUnits(inc, [unit], r?.units ?? [])
+  }
   const [ncic, setNcic] = useState(false)
   const [rmsMeta, setRmsMeta] = useState<Meta | null>(null)
   // The selected incident is shown even when this screen's lens would hide it: someone chose it.
@@ -112,13 +115,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   const dispatchPicked = useCallback(async () => {
     const s = store.get()
     if (!s.selected || !s.pick.length) return
-    try {
-      await api.post(`/incidents/${s.selected}/dispatch`, { units: s.pick, recommended: rec?.units ?? [] })
-      toast.success(`Dispatched ${s.pick.join(' ')} to ${s.selected}`)
-      store.setPick([])
-    } catch (e) {
-      toast.error(errText(e))
-    }
+    if (await dispatchUnits(s.selected, s.pick, rec?.units ?? [])) store.setPick([])
   }, [rec])
 
   useEffect(() => {
@@ -224,6 +221,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
       {screen !== 'map' && <Boundary name="command line"><CommandLine ref={cmd} view={view} /></Boundary>}
       <ScreensDialog open={screens} onClose={() => setScreens(false)} />
       <MarkOutDialog />
+      <AskHost />
       <NewIncident view={view} seed={seed} onClose={() => setSeed(null)} />
       {rmsMeta && <NcicPanel open={ncic} onOpenChange={setNcic} meta={rmsMeta} reason={selected ?? ''} />}
       <Command.Dialog

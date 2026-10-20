@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,6 +66,7 @@ type MDTView struct {
 	Emergency  *cad.Emergency  `json:"emergency,omitempty"` // the unit's open emergency
 	Pending    []*cad.Incident `json:"pending"`             // waiting for a unit, nearest first is the client's job
 	Statuses   []string        `json:"statuses"`
+	BOLOs      []*cad.BOLO     `json:"bolos"` // active BOLOs for the unit's discipline
 	Settings   struct {
 		Agency    string     `json:"agency"`
 		MapCenter [2]float64 `json:"mapCenter"`
@@ -89,6 +91,12 @@ func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a
 		if x, ok := st.Stations[firstNonEmptyStr(u.Covering, u.Station)]; ok {
 			sc := *x
 			v.Station = &sc
+		}
+		v.BOLOs = []*cad.BOLO{}
+		for _, b := range st.ActiveBOLOs(time.Now()) {
+			if len(b.Disciplines) == 0 || slices.Contains(b.Disciplines, discOf(st, u.Type)) {
+				v.BOLOs = append(v.BOLOs, b)
+			}
 		}
 		if in, ok := st.Incidents[u.Incident]; ok {
 			ic := *in
@@ -239,4 +247,13 @@ func (s *Server) mdtEmergency(w http.ResponseWriter, r *http.Request, se *auth.S
 		return
 	}
 	writeJSON(w, 200, map[string]string{"key": key})
+}
+
+func discOf(st *cad.State, unitType string) string {
+	for _, t := range st.Settings.UnitTypes {
+		if t.Code == unitType {
+			return t.Discipline
+		}
+	}
+	return "other"
 }

@@ -31,6 +31,7 @@ type Event struct {
 	Role     string          `json:"role,omitempty"`    // the actor's active role
 	Session  string          `json:"session,omitempty"` // the authenticated session (a hash, never the token)
 	Console  string          `json:"console,omitempty"` // the position
+	Duty     string          `json:"duty,omitempty"`    // the work the actor signed in to do (call-taker, police dispatcher...)
 	Incident string          `json:"incident,omitempty"`
 	Unit     string          `json:"unit,omitempty"`
 	Call     string          `json:"call,omitempty"`

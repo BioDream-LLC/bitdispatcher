@@ -130,6 +130,37 @@ export default function SettingsPage({ view }: { view: View }) {
           </div>
         </section>
         <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">Roles and sign-in</h2>
+          <p className="text-xs text-slate-400">What each duty may do is enforced by the server. A one-time code (any authenticator app) protects access to criminal justice information: confirm your state's CJIS requirements before relying on it.</p>
+          <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!!s.duties?.callTakersDispatch} onChange={(e) => up({ duties: { ...s.duties, callTakersDispatch: e.target.checked } })} /> Call-takers may also send and change units</label>
+          <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!!s.duties?.crossDiscipline} onChange={(e) => up({ duties: { ...s.duties, crossDiscipline: e.target.checked } })} /> Police, fire and EMS dispatchers may send any discipline's units</label>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="One-time codes at sign-in" htmlFor="mfa">
+              <select id="mfa" className="input" value={s.security?.mfa || 'off'} onChange={(e) => up({ security: { ...s.security, mfa: e.target.value as 'off' } })}>
+                <option value="off">Off (anyone who set one up still uses it)</option><option value="admins">Supervisors and administrators</option><option value="everyone">Everyone</option>
+              </select>
+            </Field>
+            <Field label="Lock a console after (minutes without input)" htmlFor="lck" hint="0: never. Ctrl+Shift+L locks at once; the same person unlocks with their password"><input id="lck" type="number" min={0} className="input font-mono" value={s.security?.lockMinutes ?? 0} onChange={(e) => up({ security: { ...s.security, lockMinutes: Number(e.target.value) } })} /></Field>
+          </div>
+          <label className="flex items-start gap-2 text-sm text-slate-300"><input type="checkbox" className="mt-1" checked={!!s.security?.stagedChanges} onChange={(e) => up({ security: { ...s.security, stagedChanges: e.target.checked } })} /><span>Change configuration only through staging<span className="block text-xs text-slate-500">Call types, units, stations, plans, guidance and facilities are then changed on a training board (sign in with Training ticked as an administrator), tried there, and published to the live board with a reason. Settings, users and connections stay here.</span></span></label>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">Call entry and dispatch</h2>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Flag a unit not acknowledged after (s)" htmlFor="ack"><input id="ack" type="number" min={10} className="input font-mono" value={s.ackSeconds || 60} onChange={(e) => up({ ackSeconds: Number(e.target.value) })} /></Field>
+            <Field label="Offer a newer caller location beyond (m)" htmlFor="mvm"><input id="mvm" type="number" min={5} className="input font-mono" value={s.moveMeters || 50} onChange={(e) => up({ moveMeters: Number(e.target.value) })} /></Field>
+            <Field label="Records requests due in (working days)" htmlFor="fd"><input id="fd" type="number" min={1} className="input font-mono" value={s.foiaDays || 5} onChange={(e) => up({ foiaDays: Number(e.target.value) })} /></Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!s.overrideReasonOff} onChange={(e) => up({ overrideReasonOff: !e.target.checked })} /> Ask why when other units than the recommendation are sent</label>
+          <Field label="Talkgroups" htmlFor="tgs" hint="Separated by commas: offered on every incident"><input id="tgs" className="input font-mono" key={'tg' + (s.talkgroups ?? []).join()} defaultValue={(s.talkgroups ?? []).join(', ')} onBlur={(e) => up({ talkgroups: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
+          <Field label="Incident modifiers" htmlFor="mods" hint="One per line: CODE | name | raises to priority (optional) | notify, separated by ; (optional) | safety. Empty: the built-in list">
+            <textarea id="mods" rows={6} className="input font-mono text-xs" key={'mods' + JSON.stringify(s.modifiers ?? [])}
+              defaultValue={(s.modifiers ?? []).map((m) => [m.code, m.name, m.priority || '', (m.notify ?? []).join('; '), m.safety ? 'safety' : ''].join(' | ').replace(/( \| )+$/, '')).join('\n')}
+              placeholder={(view.entry?.modifiers ?? []).map((m) => [m.code, m.name, m.priority || '', (m.notify ?? []).join('; '), m.safety ? 'safety' : ''].join(' | ').replace(/( \| )+$/, '')).join('\n')}
+              onBlur={(e) => up({ modifiers: e.target.value.split('\n').map((l) => l.split('|').map((x) => x.trim())).filter((f) => f[0]).map((f) => ({ code: f[0].toUpperCase(), name: f[1] || f[0], priority: Number(f[2]) || undefined, notify: f[3] ? f[3].split(';').map((x) => x.trim()).filter(Boolean) : undefined, safety: f[4] === 'safety' || undefined })) })} />
+          </Field>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
           <h2 className="font-semibold text-slate-100">Calls: grouping and non-emergency</h2>
           <p className="text-xs text-slate-400">Callers this near each other within this time are shown as one group, attached to one incident in one step. Calls on a non-emergency line, or whose caller says one of the words (and nothing urgent), go to the non-emergency list; a person always decides.</p>
           <div className="grid grid-cols-2 gap-2">

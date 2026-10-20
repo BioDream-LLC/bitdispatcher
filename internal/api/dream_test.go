@@ -152,7 +152,7 @@ func TestTrainingEnvironment(t *testing.T) {
 	s.Eng.SetStatus(cad.SystemActor, "E1", cad.Available, "", "")
 	jar, _ := cookiejar.New(nil)
 	tr := &client{t: t, base: ts.URL, c: &http.Client{Transport: ts.Client().Transport, Jar: jar}}
-	if code, b := tr.do("POST", "/api/auth/login", map[string]any{"username": "d1", "password": pw["d1"], "console": "T1", "training": true}, true); code != 200 || !strings.Contains(string(b), `"training":true`) {
+	if code, b := tr.do("POST", "/api/auth/login", map[string]any{"username": "d1", "password": pw["d1"], "console": "T1", "training": true, "duty": "dispatcher"}, true); code != 200 || !strings.Contains(string(b), `"training":true`) {
 		t.Fatalf("training sign-in: %d %s", code, b)
 	}
 	live := login(t, ts, "d1", pw["d1"])
@@ -181,7 +181,7 @@ func TestTrainingEnvironment(t *testing.T) {
 	// the first trainee's board alone.
 	jar2, _ := cookiejar.New(nil)
 	tr2 := &client{t: t, base: ts.URL, c: &http.Client{Transport: ts.Client().Transport, Jar: jar2}}
-	if code, b := tr2.do("POST", "/api/auth/login", map[string]any{"username": "d1", "password": pw["d1"], "console": "T2", "training": true}, true); code != 200 {
+	if code, b := tr2.do("POST", "/api/auth/login", map[string]any{"username": "d1", "password": pw["d1"], "console": "T2", "training": true, "duty": "dispatcher"}, true); code != 200 {
 		t.Fatalf("second training sign-in: %d %s", code, b)
 	}
 	if _, b := tr2.do("GET", "/api/state", nil, false); strings.Contains(string(b), "t-rob-1") || !strings.Contains(string(b), `"training":{`) {

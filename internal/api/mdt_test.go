@@ -25,7 +25,7 @@ func TestMDT(t *testing.T) {
 		code, _ := c.do("POST", "/api/auth/login", map[string]string{"username": "e1crew", "password": crew, "console": console}, true)
 		return c, code
 	}
-	if _, code := signIn("D1"); code != 401 {
+	if c, code := signIn("D1"); code == 200 || func() bool { code, _ := c.do("GET", "/api/mdt", nil, false); return code == 200 }() {
 		t.Fatalf("a field crew signed in at a console that is not a unit: %d", code)
 	}
 	c, code := signIn("e1")

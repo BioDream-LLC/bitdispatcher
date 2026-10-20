@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, Layers3, Lightbulb, Network, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -18,6 +18,11 @@ import GisAdmin from './GisAdmin'
 import Sites from './Sites'
 import Premises from './Premises'
 import Migrate from './Migrate'
+import Workstations from './Workstations'
+import Plans from './Plans'
+import Facilities from './Facilities'
+import GuidanceAdmin from './GuidanceAdmin'
+import Disclosure from './Disclosure'
 
 // Charts are large; they load when the report is opened.
 const Reports = lazy(() => import('./Reports'))
@@ -26,19 +31,24 @@ const Quality = lazy(() => import('./Quality'))
 const PAGES = [
   { to: 'units', label: 'Units', icon: Truck, admin: true },
   { to: 'stations', label: 'Stations', icon: Building2, admin: true },
+  { to: 'facilities', label: 'Facilities', icon: Hospital, admin: true },
   { to: 'calltypes', label: 'Call types & run cards', icon: ClipboardList, admin: true },
+  { to: 'plans', label: 'Response plans', icon: RouteIcon, admin: true },
   { to: 'map', label: 'Map', icon: MapIcon, admin: true },
   { to: 'gis', label: 'County GIS', icon: Layers3, admin: true },
   { to: 'settings', label: 'Settings', icon: Cog, admin: true },
   { to: 'integrations', label: 'Integrations', icon: Cable, admin: true },
   { to: 'users', label: 'Users & positions', icon: UsersIcon, admin: true },
+  { to: 'workstations', label: 'Workstations', icon: MonitorSmartphone, admin: true },
   { to: 'sites', label: 'Sites', icon: Network, admin: true },
   { to: 'premises', label: 'Premises & hazards', icon: ShieldAlert, admin: false },
   { to: 'migrate', label: 'Migration', icon: FileInput, admin: true },
   { to: 'advisory', label: 'Advisory panel', icon: Lightbulb, admin: false },
+  { to: 'guidance', label: 'Approved guidance', icon: BookOpen, admin: true },
   { to: 'reports', label: 'Operations report', icon: BarChart3, admin: false },
   { to: 'quality', label: 'Quality review', icon: Award, admin: false },
   { to: 'ledger', label: 'Ledger & audit', icon: Database, admin: false },
+  { to: 'disclosure', label: 'Disclosure rules', icon: FileLock2, admin: true },
 ]
 
 export default function Admin() {
@@ -74,13 +84,18 @@ export default function Admin() {
             <Route index element={<Navigate to={pages[0].to} replace />} />
             <Route path="units" element={<Units view={view} />} />
             <Route path="stations" element={<Stations view={view} />} />
+            <Route path="facilities" element={<Facilities view={view} />} />
             <Route path="calltypes" element={<CallTypes view={view} />} />
+            <Route path="plans" element={<Plans view={view} />} />
             <Route path="map" element={<MapAdmin view={view} />} />
             <Route path="settings" element={<SettingsPage view={view} />} />
             <Route path="integrations" element={<Integrations view={view} />} />
             <Route path="users" element={<Users />} />
+            <Route path="workstations" element={<Workstations />} />
             <Route path="ledger" element={<Ledger />} />
+            <Route path="disclosure" element={<Disclosure view={view} />} />
             <Route path="advisory" element={<AdvisoryAdmin />} />
+            <Route path="guidance" element={<GuidanceAdmin view={view} />} />
             <Route path="gis" element={<GisAdmin />} />
             <Route path="sites" element={<Sites />} />
             <Route path="premises" element={<Premises />} />

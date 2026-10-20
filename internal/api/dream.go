@@ -41,6 +41,11 @@ type Extra struct {
 	ModelKey  string `json:"modelKey"`
 	ModelName string `json:"modelName"`
 	ModelOn   bool   `json:"modelOn"`
+	// FOIAModel lets records requests ask the same model for passages that may be exempt (proposals only,
+	// for a person to decide). Off unless an administrator sets it: the record is sent to the model.
+	FOIAModel bool `json:"foiaModel"`
+	// Location providers (a supplemental location service like RapidSOS) post newer caller locations to
+	// /api/hooks/location with the hook token; see docs/LOCATION-HOOK.md. Nothing here is a vendor's API.
 }
 
 // ExtraView is Extra with its secrets replaced by whether they are set.
@@ -53,6 +58,7 @@ type ExtraView struct {
 	ModelKey   bool   `json:"modelKeySet"`
 	ModelName  string `json:"modelName"`
 	ModelOn    bool   `json:"modelOn"`
+	FOIAModel  bool   `json:"foiaModel"`
 }
 
 var hookActor = cad.Actor{User: "hook"}
@@ -69,6 +75,7 @@ func (s *Server) dreamRoutes() {
 	m.HandleFunc("POST /api/hooks/acn", s.hook(s.hookACN))
 	m.HandleFunc("POST /api/hooks/drone", s.hook(s.hookDrone))
 	m.HandleFunc("POST /api/hooks/radio-text", s.hook(s.hookRadioText))
+	m.HandleFunc("POST /api/hooks/location", s.hook(s.hookLocation))
 
 	s.handle("GET /api/phrases", auth.Viewer, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		writeJSON(w, 200, map[string]any{"items": assist.Phrases})
@@ -155,6 +162,80 @@ func (s *Server) hookTranscript(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// hookLocation takes a newer caller location from a supplemental location provider (or a rebid relayed
+// by another system): for a call by its ID, or the open call from a callback number. It becomes the call's
+// location; an incident the call is on is offered it, for the call-taker to accept.
+func (s *Server) hookLocation(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Call     string    `json:"call"`
+		Callback string    `json:"callback"`
+		Lat      *float64  `json:"lat"`
+		Lon      *float64  `json:"lon"`
+		Radius   float64   `json:"radius"`
+		Altitude *float64  `json:"altitude"`
+		VRadius  float64   `json:"vRadius"`
+		Method   string    `json:"method"`
+		Address  string    `json:"address"`
+		Source   string    `json:"source"` // the provider: rapidsos, ali-rebid, ...
+		At       time.Time `json:"at"`
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	if b.Lat == nil || b.Lon == nil || *b.Lat < -90 || *b.Lat > 90 || *b.Lon < -180 || *b.Lon > 180 {
+		fail(w, 422, "lat and lon are the caller's position")
+		return
+	}
+	id := b.Call
+	s.Eng.Read(func(st *cad.State) {
+		if id != "" {
+			if _, ok := st.Calls[id]; !ok {
+				id = ""
+			}
+			return
+		}
+		want := digitsOnly(b.Callback)
+		var best *cad.Call
+		for _, c := range st.Calls {
+			if c.State != "ended" && want != "" && digitsOnly(c.Callback) == want && (best == nil || c.Start.After(best.Start)) {
+				best = c
+			}
+		}
+		if best != nil {
+			id = best.ID
+		}
+	})
+	if id == "" {
+		fail(w, 404, "no open call for that call or callback")
+		return
+	}
+	if b.At.IsZero() {
+		b.At = time.Now().UTC()
+	}
+	src := firstNonEmpty(strings.ToLower(strings.TrimSpace(b.Source)), "provider")
+	loc := &ng911.Location{Lat: b.Lat, Lon: b.Lon, Radius: b.Radius, Altitude: b.Altitude, VRadius: b.VRadius, Method: firstNonEmpty(b.Method, "provider"),
+		Address: b.Address, Source: src, At: b.At}
+	if err := s.Eng.UpsertCall(cad.Actor{User: src}, id, cad.CallData{Source: src, Location: loc}); err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]string{"call": id})
+}
+
+func digitsOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	d := b.String()
+	if len(d) == 11 && d[0] == '1' {
+		d = d[1:]
+	}
+	return d
+}
+
 // hookACN takes a crash notification from a vehicle or a telematics provider.
 func (s *Server) hookACN(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
@@ -171,7 +252,7 @@ func (s *Server) hookACN(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		id = fmt.Sprintf("acn-%d", time.Now().UnixMilli())
 	}
-	d := cad.CallData{Source: "acn", State: "ringing", Crash: &cr, Callback: cr.Callback, Class: "ACN", Provider: cr.Provider, Emergency: true}
+	d := cad.CallData{Source: "acn", State: "data", Crash: &cr, Callback: cr.Callback, Class: "ACN", Provider: cr.Provider, Emergency: true}
 	if cr.Lat != nil && cr.Lon != nil {
 		lat, lon := *cr.Lat, *cr.Lon
 		d.Location = pointLoc(lat, lon, 10, "GPS", "acn")
@@ -461,6 +542,33 @@ func (s *Server) launchDrone(ctx context.Context, a cad.Actor, number string, au
 var droneClient = &http.Client{Timeout: 10 * time.Second}
 
 // droneRule watches for incidents of call types marked for a drone and asks for one, once each.
+// endDataCalls ends crash notifications nobody has acted on after half an hour: a data-only call has no
+// hang-up of its own, and left alone it would wait in the call queue for ever. Attaching one to an incident
+// ends it at once (in the engine). The record stays in the ledger and the incident history.
+func (s *Server) endDataCalls(ctx context.Context) {
+	t := time.NewTicker(time.Minute)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		now := s.Eng.Now()
+		var old []string
+		s.Eng.Read(func(st *cad.State) {
+			for id, c := range st.Calls {
+				if c.State == "data" && c.Incident == "" && now.Sub(c.Start) > 30*time.Minute {
+					old = append(old, id)
+				}
+			}
+		})
+		for _, id := range old {
+			s.Eng.EndCall(cad.Actor{User: "acn"}, id)
+		}
+	}
+}
+
 func (s *Server) droneRule(ctx context.Context) {
 	ch := s.Eng.Subscribe()
 	defer s.Eng.Unsubscribe(ch)
@@ -773,7 +881,7 @@ func (s *Server) quality(w http.ResponseWriter, r *http.Request, se *auth.Sessio
 func (s *Server) extraView() ExtraView {
 	x := s.extra()
 	return ExtraView{HookToken: x.HookToken != "", DroneURL: x.DroneURL, DroneToken: x.DroneToken != "", DroneAuto: x.DroneAuto,
-		ModelURL: x.ModelURL, ModelKey: x.ModelKey != "", ModelName: x.ModelName, ModelOn: x.ModelOn}
+		ModelURL: x.ModelURL, ModelKey: x.ModelKey != "", ModelName: x.ModelName, ModelOn: x.ModelOn, FOIAModel: x.FOIAModel}
 }
 
 func (s *Server) getExtra(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -791,6 +899,7 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 		ModelKey   string `json:"modelKey"`
 		ModelName  string `json:"modelName"`
 		ModelOn    bool   `json:"modelOn"`
+		FOIAModel  bool   `json:"foiaModel"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -801,7 +910,7 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 			return
 		}
 	}
-	if b.ModelOn && (strings.TrimSpace(b.ModelURL) == "" || strings.TrimSpace(b.ModelName) == "") {
+	if (b.ModelOn || b.FOIAModel) && (strings.TrimSpace(b.ModelURL) == "" || strings.TrimSpace(b.ModelName) == "") {
 		fail(w, 422, "the language model needs its address and model name")
 		return
 	}
@@ -821,6 +930,7 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 	keep(&n.Extra.ModelKey, b.ModelKey)
 	n.Extra.DroneURL, n.Extra.DroneAuto = strings.TrimSpace(b.DroneURL), b.DroneAuto
 	n.Extra.ModelURL, n.Extra.ModelName, n.Extra.ModelOn = strings.TrimRight(strings.TrimSpace(b.ModelURL), "/"), strings.TrimSpace(b.ModelName), b.ModelOn
+	n.Extra.FOIAModel = b.FOIAModel
 	data, _ := json.MarshalIndent(n, "", "  ")
 	tmp := s.integrationsPath() + ".tmp"
 	err := os.WriteFile(tmp, data, 0o600)
@@ -836,6 +946,6 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 		return
 	}
 	s.Eng.Record(a, cad.EvIntegration, map[string]any{"connections": true, "hooks": n.Extra.HookToken != "", "droneUrl": n.Extra.DroneURL,
-		"droneAuto": n.Extra.DroneAuto, "modelUrl": n.Extra.ModelURL, "modelName": n.Extra.ModelName, "modelOn": n.Extra.ModelOn})
+		"droneAuto": n.Extra.DroneAuto, "modelUrl": n.Extra.ModelURL, "modelName": n.Extra.ModelName, "modelOn": n.Extra.ModelOn, "foiaModel": n.Extra.FOIAModel})
 	writeJSON(w, 200, s.extraView())
 }

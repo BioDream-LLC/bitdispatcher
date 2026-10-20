@@ -326,3 +326,10 @@ func TestParseEndToEndAssess(t *testing.T) {
 		t.Errorf("missing EV suggestion: %v", a.Suggest)
 	}
 }
+
+func TestAssessListsNeverNil(t *testing.T) {
+	a := Assess(Crash{}, DefaultThresholds())
+	if a.Reasons == nil || a.Suggest == nil {
+		t.Fatal("nil lists reach the console as null")
+	}
+}

@@ -1,4 +1,5 @@
 import PeoplePanel from './People'
+import Exceptions from './Exceptions'
 import { TDoSBanner } from './Dream'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -425,6 +426,7 @@ export default function Board() {
         </div>
         <div className="flex min-h-0 flex-col gap-2">
           {discs.map((d) => <DisciplineCard key={d.d} view={view} d={d} units={view.units.filter((u) => discipline(view, u) === d.d)} />)}
+          <Exceptions view={raw} />
           <PeoplePanel view={raw} />
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70">
             <div className="flex items-center gap-2 border-b border-slate-800 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">

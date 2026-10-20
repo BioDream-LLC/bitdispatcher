@@ -8,13 +8,13 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'console', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'command', 'keys'] },
+    ids: ['start', 'signin', 'taker', 'resources', 'console', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
-  { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger'] },
+  { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
-    ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'quality', 'offline', 'tdos', 'hooks'] },
+    ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
-    ids: ['admin-units', 'admin-stations', 'admin-calltypes', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-sites', 'admin-premises', 'admin-migrate', 'help'] },
+    ids: ['admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'help'] },
 ]
 
 export const manual: Article[] = [
@@ -25,7 +25,7 @@ export const manual: Article[] = [
 ::figure lifecycle
 
 ## The first hour
-1. **Sign in** as the administrator with the password printed on first start. The position is the console you are at.
+1. **Sign in** as the administrator with the password printed on first start, and choose **Administrator**. See [Signing in](#signin).
 2. **Record the map**: Admin › Map, choose the centre and radius, press Record. About two minutes for 100 miles. [Open Map](#/admin/map)
 3. **Stations and units**: where units are based and what they are. [Open Stations](#/admin/stations) [Open Units](#/admin/units)
 4. **Call types and run cards**: what each kind of incident needs. The defaults are a sensible start. [Open Call types](#/admin/calltypes)
@@ -231,6 +231,8 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 | \`P 2\` · \`T VF\` | Change priority or call type |
 | \`CL Handled\` · \`RO #26-000123 reason\` | Close, reopen |
 | \`MU E4 ST1\` · \`RET E4\` | Move up to cover a station; send home |
+| \`TG <talkgroup>\` | Set the selected incident's talkgroup |
+| \`BOLO <text>\` | Issue a BOLO for the selected incident, or none |
 | \`ATTACH <call> #26-000123\` | Attach a 911 call to an incident |
 | \`ACK\` | Acknowledge the oldest open emergency |`,
   },
@@ -422,17 +424,21 @@ Delivery failures BitVoice reports show on the Situation panel.`,
   },
   {
     id: 'admin-users', title: 'Users and positions', route: '/admin/users', keys: 'users roles password viewer field dispatcher supervisor admin positions sessions demo demonstration public',
-    body: `| Role | Can |
+    body: `Each person holds one or more **duties**: call-taker, police, fire or EMS dispatcher, dispatcher (all disciplines), supervisor, administrator, records, field crew or viewer. They choose one at [sign-in](#signin); the rights follow it. Their role, the most they may ever do, is the least that holds all their duties:
+
+| Role | Can |
 |---|---|
-| Viewer | See everything, change nothing |
+| Viewer | See everything, change nothing (records staff are viewers who also work records) |
 | Field crew | The [mobile terminal](#mdt) for its own unit |
 | Dispatcher | Work incidents, units and calls |
 | Supervisor | Also reopen incidents, read the ledger and reports, certify reports |
 | Administrator | Also change configuration and users |
 
+**One-time codes**: the list shows who has an authenticator set up; **Reset** for a lost phone. You cannot change your own duties.
+
 Passwords are generated or at least 12 characters. Five wrong passwords lock an account for 15 minutes. The positions list shows who is signed in where.
 
-**A public demonstration account.** Tick **Public demonstration account** on a viewer, dispatcher or supervisor and the sign-in page offers **Sign in as the demo user**: one press signs a visitor in, with no password, at a position of their own (WEB- and four letters) unless they typed one. One account at most, never an administrator or a field crew, and wrong passwords typed for it do not lock the button out. Use it only on a demonstration server: anyone who can reach the server can then work as that user.`,
+**A public demonstration account.** Tick **Public demonstration account** on a viewer, dispatcher or supervisor and the sign-in page offers **Sign in as the demo user**, with a choice of its duties: one press signs a visitor in, with no password, at a position of their own (WEB- and four letters) unless they typed one. One account at most, never an administrator or a field crew, and wrong passwords typed for it do not lock the button out. Use it only on a demonstration server: anyone who can reach the server can then work as that user.`,
   },
   {
     id: 'admin-sites', title: 'Several sites', route: '/admin/sites', keys: 'sites multi-site backup failover active active replication peer survivable',
@@ -471,6 +477,141 @@ Premises from an earlier system come in through **Migration**.`,
 | Call types and run cards | code and run card | "2 engine; ladder:1; als": capabilities and counts. A capability no unit type has is pointed out |
 
 Importing the same file again replaces what it brought (premises by their id, call types by their code); history is added again, so import it once. Address points go to **County GIS**, which reads CSV files with latitude and longitude as well.`,
+  },
+  {
+    id: 'admin-workstations', title: 'Workstations', route: '/admin/workstations', keys: 'workstation workstations console position enrol enroll code browser sign in duties this computer',
+    body: `A **workstation** is one of the agency's console positions. A browser enrolled as a workstation signs in there, and nobody is asked which console they are at: every action is recorded with the position already known.
+
+- **Add** a workstation with a short id (\`CT1\`, \`DISP2\`) and, if you like, a name for where it sits.
+- **Duties offered** narrow what a sign-in at that position may take: Call-taker, Police, Fire or EMS dispatcher, Dispatcher (all disciplines), Supervisor, Administrator, Records. Pick none to offer every duty.
+- **Enrol this browser** makes the computer you are on that workstation; it is kept here, so it is remembered next time.
+- **Get a code for another computer** shows a one-time code. On the other computer, open the sign-in page, choose "Enrol this computer" and type it. It works once, for 24 hours.
+- **Enrolled browsers** are listed with their label and when; revoke any that should no longer sign in there.
+
+Every enrolment and revocation is a ledger event.`,
+  },
+  {
+    id: 'admin-plans', title: 'Response plans', route: '/admin/plans', keys: 'plan plans response run order due order recommendation preferred units area address time',
+    body: `A **response plan** is a run order: the units an agency wants, in due order, when a plan applies. The recommendation follows a plan's due order when one applies; if a planned unit cannot go it says why and who goes instead. A person always decides.
+
+A plan applies when all of its conditions match the incident:
+- **Call types**: the selected codes (empty means every type).
+- **Modifiers**: the selected modifiers, if any.
+- **First-due station area**: a station's area, or Anywhere.
+- **Addresses**: the incident address starts with one of these lines (one per line), for an address-specific plan.
+- **From / To**: a time of day window (HH:MM), optional.
+
+The **due order** is the unit ids in the order they are wanted; add from the list, reorder with the up and down buttons, remove any. A plan without an order narrows nothing and is ignored.`,
+  },
+  {
+    id: 'admin-facilities', title: 'Receiving facilities', route: '/admin/facilities', keys: 'facility facilities hospital trauma burn stroke cardiac psychiatric diversion closed transport destination patients',
+    body: `**Receiving facilities** are the hospitals and specialty centres a patient may be taken to, and whether each is taking patients. Crews and the console see the status beside a transport decision.
+
+- **Add** a facility with an id, name and kind (hospital, trauma, burn, stroke, cardiac, psychiatric or other), its phone and position.
+- **Status** is a coloured chip: open (taking patients), on diversion, or closed. A quick button changes it in one click, and the change is an attributed ledger event.
+
+Nothing here decides a destination; it tells the people who do what is open.`,
+  },
+  {
+    id: 'admin-guidance', title: 'Approved guidance', route: '/admin/guidance', keys: 'guidance policy guide prompt checklist passage citation approved resources call taker effective expires supersedes markdown',
+    body: `**Approved guidance** is the agency's policies, call-taking guides, response guides and checklists. The call-taker's Resources tab shows the matching **passages** with citations; nothing is invented, only approved text is shown.
+
+A document has an id, title, **kind** (Policy (mandatory), Guide, Prompts or Checklist), version, effective date, an optional expiry, what it supersedes, and the source where the full approved copy is. Narrow it to call types, modifiers or words, or mark it **always shown**. Only a document marked **Approved for use** is shown to call-takers.
+
+The **text** is Markdown with \`#\`/\`##\`/\`###\` headings. Headings divide it into passages. Under a heading, a line like \`Applies: CARD, CHEST; modifiers: WEAPONS; words: not breathing\` narrows that passage.
+
+- **Add the examples** loads clearly-titled example documents as drafts (not approved), to see how it works.
+- **Try it** matches a call type, modifiers and some text and shows the passages a call-taker would see, with their title, heading, kind, version and why, or a note when nothing matches.
+
+A document's status is a chip: approved or draft, and outdated once its expiry has passed.`,
+  },
+  {
+    id: 'admin-disclosure', title: 'Disclosure rules', route: '/admin/disclosure', keys: 'disclosure foia records request exempt redact rule category words pattern legal basis counsel jurisdiction',
+    body: `**Disclosure rules** are the agency's legally reviewed rules for records requests (FOIA). Nothing is hardcoded as exempt; the system proposes, people decide, and your counsel reviews every rule before it is enabled.
+
+A rule has an id, name, jurisdiction and record types, and matches by:
+- **Category**: a named category of the record.
+- **Words**: any of a comma-separated list.
+- **Pattern**: a Go regular expression.
+
+A **legal basis** is required, with an explanation, an optional effective window, and an enabled switch. A rule stays disabled until counsel has reviewed it.
+
+- **Add the sample rules (disabled)** loads examples; they are examples, not legal advice.
+- **Try it** pastes a record's text and shows it with the proposed passages highlighted \u2014 amber where the confidence is "review", rose where it is "high" \u2014 and a list of each with its text, rule, basis and confidence.`,
+  },
+  {
+    id: 'signin', title: 'Signing in: your duty, codes and the lock', keys: 'sign in login duty role call-taker dispatcher supervisor mfa one-time code authenticator totp lock unlock inactivity workstation position',
+    body: `Type your username and password. If you hold more than one duty, choose the one you are working: **Call-taker**, **Police**, **Fire** or **EMS dispatcher**, **Dispatcher (all disciplines)**, **Supervisor**, **Administrator** or **Records** (number keys choose). Your workspace opens for it, and what you may do follows it: the server enforces it, not only the screen.
+
+| Duty | Opens | May |
+|---|---|---|
+| Call-taker | [Call entry](#taker) | Enter and update incidents; not send units (unless the agency allows it) |
+| Police, fire, EMS dispatcher | The console with that discipline | Send and change their discipline's units (any, if the agency allows it) |
+| Dispatcher (all disciplines) | The console | Everything on the floor |
+| Supervisor | The console, the [board](#board) | Also intervene anywhere, reopen, read the ledger, run exercises |
+| Administrator | Administration | Configuration; works the floor only when signed in for a floor duty |
+| Records | [Records](#records) | Review views and records requests; changes no incident |
+
+A supervisor covering a position keeps supervisory rights. You are never asked which console you are at: an [enrolled workstation](#admin-workstations) gives the position; a browser that is not one keeps a web position of its own (WEB- and four letters).
+
+**One-time codes.** When the agency asks for them (Settings › Roles and sign-in), the first sign-in shows a QR code: scan it with any authenticator app and type its six digits. After that, type the current code each time; a code works once. An administrator resets it for a lost phone.
+
+**The lock.** **Ctrl+Shift+L**, or the agency's minutes without input, locks the console: nothing is shown or changed until you unlock it with your password (and code). Everything stays open underneath, including what you were typing. Signing in and out, locking and unlocking are all in the ledger, with the duty and workstation.
+
+> Before relying on these for criminal justice information, confirm your state's CJIS and access requirements.`,
+  },
+  {
+    id: 'taker', title: 'Call entry: the call-taker\u2019s workspace', route: '/taker', keys: 'call taker call entry tabs persons vehicles previous hazards search comments history resources submit f4 f2 rebid f6 modifiers duplicate',
+    body: `A calm workspace for one call: the call list on the left, nine tabs across the top with only the chosen one shown, and the call (its location, transcript and what was heard) with the **narrative** always on the right.
+
+| Key | Does |
+|---|---|
+| F4 or Ctrl+Enter | Submit the incident; after it, save changes to it |
+| F2 | Clear for the next call (asks first if anything is unsubmitted) |
+| F6 | Rebid the caller's location |
+| F8 | Write in the narrative |
+| F3 | CAD search |
+| Alt+1 … Alt+9 | Change tab |
+
+**Call Entry.** Type a code or a word for the call type (hundreds are fine; arrows and Enter choose), the priority (the type's, or another), **modifiers** (weapons, in progress, entrapment…: some raise the priority, some add people to notify, officer-safety ones show red), the incident's location (pick a suggestion, right-click the map, or use the caller's ALI position; **Verify** when the caller confirms it), the caller and callback, and where the caller is when not at the incident. The call's ANI/ALI is beside it.
+
+**Before a second incident.** F4 first looks for open incidents at the same address, nearby or from the same callback. If there are any you see them: **Add this call to it** puts the call (and what you wrote) on that incident; F4 again makes a new one.
+
+**After submission** the workspace stays on the incident. Dispatch has it at once; keep typing: comments go straight on it, and F4 saves changes to the type, priority, location or caller. A newer caller location (a rebid, a location provider) shows at the top: **Use it** changes the incident's location (the old one stays in the timeline, dispatchers and units are told); **Keep** leaves it.
+
+**The other tabs.** **Persons** and **Vehicles** (several of each, with their role; what the caller said is offered to fill them), **Previous** (earlier incidents linked by address, phone, names, plates and VINs, confirmed or possible), **Hazards** (premises at and near the place, officer-safety people and modifiers, BOLO matches: the critical ones also show as one red line on every tab), **CAD Search**, **Comments** (every note in order, and logging transfers, referrals, outbound calls and instructions given), **History** (units and their times, radio, the response recommended) and **Resources** (the agency's [approved guidance](#resources)).
+
+Notes written before submission keep their own time. Nothing is lost on a lock or a reload: the entry is kept in the browser tab until it is submitted or cleared.`,
+  },
+  {
+    id: 'resources', title: 'Resources: approved guidance with the call', keys: 'resources guidance policy procedure call taking guide checklist prompts citation version effective',
+    body: `As the call type, modifiers and what is said change, the **Resources** tab finds the passages of the agency's approved policies, call-taking guides, response guides and checklists that apply, and lights up when there is something new. Each passage shows its document, section, version and effective date, whether it is **policy (mandatory)**, a guide, a checklist or suggested prompts, and why it matched; **The whole document** opens the full approved text at that section. Outdated passages and two policies that both apply are marked. When nothing applies it says so.
+
+Only approved text is shown, word for word; nothing is generated. Opening the tab records which passages, at which versions, were shown for the incident, so a reviewer later sees what was available at the time. Documents are kept in [Approved guidance](#admin-guidance).`,
+  },
+  {
+    id: 'dispatching', title: 'Dispatching: reasons, warnings, plans and acknowledgement', keys: 'dispatch reason override warning confirm verified location plan run order first due acknowledge ack no ack talkgroup bolo facilities diversion passdown notify mutual aid',
+    body: `- **Send rec** on a pending incident in the queue dispatches its recommendation in one press.
+- **A reason.** Sending units other than the recommendation asks why (quick choices, or your own words); on the command line write it after a slash: \`D E5 / closer by radio\`. The reason and the response plan followed are kept with the dispatch.
+- **Warnings.** When the location is not verified, is uncertain or is missing, the recommendation says so and you confirm before sending.
+- **Response plans.** When a [plan](#admin-plans) applies, its due order leads; a planned unit that cannot go is struck through with why, and the unit going instead says whose place it takes. When the recommendation changes, the change is shown until you mark it seen.
+- **Acknowledgement.** A dispatched unit that has not acknowledged in the agency's seconds flashes **NO ACK**; press it (or \`ACK E1\`) when it does. A crew acknowledges on its terminal.
+- **Call entry facts** on the incident: modifiers, people and vehicles, a changed location (in amber for half an hour), where the caller is, BOLO matches, the talkgroup (\`TG FIRE-OPS2\`) and notifications still to make, each with **done**.
+- **Situation**: the shift **passdown** log, active **BOLOs** (issue, cancel; \`BOLO text\` on the command line; crews see them) and **facilities** with one-press open / diversion / closed.`,
+  },
+  {
+    id: 'exercises', title: 'Exercises, injects and staging', keys: 'exercise instructor inject drill training timeline debrief staging publish configuration change control',
+    body: `**An exercise** is one training board for everyone who joins it: tick **Training** at sign-in and type the exercise's name (any name; the first to join makes it). Trainees sign in with their own duties, so a call-taker, dispatchers and a supervisor work it together, and crews can join on the [mobile terminal](#mdt) the same way. Practising alone, leave the name empty.
+
+**The instructor** (a supervisor or administrator) presses **Inject**: a new caller (where, who, and what they say as the exercise goes), the caller saying more or moving, a unit going out of service, an emergency button, or a unit on the radio. **Timeline** downloads every event for the debrief, and when the exercise ends its timeline is kept (Supervisors: \`/api/exercises\`).
+
+**Staging.** An administrator signed in with Training changes call types, units, stations, response plans, guidance or facilities on the training board, tries them there, then opens **Staged changes**: it lists what differs from the live board; choose the parts, say why, and **Publish**. With *Change configuration only through staging* on (Settings), those changes cannot be made on the live board directly.
+
+> The training board is not a backup of the live board. A continuity site is a separate, tested arrangement: see [Several sites](#admin-sites).`,
+  },
+  {
+    id: 'console-route', title: 'The full console', route: '/console', keys: 'console full dispatcher screen call taker switch',
+    body: `**#/console** always opens the full dispatcher screen, whatever duty you signed in for: a call-taker can look at the whole board there, and come back to [call entry](#taker) at **#/taker**.`,
   },
   {
     id: 'help', title: 'This manual', route: '/help', keys: 'help manual documentation guide search',
@@ -568,7 +709,7 @@ It names the least busy positions free to relieve someone.`,
   },
   {
     id: 'training', title: 'Training', keys: 'training scenario simulation practice trainee score reset',
-    body: `Tick **Training** when signing in. The console opens a board of its own, marked TRAINING in violet: the agency's units, stations, call types, premises and map, on a ledger of its own. Each trainee has their own board, even on a shared account; one left idle for two hours is cleared. Nothing done there reaches the live board, and administration is closed.
+    body: `Tick **Training** when signing in. The console opens a board of its own, marked TRAINING in violet: the agency's units, stations, call types, premises and map, on a ledger of its own. Each trainee has their own board, even on a shared account; one left idle for two hours is cleared. Nothing done there reaches the live board. Administration there is staging: an administrator's changes stay on the training board until published (see [Exercises, injects and staging](#exercises)); users, connections and maps are the live board's.
 
 - **Scenarios** play calls, transcripts, crash data and radio traffic into it on the agency's own map: a house fire with three callers, a cardiac arrest in Spanish, an interstate crash with crash data, an armed robbery, and a flood of calls on the line.
 - **Score** checks what was done: every caller on an incident, the call type, the units sent, a reply in the caller's language, and each incident's [quality review](#quality).
@@ -618,6 +759,32 @@ A supervisor **acknowledges** it; it clears after ten quiet minutes. Keep answer
 | \`/api/hooks/radio-text\` | \`{"unit" or "radioId", "channel", "text"}\` |
 
 The drone system's launch address and token, the launch rule, and the optional translation model are set on the same screen.`,
+  },
+  {
+    id: 'records', title: 'Records and requests', route: '/records', keys: 'records foia freedom of information review audit release redaction disclosure request requester',
+    body: `The records area reads a finished incident and answers requests for it, all from the same tamper-evident [ledger](#ledger) the rest of the system writes to.
+
+## Reviewing a record
+The review screen shows one incident four ways, and opening or exporting a view is itself recorded in the ledger.
+
+| View | What it shows |
+|---|---|
+| As first entered | The incident as it was first created, before any later change |
+| Summary | The short account |
+| Detailed | Everything on the incident |
+| Full audit | Every ledger event, with a hash-chain check: it confirms the number of events and reports any break |
+
+**Print** or **Download text** keeps a copy; both are recorded. Open any incident by its number.
+
+## Records requests
+A request names a requester, a contact, what is asked for, the incidents, and whether the **summary** or **detailed** view is released. Each request shows the working days left until it is due (amber when close, rose when overdue) and the working time taken so far.
+
+1. **Assemble** builds the release copy from the chosen view and proposes redactions by the agency's disclosure rules; the original record is untouched.
+2. For each incident, accept or reject each proposed redaction, giving the **basis** required for anything withheld, or **mark a passage** by selecting it in the record. A live preview shows the redacted copy.
+3. **Save decisions** records every decision, accepted and rejected.
+4. **Approve and release** is the moment a person authorises the release: accepted redactions are applied permanently and the copy is checked for leaks before it leaves. A released copy can then be downloaded, and its hash is shown.
+
+> Records work needs the records duty, a supervisor or an administrator.`,
   }
 ]
 

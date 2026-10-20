@@ -43,6 +43,22 @@ type Recommendation struct {
 	Notes     []string  `json:"notes"`
 	Estimate  string    `json:"estimate"` // how travel times were estimated
 	Generated time.Time `json:"generated"`
+	// Plan is the response plan followed, and Planned its units in due order with where each is: a planned
+	// unit that cannot go is shown with who goes instead.
+	Plan    string     `json:"plan,omitempty"`
+	PlanID  string     `json:"planId,omitempty"`
+	Planned []PlanUnit `json:"planned,omitempty"`
+	// Warnings must be confirmed before dispatching: the location is not verified, is uncertain, or missing.
+	Warnings []string `json:"warnings"`
+}
+
+// PlanUnit is one unit of a response plan's due order, and whether it can go.
+type PlanUnit struct {
+	Unit   string `json:"unit"`
+	Due    int    `json:"due"` // 1 for first due
+	Status string `json:"status"`
+	Can    bool   `json:"can"`
+	Why    string `json:"why,omitempty"` // why it cannot: on scene at 26-000004, out of service
 }
 
 func distance(a, b Position) float64 { return geo.Distance(a.Lat, a.Lon, b.Lat, b.Lon) }
@@ -104,7 +120,7 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 		return Recommendation{}, problem("incident", "no incident %s", number)
 	}
 	set := s.Settings
-	r := Recommendation{Incident: number, Type: in.Type, Lines: []Line{}, Units: []string{}, Notes: []string{}, Generated: now,
+	r := Recommendation{Incident: number, Type: in.Type, Lines: []Line{}, Units: []string{}, Notes: []string{}, Warnings: []string{}, Generated: now,
 		Estimate: fmt.Sprintf("Straight line × %.1f at %.0f km/h; no road network loaded", set.RoadFactor, set.SpeedKmh)}
 	if tf != nil {
 		r.Estimate = label
@@ -117,6 +133,39 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 	hasPoint := in.Location.HasPoint()
 	if !hasPoint {
 		r.Notes = append(r.Notes, "The incident has no map position, so units are not ranked by distance: place it on the map")
+		r.Warnings = append(r.Warnings, "No map position: the units are not ranked by distance")
+	} else if in.Location.Radius > 150 {
+		r.Warnings = append(r.Warnings, fmt.Sprintf("The location is uncertain (±%.0f m): confirm it before sending", in.Location.Radius))
+	} else if !in.LocVerified && in.Location.Address == "" {
+		r.Warnings = append(r.Warnings, "The location is a caller position, not a verified address")
+	}
+	// A response plan for the area, address, type and time puts its units first, in due order.
+	plan := s.PlanFor(in, now)
+	due := map[string]int{}
+	if plan != nil {
+		r.Plan, r.PlanID = plan.Name, plan.ID
+		for i, id := range plan.Order {
+			due[id] = i + 1
+			pu := PlanUnit{Unit: id, Due: i + 1}
+			if u, ok := s.Units[id]; ok {
+				pu.Status = u.Status
+				switch {
+				case u.Status == Available:
+					pu.Can = true
+				case u.Incident == number && Committed(u.Status):
+					pu.Can, pu.Why = true, "already on this incident"
+				case Committed(u.Status):
+					pu.Why = fmt.Sprintf("%s at %s", u.Status, u.Incident)
+				case u.Status == MarkedOut && u.MarkOut != nil:
+					pu.Why = "marked out (" + u.MarkOut.Code + ")"
+				default:
+					pu.Why = u.Status
+				}
+			} else {
+				pu.Why = "no such unit"
+			}
+			r.Planned = append(r.Planned, pu)
+		}
 	}
 	// Units already on the incident fill lines first.
 	onScene := []string{}
@@ -160,6 +209,14 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 		}
 		sort.SliceStable(cands, func(a, b int) bool {
 			ca, cb := cands[a], cands[b]
+			// The plan's due order first: its units before any other, in their order.
+			da, db := due[ca.Unit], due[cb.Unit]
+			if (da > 0) != (db > 0) {
+				return da > 0
+			}
+			if da > 0 && da != db {
+				return da < db
+			}
 			if (ca.Seconds == 0) != (cb.Seconds == 0) {
 				return ca.Seconds != 0 // known travel times before unknown
 			}
@@ -208,7 +265,15 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 	for i := range lines {
 		for j := range lines[i].Units {
 			c := &lines[i].Units[j]
-			if j == 0 && len(lines[i].Units) > 0 {
+			if d := due[c.Unit]; d > 0 {
+				c.Reasons = append([]string{fmt.Sprintf("%s due on %s", ordinal(d), plan.Name)}, c.Reasons...)
+				// Who it replaces: planned units ahead of it that cannot go.
+				for _, pu := range r.Planned {
+					if pu.Due < d && !pu.Can && s.Units[pu.Unit] != nil && slices.Contains(s.Capabilities(s.Units[pu.Unit]), c.Capability) {
+						c.Reasons = append(c.Reasons, fmt.Sprintf("instead of %s (%s)", pu.Unit, pu.Why))
+					}
+				}
+			} else if j == 0 && len(lines[i].Units) > 0 {
 				c.Reasons = append([]string{"Closest available with " + c.Capability}, c.Reasons...)
 			}
 		}
@@ -289,6 +354,18 @@ func (s *State) candidate(u *Unit, in *Incident, capability string, now time.Tim
 		c.Reasons = append(c.Reasons, "On the radio "+ago(now.Sub(u.LastHeard)))
 	}
 	return c
+}
+
+func ordinal(n int) string {
+	switch n {
+	case 1:
+		return "1st"
+	case 2:
+		return "2nd"
+	case 3:
+		return "3rd"
+	}
+	return fmt.Sprintf("%dth", n)
 }
 
 func ago(d time.Duration) string {

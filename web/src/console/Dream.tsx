@@ -1,3 +1,4 @@
+import { TrainingTools } from './TrainingTools'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { BellOff, ClipboardCopy, Coffee, Drama, GraduationCap, HeartHandshake, NotebookPen, Plane, Play, RotateCcw, ShieldAlert, Trophy, Video, WifiOff } from 'lucide-react'
@@ -129,7 +130,7 @@ export function TrainingBar({ view }: { view: View }) {
   const [score, setScore] = useState<Score | null>(null)
   const t = view.training
   useEffect(() => {
-    if (t && !t.scenario && can.dispatch(me)) api.get<{ items: Scenario[] }>('/training/scenarios').then((r) => setList(r.items)).catch(() => {})
+    if (t && !t.scenario && can.dispatch(me) && !me?.exercise && me?.duty !== 'admin') api.get<{ items: Scenario[] }>('/training/scenarios').then((r) => setList(r.items)).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!t])
   if (!t) return null
@@ -147,7 +148,8 @@ export function TrainingBar({ view }: { view: View }) {
         <GraduationCap size={16} className="text-violet-300" aria-hidden />
         <b>TRAINING</b> <span className="text-violet-200/80">a board of its own: nothing here reaches the live board</span>
         {t.scenario && <span className="chip bg-violet-500/30 text-violet-100">{t.name} · {t.played}/{t.steps}</span>}
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex items-center gap-1">
+          <TrainingTools view={view} />
           <button className="btn h-7 text-xs" onClick={() => api.get<{ items: Scenario[] }>('/training/scenarios').then((r) => setList(r.items)).catch((e) => toast.error(errText(e)))}><Drama size={13} aria-hidden /> Scenarios</button>
           {t.scenario && <button className="btn h-7 text-xs" onClick={() => api.get<Score>('/training/score').then(setScore).catch((e) => toast.error(errText(e)))}><Trophy size={13} aria-hidden /> Score</button>}
           <button className="btn h-7 text-xs" title="Start again with an empty board" onClick={() => api.post('/training/reset').then(() => toast.success('The training board is empty again')).catch((e) => toast.error(errText(e)))}><RotateCcw size={13} aria-hidden /> Reset</button>

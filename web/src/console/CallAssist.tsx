@@ -62,8 +62,8 @@ function CrashCard({ call }: { call: Call }) {
         {c.occupants ? <><dt className="text-slate-500">Occupants</dt><dd className="text-slate-200">{c.occupants}{c.belted === false ? ', NOT belted' : c.belted ? ', belted' : ''}</dd></> : null}
         {c.fuel && <><dt className="text-slate-500">Power</dt><dd className={cx(['electric', 'hybrid', 'hydrogen', 'cng'].includes(c.fuel) ? 'font-semibold text-amber-200' : 'text-slate-200')}>{c.fuel}</dd></>}
       </dl>
-      {r && r.reasons.length > 0 && <div className="mt-1 text-[11px] text-slate-300">{r.reasons.join(' · ')}</div>}
-      {r && r.suggest.length > 0 && <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-100">{r.suggest.map((x) => <li key={x}>{x}</li>)}</ul>}
+      {(r?.reasons?.length ?? 0) > 0 && <div className="mt-1 text-[11px] text-slate-300">{r!.reasons.join(' · ')}</div>}
+      {(r?.suggest?.length ?? 0) > 0 && <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-100">{r!.suggest.map((x) => <li key={x}>{x}</li>)}</ul>}
       <div className="mt-1 text-[10px] text-slate-500">A rule of thumb from field-triage criteria, to help pick the response. Not a diagnosis.</div>
     </section>
   )

@@ -39,9 +39,9 @@ test('training: a board of its own, a scenario, a reply in Spanish and a score',
   const { creds } = await import('./helpers')
   await page.fill('#u', 'admin')
   await page.fill('#p', creds().password)
-  await page.fill('#c', 'T1')
   await page.getByLabel(/^Training/).check()
-  await page.click('button:has-text("Sign in")')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.getByRole('button', { name: /Supervisor/ }).click()
   await expect(page.getByText('TRAINING', { exact: true })).toBeVisible()
   await page.getByRole('dialog').getByText('Cardiac arrest, Spanish-speaking caller').locator('xpath=../..').getByRole('button', { name: 'Start' }).click()
   const calls = page.getByRole('list', { name: '911 calls' })
@@ -60,7 +60,7 @@ test('training: a board of its own, a scenario, a reply in Spanish and a score',
 })
 
 test('the supervisor sees the people, the quality review and a break', async ({ page }) => {
-  const errors = await signIn(page, undefined, undefined, 'SUP')
+  const errors = await signIn(page)
   await expect(page.getByText('911 CALLS')).toBeVisible()
   await page.getByRole('button', { name: /break/i }).first().click()
   await expect(page.getByText('On break')).toBeVisible()

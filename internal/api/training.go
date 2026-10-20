@@ -68,7 +68,11 @@ func (s *Server) trainingFor(r *http.Request) *Server {
 	if !ok || !se.Training {
 		return nil
 	}
-	t, err := s.trainer.get(se.Hash)
+	key := se.Hash
+	if se.Exercise != "" {
+		key = "ex:" + strings.ToLower(se.Exercise) // a shared exercise: everyone who joined it, one board
+	}
+	t, err := s.trainer.get(key)
 	if err != nil {
 		s.Log.Error("training: cannot start", "err", err)
 		return nil
@@ -123,6 +127,14 @@ func (t *trainer) drop(key string) {
 	close(b.srv.quit)
 	b.srv.Close()
 	b.srv.Eng.Close()
+	// An exercise's timeline is kept for its evaluation; a practice board is simply gone.
+	if strings.HasPrefix(key, "ex:") {
+		arch := filepath.Join(t.live.DataDir, "exercises")
+		if os.MkdirAll(arch, 0o700) == nil {
+			name := fmt.Sprintf("%s-%s.jsonl", time.Now().UTC().Format("20060102-150405"), safeName(strings.TrimPrefix(key, "ex:")))
+			os.Rename(filepath.Join(b.dir, "ledger.jsonl"), filepath.Join(arch, name))
+		}
+	}
 	os.RemoveAll(b.dir)
 }
 
@@ -162,6 +174,11 @@ func (t *trainer) build(key string) (*board, error) {
 		return nil, err
 	}
 	srv.resetTraining = func() (*Server, error) { return t.reset(key) }
+	srv.liveServer = live
+	srv.exercise = strings.TrimPrefix(key, "ex:")
+	if !strings.HasPrefix(key, "ex:") {
+		srv.exercise = ""
+	}
 	return &board{srv: srv, dir: dir}, nil
 }
 
@@ -389,58 +406,63 @@ func (s *Server) startScenario(sc Scenario) {
 	s.mu.Unlock()
 	var centre [2]float64
 	s.Eng.Read(func(st *cad.State) { centre = st.Settings.MapCenter })
+	go s.runSteps(ctx, sc.steps, p, centre)
+}
+
+// runSteps plays steps into this (training) engine: calls ringing and answered, what callers say, where
+// they move, crash data, and what units say on the radio.
+func (s *Server) runSteps(ctx context.Context, steps []step, p *player, centre [2]float64) {
 	actor := cad.Actor{User: "training"}
-	go func() {
-		start := time.Now()
-		addr := map[string]string{}
-		for _, st := range sc.steps {
-			wait := time.Until(start.Add(time.Duration(st.at) * time.Second))
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(wait):
-			}
-			p.mu.Lock()
-			p.played++
-			if st.call != "" && !slices.Contains(p.calls, st.call) {
-				p.calls = append(p.calls, st.call)
-			}
-			p.mu.Unlock()
-			switch {
-			case st.end:
-				s.Eng.EndCall(actor, st.call)
-			case st.radio != "":
-				s.playRadio(actor, p, st)
-			case st.call != "":
-				d := cad.CallData{Source: "training", State: st.state, Callback: st.callback, CallerName: st.name, Line: st.line, Transcript: st.say, Crash: st.crash, Emergency: true}
-				if st.state == "answered" {
-					d.Answer = time.Now()
-				}
-				if st.radius > 0 {
-					lat, lon := offset(centre, st.east, st.north)
-					loc := &ng911.Location{Lat: &lat, Lon: &lon, Radius: st.radius, Method: st.method, Source: "training", At: time.Now()}
-					if st.alt != 0 {
-						loc.Altitude, loc.VRadius = ptr(st.alt), 3
-					}
-					key := st.call
-					if addr[key] == "" {
-						addr[key] = s.reverseLabel(lat, lon)
-					}
-					if a := addr[key]; a != "" {
-						civic := &ng911.Civic{Location: a, Floor: st.floor}
-						loc.Civic, loc.Address = civic, a+map[bool]string{true: ", Floor " + st.floor, false: ""}[st.floor != ""]
-					}
-					d.Location = loc
-					if st.crash != nil {
-						c := *st.crash
-						c.Lat, c.Lon, c.Callback = &lat, &lon, st.callback
-						d.Crash = &c
-					}
-				}
-				s.Eng.UpsertCall(actor, st.call, d)
-			}
+
+	start := time.Now()
+	addr := map[string]string{}
+	for _, st := range steps {
+		wait := time.Until(start.Add(time.Duration(st.at) * time.Second))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
 		}
-	}()
+		p.mu.Lock()
+		p.played++
+		if st.call != "" && !slices.Contains(p.calls, st.call) {
+			p.calls = append(p.calls, st.call)
+		}
+		p.mu.Unlock()
+		switch {
+		case st.end:
+			s.Eng.EndCall(actor, st.call)
+		case st.radio != "":
+			s.playRadio(actor, p, st)
+		case st.call != "":
+			d := cad.CallData{Source: "training", State: st.state, Callback: st.callback, CallerName: st.name, Line: st.line, Transcript: st.say, Crash: st.crash, Emergency: true}
+			if st.state == "answered" {
+				d.Answer = time.Now()
+			}
+			if st.radius > 0 {
+				lat, lon := offset(centre, st.east, st.north)
+				loc := &ng911.Location{Lat: &lat, Lon: &lon, Radius: st.radius, Method: st.method, Source: "training", At: time.Now()}
+				if st.alt != 0 {
+					loc.Altitude, loc.VRadius = ptr(st.alt), 3
+				}
+				key := st.call
+				if addr[key] == "" {
+					addr[key] = s.reverseLabel(lat, lon)
+				}
+				if a := addr[key]; a != "" {
+					civic := &ng911.Civic{Location: a, Floor: st.floor}
+					loc.Civic, loc.Address = civic, a+map[bool]string{true: ", Floor " + st.floor, false: ""}[st.floor != ""]
+				}
+				d.Location = loc
+				if st.crash != nil {
+					c := *st.crash
+					c.Lat, c.Lon, c.Callback = &lat, &lon, st.callback
+					d.Crash = &c
+				}
+			}
+			s.Eng.UpsertCall(actor, st.call, d)
+		}
+	}
 }
 
 // playRadio has a unit sent to the scenario's incident say something; if none was sent, nothing is said.

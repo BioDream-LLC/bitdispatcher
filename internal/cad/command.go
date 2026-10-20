@@ -2,6 +2,7 @@ package cad
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -41,7 +42,9 @@ var Verbs = []Verb{
 	{[]string{"T", "TYPE"}, "T <type>", "Change the selected incident's call type"},
 	{[]string{"CL", "CLOSE"}, "CL <disposition> [text]", "Close the selected incident"},
 	{[]string{"RO", "REOPEN"}, "RO #incident <reason>", "Reopen a closed incident"},
-	{[]string{"ACK"}, "ACK", "Acknowledge the oldest open emergency"},
+	{[]string{"ACK"}, "ACK [units…]", "With units: they acknowledged their assignment; alone: acknowledge the oldest open emergency"},
+	{[]string{"TG"}, "TG <talkgroup>", "Set the selected incident's talkgroup"},
+	{[]string{"BOLO"}, "BOLO <text>", "Issue a BOLO for the selected incident (or none)"},
 	{[]string{"MU", "COVER"}, "MU <unit> <station>", "Move a unit up to cover another station"},
 	{[]string{"RET", "HOME"}, "RET <units…>", "Send covering units back to their own station"},
 	{[]string{"ATTACH"}, "ATTACH <call> [#incident]", "Attach a 911 call to the selected (or named) incident"},
@@ -109,10 +112,18 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 		if len(rest) == 0 {
 			return CommandResult{Message: "Name the units: D E1 M2"}
 		}
+		units, why := rest, ""
+		if i := slices.Index(rest, "/"); i >= 0 {
+			units, why = rest[:i], strings.Join(rest[i+1:], " ")
+		}
 		rec, _ := e.Recommend(inc)
-		if err := e.Dispatch(a, inc, upper(rest), rec.Units); err != nil {
+		if err := e.NeedReason(inc, upper(units), rec.Units, why); err != nil {
 			return fail(err)
 		}
+		if err := e.DispatchWhy(a, inc, upper(units), rec.Units, why, rec.Plan); err != nil {
+			return fail(err)
+		}
+		rest = units
 		return CommandResult{OK: true, Message: "Dispatched " + strings.Join(upper(rest), " ") + " to " + inc, Incident: inc}
 	case "REC":
 		inc, _, err := pickInc()
@@ -129,7 +140,7 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 		if len(rec.Units) == 0 {
 			return CommandResult{Message: "Nothing to recommend: " + strings.Join(rec.Notes, "; "), Incident: inc}
 		}
-		if err := e.Dispatch(a, inc, rec.Units, rec.Units); err != nil {
+		if err := e.DispatchWhy(a, inc, rec.Units, rec.Units, "", rec.Plan); err != nil {
 			return fail(err)
 		}
 		return CommandResult{OK: true, Message: "Dispatched the recommendation " + strings.Join(rec.Units, " ") + " to " + inc, Incident: inc}
@@ -399,7 +410,32 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 			return fail(err)
 		}
 		return CommandResult{OK: true, Message: inc + " reopened", Incident: inc}
+	case "TG":
+		if err := needInc(selected); err != nil {
+			return fail(err)
+		}
+		if err := e.SetTalkgroup(a, selected, strings.Join(args, " ")); err != nil {
+			return fail(err)
+		}
+		return CommandResult{OK: true, Message: selected + " on talkgroup " + strings.Join(args, " "), Incident: selected}
+	case "BOLO":
+		if len(args) == 0 {
+			return CommandResult{Message: "Say what to look out for: BOLO silver Honda Civic VA KTR-4471 northbound"}
+		}
+		id, err := e.SaveBOLO(a, BOLO{Text: strings.Join(args, " "), Incident: selected})
+		if err != nil {
+			return fail(err)
+		}
+		return CommandResult{OK: true, Message: id + " issued", Incident: selected}
 	case "ACK":
+		if len(args) > 0 {
+			for _, u := range upper(args) {
+				if err := e.AckUnit(a, u, "dispatcher"); err != nil {
+					return fail(err)
+				}
+			}
+			return CommandResult{OK: true, Message: strings.Join(upper(args), " ") + " acknowledged"}
+		}
 		key := ""
 		e.Read(func(s *State) {
 			var oldest *Emergency

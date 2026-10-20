@@ -88,6 +88,8 @@ type UnitDef struct {
 	RadioID      int      `json:"radioId,omitempty"`      // the radio's unit ID (P25 decimal)
 	RadioAlias   string   `json:"radioAlias,omitempty"`
 	Agency       string   `json:"agency,omitempty"`
+	// Area is the unit's own beat, sector or district, for police backup and response plans.
+	Area string `json:"area,omitempty"`
 }
 
 // Position is where a unit is, by AVL or radio.
@@ -152,6 +154,11 @@ type CallType struct {
 	Critical bool `json:"critical,omitempty"`
 	// Drone asks the drone system to launch for this call type, when a drone system is configured.
 	Drone bool `json:"drone,omitempty"`
+	// Notify are the people or agencies to tell for this call type (a fire marshal, animal control),
+	// listed on every incident of the type as a checklist.
+	Notify []string `json:"notify,omitempty"`
+	// Group is the agency's own heading for the type in long lists (Medical, Traffic, Property...).
+	Group string `json:"group,omitempty"`
 }
 
 // Caller is who reported an incident.
@@ -169,8 +176,11 @@ type Assignment struct {
 	Enroute     time.Time `json:"enroute,omitzero"`
 	OnScene     time.Time `json:"onScene,omitzero"`
 	Transport   time.Time `json:"transport,omitzero"`
-	AtDest      time.Time `json:"atDest,omitzero"`
-	Cleared     time.Time `json:"cleared,omitzero"`
+	// Acked is when the unit acknowledged the assignment (by radio, the mobile terminal or the dispatcher).
+	Acked   time.Time `json:"acked,omitzero"`
+	AckedBy string    `json:"ackedBy,omitempty"`
+	AtDest  time.Time `json:"atDest,omitzero"`
+	Cleared time.Time `json:"cleared,omitzero"`
 }
 
 // Entry is one line of an incident's timeline.
@@ -201,6 +211,19 @@ type Incident struct {
 	Closed      time.Time       `json:"closed,omitzero"`
 	Disposition string          `json:"disposition,omitempty"`
 	Reports     []string        `json:"reports,omitempty"` // incident reports written for it
+	// Call entry: modifiers, people and vehicles, where the caller is when not at the incident, the
+	// checklist of notifications and logged contacts, the talkgroup, and a newer caller location waiting
+	// for the call-taker to accept it.
+	Modifiers   []string        `json:"modifiers,omitempty"`
+	Persons     []Person        `json:"persons,omitempty"`
+	Vehicles    []Vehicle       `json:"vehicles,omitempty"`
+	CallerAt    *ng911.Location `json:"callerAt,omitempty"`
+	Notices     []Contact       `json:"notices,omitempty"`
+	Talkgroup   string          `json:"talkgroup,omitempty"`
+	LocVerified bool            `json:"locVerified,omitempty"` // the call-taker confirmed the address on the map
+	NewLocation *LocOffer       `json:"newLocation,omitempty"`
+	Guidance    []Shown         `json:"guidance,omitempty"` // approved guidance shown for it, by version
+	Changed     *LocChange      `json:"changed,omitempty"`  // the last accepted location change, for dispatchers
 }
 
 // TextLine is one line of a text conversation with a caller.
@@ -343,6 +366,17 @@ type Settings struct {
 	ClusterMeters  float64 `json:"clusterMeters,omitempty"`
 	ClusterMinutes int     `json:"clusterMinutes,omitempty"`
 	QA             QA      `json:"qa,omitzero"`
+
+	// Call entry and the work of each role.
+	Modifiers  []Modifier `json:"modifiers,omitempty"`  // the agency's incident modifiers (weapons, in progress...)
+	Duties     DutyRules  `json:"duties,omitzero"`      // what each role may do
+	Security   Security   `json:"security,omitzero"`    // sign-in, MFA and lock policy
+	AckSeconds int        `json:"ackSeconds,omitempty"` // a dispatched unit not acknowledged after this is flagged (0: 60)
+	// OverrideReasonOff stops asking dispatchers why they sent other units than recommended.
+	OverrideReasonOff bool     `json:"overrideReasonOff,omitempty"`
+	Talkgroups        []string `json:"talkgroups,omitempty"`
+	MoveMeters        float64  `json:"moveMeters,omitempty"` // a newer caller location this far away is offered (0: 50 m)
+	FOIADays          int      `json:"foiaDays,omitempty"`   // working days to answer a records request (0: 5)
 }
 
 // MarkOutType finds a mark-out type by its code, in any case.

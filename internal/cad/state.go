@@ -3,6 +3,7 @@ package cad
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/biodream-llc/bitdispatcher/internal/foia"
 	"slices"
 	"strings"
 	"time"
@@ -73,13 +74,16 @@ type idData struct {
 }
 
 type incidentCreated struct {
-	Number    string          `json:"number"`
-	Type      string          `json:"type"`
-	Priority  int             `json:"priority"`
-	Location  *ng911.Location `json:"location,omitempty"`
-	Caller    *Caller         `json:"caller,omitempty"`
-	Narrative string          `json:"narrative,omitempty"`
-	Call      string          `json:"call,omitempty"`
+	Modifiers   []string        `json:"modifiers,omitempty"`
+	CallerAt    *ng911.Location `json:"callerAt,omitempty"`
+	LocVerified bool            `json:"locVerified,omitempty"`
+	Number      string          `json:"number"`
+	Type        string          `json:"type"`
+	Priority    int             `json:"priority"`
+	Location    *ng911.Location `json:"location,omitempty"`
+	Caller      *Caller         `json:"caller,omitempty"`
+	Narrative   string          `json:"narrative,omitempty"`
+	Call        string          `json:"call,omitempty"`
 }
 
 type incidentChanged struct {
@@ -98,6 +102,8 @@ type noteData struct {
 type dispatchData struct {
 	Units       []string `json:"units"`
 	Recommended []string `json:"recommended"`
+	Reason      string   `json:"reason,omitempty"` // why other units than recommended
+	Plan        string   `json:"plan,omitempty"`   // the response plan the recommendation followed
 }
 
 type statusData struct {
@@ -133,32 +139,40 @@ type actionData struct {
 
 // State is everything bitdispatcher knows, rebuilt from the ledger.
 type State struct {
-	Seq         uint64                `json:"seq"`
-	Settings    Settings              `json:"settings"`
-	Stations    map[string]*Station   `json:"stations"`
-	Units       map[string]*Unit      `json:"units"`
-	CallTypes   map[string]*CallType  `json:"callTypes"`
-	Incidents   map[string]*Incident  `json:"incidents"`
-	Calls       map[string]*Call      `json:"calls"`
-	Emergencies map[string]*Emergency `json:"emergencies"`
-	Users       map[string]*UserInfo  `json:"users"`
-	Advisory    AdvisoryState         `json:"advisory"`
-	Reports     map[string]*RMSReport `json:"reports"`
-	Premises    map[string]*Premise   `json:"premises"`
-	Drones      map[string]*Drone     `json:"drones"`
-	Radio       []RadioLine           `json:"radio"`
-	Care        map[string]*CareCase  `json:"care"`
-	Breaks      map[string]*Break     `json:"breaks"`
-	TDoS        TDoS                  `json:"tdos"`
-	tdos        tdosTrack
-	History     []History      `json:"-"` // incidents from an earlier system
-	rptCount    map[string]int // "site prefix|yy"
-	premCount   int
-	premGrid    grid
-	premIDs     []string
-	premIdx     map[string]int
-	histGrid    grid
-	yearCount   map[string]int // incidents per site and year, for numbering
+	Seq          uint64                   `json:"seq"`
+	Settings     Settings                 `json:"settings"`
+	Stations     map[string]*Station      `json:"stations"`
+	Units        map[string]*Unit         `json:"units"`
+	CallTypes    map[string]*CallType     `json:"callTypes"`
+	Incidents    map[string]*Incident     `json:"incidents"`
+	Calls        map[string]*Call         `json:"calls"`
+	Emergencies  map[string]*Emergency    `json:"emergencies"`
+	Users        map[string]*UserInfo     `json:"users"`
+	Advisory     AdvisoryState            `json:"advisory"`
+	Reports      map[string]*RMSReport    `json:"reports"`
+	Premises     map[string]*Premise      `json:"premises"`
+	Drones       map[string]*Drone        `json:"drones"`
+	Radio        []RadioLine              `json:"radio"`
+	Care         map[string]*CareCase     `json:"care"`
+	Breaks       map[string]*Break        `json:"breaks"`
+	TDoS         TDoS                     `json:"tdos"`
+	BOLOs        map[string]*BOLO         `json:"bolos"`
+	Facilities   map[string]*Facility     `json:"facilities"`
+	Plans        map[string]*ResponsePlan `json:"plans"`
+	Guidance     map[string]*GuidanceDoc  `json:"guidance"`
+	Passdown     []Passdown               `json:"passdown"`
+	Workstations map[string]*Workstation  `json:"workstations"`
+	FOIARules    map[string]*foia.Rule    `json:"foiaRules"`
+	FOIA         map[string]*FOIARequest  `json:"foia"`
+	tdos         tdosTrack
+	History      []History      `json:"-"` // incidents from an earlier system
+	rptCount     map[string]int // "site prefix|yy"
+	premCount    int
+	premGrid     grid
+	premIDs      []string
+	premIdx      map[string]int
+	histGrid     grid
+	yearCount    map[string]int // incidents per site and year, for numbering
 }
 
 func newState() *State {
@@ -169,6 +183,7 @@ func newState() *State {
 		Reports: map[string]*RMSReport{}, rptCount: map[string]int{},
 		Premises: map[string]*Premise{}, premGrid: grid{}, premIdx: map[string]int{}, histGrid: grid{},
 		Drones: map[string]*Drone{}, Care: map[string]*CareCase{}, Breaks: map[string]*Break{},
+		BOLOs: map[string]*BOLO{}, Facilities: map[string]*Facility{}, Plans: map[string]*ResponsePlan{}, Guidance: map[string]*GuidanceDoc{},
 	}
 }
 
@@ -185,6 +200,12 @@ func decode[T any](e ledger.Event) (T, error) {
 // an error, because the ledger was written by commands that validated it.
 func (s *State) apply(e ledger.Event) error {
 	s.Seq++ // events applied: the ledger's sequence on one site, the merged count on several
+	if ok, err := s.applyEntry(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
 	if ok, err := s.applyDream(e); ok {
 		if err == nil {
 			s.afterApply(e)
@@ -308,7 +329,8 @@ func (s *State) applyCore(e ledger.Event) error {
 			return err
 		}
 		in := &Incident{Number: v.Number, Type: v.Type, Priority: v.Priority, Status: Pending, Location: v.Location,
-			Caller: v.Caller, Calls: []string{}, Units: []Assignment{}, Timeline: []Entry{}, Created: e.At, CreatedBy: e.Actor, Updated: e.At}
+			Caller: v.Caller, Calls: []string{}, Units: []Assignment{}, Timeline: []Entry{}, Created: e.At, CreatedBy: e.Actor, Updated: e.At,
+			Modifiers: v.Modifiers, CallerAt: v.CallerAt, LocVerified: v.LocVerified}
 		s.Incidents[v.Number] = in
 		s.yearCount[fmt.Sprintf("%s|%d", e.Site, e.At.UTC().Year())]++
 		text := "Created " + s.typeLabel(v.Type) + " P" + fmt.Sprint(v.Priority)
@@ -384,6 +406,12 @@ func (s *State) applyCore(e ledger.Event) error {
 			}
 			if len(v.Recommended) > 0 && len(off) > 0 {
 				text += " (not recommended: " + strings.Join(off, " ") + ")"
+			}
+			if v.Reason != "" {
+				text += " — why: " + v.Reason
+			}
+			if v.Plan != "" {
+				text += " — plan: " + v.Plan
 			}
 			in.add(e, "dispatch", text)
 		}

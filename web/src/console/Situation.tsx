@@ -7,6 +7,7 @@ import { can, store, useStore } from '../store'
 import { StatusChip } from '../ui'
 import { activity as doing, ago, clock, cx, ms, overdue, statusMeta, typeName, useNow } from '../util'
 import type { Call, Coverage, View } from '../types'
+import { Passdown, BOLOs, Facilities } from './Ops'
 import { CallBox, UnitDetail } from './IncidentPanel'
 
 const LABEL: Record<string, string> = {
@@ -54,6 +55,9 @@ export default function Situation({ view, onCreateFromCall }: { view: View; onCr
           </div>
         )}
         {selUnit && <UnitDetail view={view} id={selUnit} />}
+        <Passdown view={view} />
+        <BOLOs view={view} />
+        <Facilities view={view} />
         {adv && <AdvisoryCards list={adv.suggestions} status={adv.status} />}
         {failures.length > 0 && (
           <section className="rounded-md border border-amber-800/60 bg-amber-950/20 p-2 text-xs">

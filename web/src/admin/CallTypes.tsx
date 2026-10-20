@@ -6,7 +6,19 @@ import { Field, Modal, Priority } from '../ui'
 import type { Requirement, View } from '../types'
 import { Page, Table } from './Admin'
 
-type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; isNew: boolean }
+type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; notify?: string[]; group?: string; isNew: boolean }
+
+// importCSV reads call types from a spreadsheet: code, name, priority, discipline, group, run card
+// ("2 engine; 1 ladder"), notify ("Fire marshal; Animal control"). A header row is skipped.
+export function parseCallTypes(text: string) {
+  const rows = text.split(/\r?\n/).map((l) => l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((x) => x.trim().replace(/^"|"$/g, ''))).filter((r) => r[0])
+  if (rows[0] && /^code$/i.test(rows[0][0])) rows.shift()
+  return rows.map((r) => ({
+    code: r[0].toUpperCase(), name: r[1] || r[0], priority: Math.min(5, Math.max(1, Number(r[2]) || 3)), discipline: (r[3] || 'other').toLowerCase(), group: r[4] || undefined,
+    runCard: (r[5] || '').split(';').map((x) => x.trim().match(/^(\d+)\s*[x×]?\s*(.+)$/i)).filter(Boolean).map((m) => ({ count: Number(m![1]), capability: m![2].trim().toLowerCase() })),
+    notify: r[6] ? r[6].split(';').map((x) => x.trim()).filter(Boolean) : undefined,
+  }))
+}
 
 export default function CallTypes({ view }: { view: View }) {
   const [d, setD] = useState<Draft | null>(null)
@@ -20,7 +32,7 @@ export default function CallTypes({ view }: { view: View }) {
   const save = async () => {
     if (!d) return
     try {
-      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone })
+      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, notify: d.notify, group: d.group })
       toast.success(`Call type ${d.code.toUpperCase()} saved`)
       setD(null)
     } catch (e) {
@@ -32,7 +44,22 @@ export default function CallTypes({ view }: { view: View }) {
     <Page
       title="Call types and run cards"
       intro="Each call type has a default priority and a run card: how many units of each capability to recommend. The recommendation fills scarce capabilities first, counts units already on the incident, and flags lines it cannot fill."
-      actions={<button className="btn btn-go" onClick={() => open()}><Plus size={14} aria-hidden /> Add call type</button>}
+      actions={<>
+        <label className="btn cursor-pointer" title="A CSV: code, name, priority, discipline, group, run card (2 engine; 1 ladder), notify (Fire marshal; Animal control)">
+          Import CSV
+          <input type="file" accept=".csv,text/csv" className="sr-only" onChange={async (e) => {
+            const f = e.target.files?.[0]
+            if (!f) return
+            const list = parseCallTypes(await f.text())
+            if (!confirm(`Import ${list.length} call types? Existing codes are replaced.`)) return
+            let n = 0
+            for (const c of list) { try { await api.put(`/admin/calltypes/${encodeURIComponent(c.code)}`, c); n++ } catch (err) { toast.error(`${c.code}: ${errText(err)}`) } }
+            toast.success(`${n} call types imported`)
+            e.target.value = ''
+          }} />
+        </label>
+        <button className="btn btn-go" onClick={() => open()}><Plus size={14} aria-hidden /> Add call type</button>
+      </>}
     >
       <Table head={['Code', 'Name', 'Priority', 'Discipline', 'Run card']}>
         {view.callTypes.map((c) => (
@@ -78,6 +105,8 @@ export default function CallTypes({ view }: { view: View }) {
                 {['fire', 'ems', 'police', 'other'].map((x) => <option key={x}>{x}</option>)}
               </select>
             </Field>
+            <Field label="Group" htmlFor="cg"><input id="cg" className="input" value={d.group ?? ''} placeholder="Medical, Traffic…" onChange={(e) => setD({ ...d, group: e.target.value || undefined })} /></Field>
+            <div className="sm:col-span-3"><Field label="Notify" htmlFor="cno" hint="People or agencies to tell for this type, separated by semicolons: a checklist on every incident of it"><input id="cno" className="input" value={(d.notify ?? []).join('; ')} onChange={(e) => setD({ ...d, notify: e.target.value.split(';').map((x) => x.trim()).filter(Boolean) })} /></Field></div>
             <label className="flex items-start gap-2 text-sm text-slate-300 sm:col-span-2">
               <input type="checkbox" className="mt-1" checked={!!d.critical} onChange={(e) => setD({ ...d, critical: e.target.checked })} />
               <span>Critical call<span className="block text-xs text-slate-500">Hard on the people who work it: they go on the supervisor's care list</span></span>

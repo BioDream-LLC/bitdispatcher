@@ -6,7 +6,6 @@ import (
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -51,6 +51,13 @@ type User struct {
 	Iter     int       `json:"iter"`
 	Created  time.Time `json:"created"`
 	LastIn   time.Time `json:"lastIn,omitzero"`
+	// Duties are the person's qualifications (empty: the role's usual ones); LastDuty the one last worked.
+	Duties   []string `json:"duties,omitempty"`
+	LastDuty string   `json:"lastDuty,omitempty"`
+	// TOTP is the authenticator secret (base32); PendingTOTP one being set up; TOTPStep the last code used.
+	TOTP        string `json:"totp,omitempty"`
+	PendingTOTP string `json:"pendingTotp,omitempty"`
+	TOTPStep    int64  `json:"totpStep,omitempty"`
 }
 
 // Public is a user without secrets.
@@ -62,6 +69,8 @@ type Public struct {
 	Demo     bool      `json:"demo,omitempty"`
 	Created  time.Time `json:"created"`
 	LastIn   time.Time `json:"lastIn,omitzero"`
+	Duties   []string  `json:"duties"`
+	MFA      bool      `json:"mfa,omitempty"` // has an authenticator set up
 }
 
 // Session is one signed-in browser.
@@ -77,6 +86,16 @@ type Session struct {
 	Last     time.Time `json:"last"`
 	// Training sessions work in the training environment: its own board and ledger, never the live one.
 	Training bool `json:"training,omitempty"`
+	// Exercise is the shared training exercise the session joined (empty: a practice board of its own).
+	Exercise string `json:"exercise,omitempty"`
+	// Duty is the work the person signed in to do; Role (the rights) follows from it.
+	Duty string `json:"duty"`
+	// A locked console shows and changes nothing until the same person unlocks it; Active is the last input.
+	Locked   bool      `json:"locked,omitempty"`
+	LockedAt time.Time `json:"lockedAt,omitzero"`
+	Active   time.Time `json:"active,omitzero"`
+	// Workstation is the enrolled workstation the browser is, when it is one.
+	Workstation string `json:"workstation,omitempty"`
 }
 
 // Store is the user file and the live sessions.
@@ -89,6 +108,12 @@ type Store struct {
 	now      func() time.Time
 	Idle     time.Duration
 	MaxAge   time.Duration
+	// The agency's sign-in policy: MFA off, admins or everyone; LockAfter locks a console without input.
+	MFA       string
+	LockAfter time.Duration
+	Issuer    string // the name authenticator apps show
+	// OnLock is told when a console locks itself for inactivity, for the audit.
+	OnLock func(Session)
 }
 
 var reUser = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,31}$`)
@@ -220,6 +245,9 @@ func (s *Store) Save(username, name, role, password string, disabled bool) error
 		u.Iter = iterations
 		u.Hash = hash(password, u.Salt, u.Iter)
 	}
+	if role != u.Role && len(u.Duties) > 0 && RoleForDuties(u.Duties) != role {
+		u.Duties = nil // the new role's usual duties
+	}
 	u.Name, u.Role, u.Disabled = strings.TrimSpace(name), role, disabled
 	s.users[username] = u
 	if disabled {
@@ -227,7 +255,10 @@ func (s *Store) Save(username, name, role, password string, disabled bool) error
 	}
 	for _, se := range s.sessions {
 		if se.Username == username {
-			se.Role, se.Name = role, u.Name
+			if !slices.Contains(u.duties(), se.Duty) {
+				se.Duty = u.defaultDuty()
+			}
+			se.Role, se.Name = SessionRole(se.Duty, role), u.Name
 		}
 	}
 	return s.save()
@@ -273,7 +304,8 @@ func (s *Store) List() []Public {
 	defer s.mu.Unlock()
 	out := []Public{}
 	for _, u := range s.users {
-		out = append(out, Public{Username: u.Username, Name: u.Name, Role: u.Role, Disabled: u.Disabled, Demo: u.Demo, Created: u.Created, LastIn: u.LastIn})
+		out = append(out, Public{Username: u.Username, Name: u.Name, Role: u.Role, Disabled: u.Disabled, Demo: u.Demo, Created: u.Created, LastIn: u.LastIn,
+			Duties: u.duties(), MFA: u.TOTP != ""})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Username < out[j].Username })
 	return out
@@ -285,35 +317,26 @@ var ErrLocked = errors.New("too many failed sign-ins: try again in 15 minutes")
 // ErrBadLogin is returned for a wrong username or password, without saying which.
 var ErrBadLogin = errors.New("wrong username or password")
 
-// Login checks a password and opens a session.
+// Login checks a password and opens a session working the person's highest duty. It is for callers that
+// cannot ask (tests, tools); people sign in with SignIn, which asks for the duty and any one-time code.
 func (s *Store) Login(username, password, console, from string) (*Session, error) {
 	username = strings.ToLower(strings.TrimSpace(username))
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := s.now()
-	recent := s.fails[username][:0:0]
-	for _, t := range s.fails[username] {
-		if now.Sub(t) < 15*time.Minute {
-			recent = append(recent, t)
-		}
-	}
-	s.fails[username] = recent
-	if len(recent) >= 5 {
-		return nil, ErrLocked
-	}
-	u, ok := s.users[username]
 	// Hash even for an unknown user, so timing does not say which usernames exist.
-	salt, iter, want := "x", iterations, strings.Repeat("0", 64)
-	if ok {
-		salt, iter, want = u.Salt, u.Iter, u.Hash
+	u, err := s.checkPassword(username, password)
+	if err != nil {
+		return nil, err
 	}
-	got := hash(password, salt, iter)
-	if !ok || u.Disabled || subtle.ConstantTimeCompare([]byte(got), []byte(want)) != 1 {
-		s.fails[username] = append(s.fails[username], now)
-		return nil, ErrBadLogin
+	if s.mfaRequired(u) {
+		return nil, errors.New("this account needs its one-time code: sign in on the sign-in page")
 	}
 	delete(s.fails, username)
-	return s.open(u, console, from), nil
+	se := s.open(u, console, from)
+	se.Duty = u.defaultDuty()
+	se.Role = SessionRole(se.Duty, u.Role)
+	cp := *se
+	return &cp, nil
 }
 
 // demoRole is whether a role may be the public demonstration account's: never an administrator (anyone could
@@ -347,7 +370,7 @@ func (s *Store) Demo() (Public, bool) {
 	defer s.mu.Unlock()
 	for _, u := range s.users {
 		if u.Demo && !u.Disabled && demoRole(u.Role) {
-			return Public{Username: u.Username, Name: u.Name, Role: u.Role, Demo: true}, true
+			return Public{Username: u.Username, Name: u.Name, Role: u.Role, Demo: true, Duties: u.duties()}, true
 		}
 	}
 	return Public{}, false
@@ -355,12 +378,19 @@ func (s *Store) Demo() (Public, bool) {
 
 // LoginDemo signs in as the public demonstration account, without its password. Wrong passwords typed for it
 // elsewhere never lock this out.
-func (s *Store) LoginDemo(console, from string) (*Session, error) {
+func (s *Store) LoginDemo(console, from, duty string) (*Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, u := range s.users {
 		if u.Demo && !u.Disabled && demoRole(u.Role) {
-			return s.open(u, console, from), nil
+			se := s.open(u, console, from)
+			se.Duty = u.defaultDuty()
+			if duty != "" && slices.Contains(u.duties(), duty) {
+				se.Duty = duty
+			}
+			se.Role = SessionRole(se.Duty, u.Role)
+			cp := *se
+			return &cp, nil
 		}
 	}
 	return nil, errors.New("there is no demonstration account here")
@@ -374,7 +404,7 @@ func (s *Store) open(u *User, console, from string) *Session {
 	id := RandomToken(32)
 	sum := sha256.Sum256([]byte(id))
 	se := &Session{ID: id, Hash: hex.EncodeToString(sum[:8]), Username: u.Username, Name: u.Name, Role: u.Role,
-		Console: strings.TrimSpace(console), From: from, Created: now, Last: now}
+		Console: strings.TrimSpace(console), From: from, Created: now, Last: now, Active: now}
 	s.sessions[id] = se
 	return se
 }
@@ -393,6 +423,15 @@ func (s *Store) Session(id string) (*Session, bool) {
 		return nil, false
 	}
 	se.Last = now
+	// The inactivity lock: no input at the console for the policy's minutes. Field terminals in a moving
+	// vehicle and the training board are left alone.
+	if s.LockAfter > 0 && !se.Locked && se.Role != Field && !se.Active.IsZero() && now.Sub(se.Active) > s.LockAfter {
+		se.Locked, se.LockedAt = true, now
+		if s.OnLock != nil {
+			cp := *se
+			go s.OnLock(cp)
+		}
+	}
 	cp := *se
 	return &cp, true
 }
@@ -406,12 +445,21 @@ func (s *Store) SetConsole(id, console string) {
 	}
 }
 
-// SetTraining puts a session in the training environment.
-func (s *Store) SetTraining(id string) {
+// SetTraining puts a session in the training environment: a shared exercise, or a practice board of its own.
+func (s *Store) SetTraining(id, exercise string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if se, ok := s.sessions[id]; ok {
-		se.Training = true
+		se.Training, se.Exercise = true, exercise
+	}
+}
+
+// SetWorkstation records the enrolled workstation a session signed in at.
+func (s *Store) SetWorkstation(id, ws string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if se, ok := s.sessions[id]; ok {
+		se.Workstation = ws
 	}
 }
 

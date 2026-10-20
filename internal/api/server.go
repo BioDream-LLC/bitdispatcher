@@ -40,6 +40,7 @@ type Integrations struct {
 
 // Server is the API.
 type Server struct {
+	enrol          enrolCodes // one-time workstation enrolment codes
 	Eng            *cad.Engine
 	Auth           *auth.Store
 	BV             *bitvoice.Bridge
@@ -72,6 +73,10 @@ type Server struct {
 	isTraining bool
 	quit       chan struct{} // closed when a training environment is reset, ending its streams
 	player     *player
+	// liveServer is the live server a training board belongs to (for publishing staged configuration), and
+	// exercise the shared exercise it is, when it is one.
+	liveServer *Server
+	exercise   string
 	// resetTraining rebuilds the training environment (set on a training server).
 	resetTraining func() (*Server, error)
 }
@@ -210,9 +215,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		t.ServeHTTP(w, r)
 		return
 	}
-	if s.isTraining && (strings.HasPrefix(r.URL.Path, "/api/admin/") || strings.HasPrefix(r.URL.Path, "/api/sites")) {
-		fail(w, http.StatusForbidden, "not in training: sign in without training to change the configuration")
+	if s.isTraining && (strings.HasPrefix(r.URL.Path, "/api/admin/") && !staged(r.URL.Path) || strings.HasPrefix(r.URL.Path, "/api/sites")) {
+		fail(w, http.StatusForbidden, "not in training: sign in without training to change this (users, connections and maps are the live board's)")
 		return
+	}
+	// With staged changes on, the live board's configuration changes only by publishing from staging.
+	if !s.isTraining && r.Method != http.MethodGet && staged(r.URL.Path) && r.URL.Path != "/api/admin/settings" {
+		var on bool
+		s.Eng.Read(func(st *cad.State) { on = st.Settings.Security.StagedChanges })
+		if on {
+			fail(w, http.StatusConflict, "configuration changes go through staging here: sign in with Training ticked as an administrator, make the change, try it, then publish it (Settings › Security)")
+			return
+		}
 	}
 	s.mux.ServeHTTP(w, r)
 }
@@ -274,11 +288,19 @@ func (s *Server) handle(pattern, role string, h handler) {
 			fail(w, http.StatusForbidden, "missing "+csrfHeader+" header")
 			return
 		}
+		// A locked console shows and changes nothing until its person unlocks it.
+		if se.Locked {
+			writeJSON(w, http.StatusLocked, map[string]any{"message": "this console is locked: unlock it with your password", "locked": true})
+			return
+		}
 		if !auth.AtLeast(se.Role, role) {
 			fail(w, http.StatusForbidden, "your role ("+se.Role+") cannot do this; it needs "+role)
 			return
 		}
-		h(w, r, se, cad.Actor{User: se.Username, Role: se.Role, Session: se.Hash, Console: se.Console})
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			s.Auth.Touch(c.Value) // a change is input at the console
+		}
+		h(w, r, se, actorOf(se))
 	})
 }
 
@@ -290,7 +312,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "time": time.Now().UTC()})
 	})
-	m.HandleFunc("POST /api/auth/login", s.login)
+	m.HandleFunc("POST /api/auth/login", s.signIn)
+	s.entryRoutes()
+	s.recordsRoutes()
+	s.lockRoutes()
+	s.workstationRoutes()
 	m.HandleFunc("POST /api/auth/logout", s.logout)
 	m.HandleFunc("POST /api/auth/demo", s.loginDemo)
 	m.HandleFunc("GET /api/auth/me", s.me)
@@ -369,6 +395,9 @@ func (s *Server) routes() {
 	s.dreamRoutes()
 	if s.isTraining {
 		s.trainingRoutes()
+		s.trainingMoreRoutes()
+	} else {
+		s.exerciseRoutes()
 	}
 	s.siteRoutes()
 	s.rmsRoutes()
@@ -391,55 +420,13 @@ func (s *Server) routes() {
 
 // ---- sign-in ----
 
-func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(csrfHeader) == "" {
-		fail(w, http.StatusForbidden, "missing "+csrfHeader+" header")
-		return
-	}
-	var b struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Console  string `json:"console"`
-		Training bool   `json:"training"`
-	}
-	if !readJSON(w, r, &b) {
-		return
-	}
-	se, err := s.Auth.Login(b.Username, b.Password, b.Console, clientIP(r))
-	// A field crew signs in as its unit: the position is the unit's call sign.
-	if err == nil && se.Role == auth.Field {
-		unit := strings.ToUpper(strings.TrimSpace(b.Console))
-		known := false
-		s.Eng.Read(func(st *cad.State) { _, known = st.Units[unit] })
-		if !known {
-			s.Auth.Logout(se.ID)
-			err = fmt.Errorf("sign in on a mobile terminal with your unit's call sign as the position (no unit %q)", unit)
-		} else {
-			s.Auth.SetConsole(se.ID, unit)
-			cp := *se
-			cp.Console = unit
-			se = &cp
-		}
-	}
-	if err != nil {
-		s.Eng.Record(cad.Actor{User: strings.ToLower(b.Username)}, cad.EvSignInFailed, map[string]string{"from": clientIP(r), "reason": err.Error()})
-		fail(w, http.StatusUnauthorized, err.Error())
-		return
-	}
-	if b.Training {
-		s.Auth.SetTraining(se.ID)
-		se.Training = true
-	}
-	s.signedIn(w, se, nil)
-}
-
 // signedIn records a sign-in and gives the browser its session.
 func (s *Server) signedIn(w http.ResponseWriter, se *auth.Session, extra map[string]string) {
 	data := map[string]string{"from": se.From}
 	for k, v := range extra {
 		data[k] = v
 	}
-	s.Eng.Record(cad.Actor{User: se.Username, Role: se.Role, Session: se.Hash, Console: se.Console}, cad.EvSignIn, data)
+	s.Eng.Record(actorOf(se), cad.EvSignIn, data)
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: se.ID, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	writeJSON(w, 200, se)
 }
@@ -454,6 +441,7 @@ func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Console  string `json:"console"`
 		Training bool   `json:"training"`
+		Duty     string `json:"duty"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -462,13 +450,13 @@ func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
 	if console == "" || len(console) > 24 {
 		console = "WEB-" + strings.ToUpper(auth.RandomToken(3))[:4]
 	}
-	se, err := s.Auth.LoginDemo(console, clientIP(r))
+	se, err := s.Auth.LoginDemo(console, clientIP(r), b.Duty)
 	if err != nil {
 		fail(w, http.StatusNotFound, err.Error())
 		return
 	}
 	if b.Training {
-		s.Auth.SetTraining(se.ID)
+		s.Auth.SetTraining(se.ID, "")
 		se.Training = true
 	}
 	s.signedIn(w, se, map[string]string{"demo": "true"})
@@ -477,7 +465,7 @@ func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		if se, ok := s.Auth.Logout(c.Value); ok {
-			s.Eng.Record(cad.Actor{User: se.Username, Role: se.Role, Session: se.Hash, Console: se.Console}, cad.EvSignOut, nil)
+			s.Eng.Record(actorOf(se), cad.EvSignOut, nil)
 		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
@@ -495,7 +483,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"signedIn": false}
 	// The sign-in page offers the public demonstration account, when there is one.
 	if d, ok := s.Auth.Demo(); ok {
-		out["demo"] = map[string]string{"name": d.Name, "role": d.Role}
+		out["demo"] = map[string]any{"name": d.Name, "role": d.Role, "duties": d.Duties}
 	}
 	writeJSON(w, 200, out)
 }
@@ -535,6 +523,7 @@ type View struct {
 	Breaks    map[string]*cad.Break `json:"breaks"`
 	TDoS      cad.TDoS              `json:"tdos"`
 	Training  *TrainingView         `json:"training,omitempty"`
+	Entry     EntryView             `json:"entry"`
 }
 
 // HealthView is every interface's health.
@@ -624,6 +613,7 @@ func (s *Server) view() ([]byte, error) {
 		}
 		sort.Slice(v.Calls, func(i, j int) bool { return v.Calls[i].Start.After(v.Calls[j].Start) })
 		v.Training = s.trainingView()
+		v.Entry = s.entryView(st, now)
 		v.Summaries, v.Drones, v.Care, v.Breaks, v.TDoS = map[string]string{}, []*cad.Drone{}, []*cad.CareCase{}, st.Breaks, st.TDoS
 		for _, in := range v.Incidents {
 			if in.Status != cad.Closed {
@@ -901,11 +891,26 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 	var b struct {
 		Units       []string `json:"units"`
 		Recommended []string `json:"recommended"`
+		Reason      string   `json:"reason"`  // why other units than recommended
+		Confirm     bool     `json:"confirm"` // the dispatcher confirmed the recommendation's warnings
 	}
 	if !readJSON(w, r, &b) {
 		return
 	}
-	if err := s.Eng.Dispatch(a, r.PathValue("n"), b.Units, b.Recommended); err != nil {
+	n := r.PathValue("n")
+	rec, _ := s.Eng.Recommend(n)
+	if len(rec.Warnings) > 0 && !b.Confirm {
+		writeJSON(w, 422, map[string]any{"message": "Confirm first: " + strings.Join(rec.Warnings, "; "), "field": "confirm", "warnings": rec.Warnings})
+		return
+	}
+	if len(b.Recommended) == 0 {
+		b.Recommended = rec.Units
+	}
+	if err := s.Eng.NeedReason(n, b.Units, b.Recommended, b.Reason); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := s.Eng.DispatchWhy(a, n, b.Units, b.Recommended, b.Reason, rec.Plan); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -1261,7 +1266,7 @@ func (s *Server) saveUser(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 		return
 	}
 	name := strings.ToLower(r.PathValue("name"))
-	if name == se.Username && (b.Role != se.Role || b.Disabled) {
+	if name == se.Username && (b.Role != s.Auth.UserRole(se.Username) || b.Disabled) {
 		fail(w, 422, "you cannot change your own role or disable yourself")
 		return
 	}
@@ -1512,6 +1517,8 @@ func (s *Server) Run(ctx context.Context) {
 	go s.BV.Run(ctx)
 	go s.runSites(ctx)
 	go s.droneRule(ctx)
+	go s.endDataCalls(ctx)
+	go s.policyWatch(ctx)
 	go s.translator(ctx)
 	if s.Advisory != nil {
 		go s.Advisory.Run(ctx)
@@ -1573,4 +1580,15 @@ func (s *Server) siteHealth() []PeerHealth {
 		}
 	}
 	return out
+}
+
+// staged reports whether an administration path is configuration a staging board may change and publish.
+func staged(path string) bool {
+	for _, p := range []string{"/api/admin/settings", "/api/admin/calltypes", "/api/admin/units", "/api/admin/stations", "/api/admin/plans",
+		"/api/admin/guidance", "/api/admin/facilities"} {
+		if path == p || strings.HasPrefix(path, p+"/") {
+			return true
+		}
+	}
+	return false
 }

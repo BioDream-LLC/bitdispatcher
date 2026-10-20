@@ -83,7 +83,7 @@ func TestDemoAccount(t *testing.T) {
 	if _, ok := s.Demo(); ok {
 		t.Fatal("a demonstration account before one was named")
 	}
-	if _, err := s.LoginDemo("", ""); err == nil {
+	if _, err := s.LoginDemo("", "", ""); err == nil {
 		t.Fatal("signed in as a demonstration account that does not exist")
 	}
 	if err := s.SetDemo("admin", true); err == nil {
@@ -106,7 +106,7 @@ func TestDemoAccount(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		s.Login("demo", "wrong-password-xx", "", "")
 	}
-	se, err := s.LoginDemo("WEB-1", "203.0.113.9")
+	se, err := s.LoginDemo("WEB-1", "203.0.113.9", "")
 	if err != nil || se.Username != "demo" || se.Role != Dispatcher || se.Console != "WEB-1" {
 		t.Fatalf("%+v %v", se, err)
 	}
@@ -114,7 +114,7 @@ func TestDemoAccount(t *testing.T) {
 		t.Fatal("the demonstration account was made an administrator")
 	}
 	s.Save("demo", "Demo", Dispatcher, "", true)
-	if _, err := s.LoginDemo("", ""); err == nil {
+	if _, err := s.LoginDemo("", "", ""); err == nil {
 		t.Fatal("a disabled demonstration account signed in")
 	}
 }

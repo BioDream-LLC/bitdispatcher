@@ -21,6 +21,7 @@ type Actor struct {
 	Role    string
 	Session string
 	Console string
+	Duty    string // the work the person signed in to do: calltaker, police, fire, ems, dispatcher, supervisor, admin
 }
 
 // System actors.
@@ -136,7 +137,7 @@ func (e *Engine) write(a Actor, typ string, r refs, data any) (ledger.Event, err
 		}
 		raw = b
 	}
-	ev, err := e.led.Append(ledger.Event{Type: typ, Actor: a.User, Role: a.Role, Session: a.Session, Console: a.Console,
+	ev, err := e.led.Append(ledger.Event{Type: typ, Actor: a.User, Role: a.Role, Session: a.Session, Console: a.Console, Duty: a.Duty,
 		Incident: r.Incident, Unit: r.Unit, Call: r.Call, Parent: r.Parent, Data: raw, At: e.now(), Site: e.site})
 	if err != nil {
 		return ledger.Event{}, err
@@ -380,7 +381,8 @@ func (e *Engine) Record(a Actor, typ string, data any) error {
 	switch typ {
 	case EvUserSaved, EvUserRemoved, EvIntegration, EvSignIn, EvSignInFailed, EvSignOut, EvMapRecording, EvMapRecorded, EvMapFailed,
 		EvPhotosRecording, EvPhotosRecorded, EvPhotosFailed,
-		EvAdvisorySuggested, EvAdvisoryDecided, EvAdvisoryWithdrawn, EvGISImporting, EvGISImported, EvGISFailed, EvJusticeQuery, EvIBRExported:
+		EvAdvisorySuggested, EvAdvisoryDecided, EvAdvisoryWithdrawn, EvGISImporting, EvGISImported, EvGISFailed, EvJusticeQuery, EvIBRExported,
+		EvLocked, EvUnlocked, EvReviewExported, EvConfigStaged, EvWorkstationCode, EvUserDuties, EvUserMFAReset, EvRecordsViewed, EvTrainingInject:
 	default:
 		return fmt.Errorf("cad: %s is not a record event", typ)
 	}
@@ -433,7 +435,15 @@ func (e *Engine) UpsertCall(a Actor, id string, d CallData) error {
 	if known {
 		typ = EvCallUpdated
 	}
-	_, err := e.write(a, typ, refs{Call: id}, d)
+	ev, err := e.write(a, typ, refs{Call: id}, d)
+	if err != nil {
+		return err
+	}
+	// A newer caller location (a rebid, a supplemental provider) is offered to the incident the call is on;
+	// the call-taker decides whether it becomes the incident's.
+	if number, offer := e.st.offerLocation(ev); offer != nil {
+		_, err = e.write(a, EvIncLocOffered, refs{Incident: number, Call: id}, offer)
+	}
 	return err
 }
 
@@ -496,8 +506,15 @@ func (e *Engine) AttachCall(a Actor, callID, number string) error {
 	if c.Incident == number {
 		return nil
 	}
-	_, err := e.write(a, EvCallAttached, refs{Call: callID, Incident: number}, nil)
-	return err
+	if _, err := e.write(a, EvCallAttached, refs{Call: callID, Incident: number}, nil); err != nil {
+		return err
+	}
+	if c.State == "data" {
+		// A data-only call (a vehicle's crash notification) is done once it is on an incident.
+		_, err := e.write(a, EvCallEnded, refs{Call: callID}, nil)
+		return err
+	}
+	return nil
 }
 
 // RecordCallAction records something a dispatcher asked call handling to do for a call, and how it went.
@@ -516,12 +533,15 @@ func (e *Engine) RecordCallAction(a Actor, callID, action string, ok bool, detai
 
 // NewIncident is what a dispatcher gives to create an incident.
 type NewIncident struct {
-	Type      string          `json:"type"`
-	Priority  int             `json:"priority,omitempty"` // 0: the call type's
-	Location  *ng911.Location `json:"location,omitempty"`
-	Caller    *Caller         `json:"caller,omitempty"`
-	Narrative string          `json:"narrative,omitempty"`
-	Call      string          `json:"call,omitempty"` // create from this call
+	Modifiers   []string        `json:"modifiers,omitempty"`
+	CallerAt    *ng911.Location `json:"callerAt,omitempty"` // where the caller is, when not at the incident
+	LocVerified bool            `json:"locVerified,omitempty"`
+	Type        string          `json:"type"`
+	Priority    int             `json:"priority,omitempty"` // 0: the call type's
+	Location    *ng911.Location `json:"location,omitempty"`
+	Caller      *Caller         `json:"caller,omitempty"`
+	Narrative   string          `json:"narrative,omitempty"`
+	Call        string          `json:"call,omitempty"` // create from this call
 }
 
 // CreateIncident creates an incident. From a call, it takes the call's location and caller unless given.
@@ -571,7 +591,16 @@ func (e *Engine) CreateIncident(a Actor, n NewIncident) (string, error) {
 		number = fmt.Sprintf("%s%s%02d-%06d", e.st.Settings.IncidentPrefix, e.sitePrefix, now.UTC().Year()%100, seqNo)
 	}
 	_, err := e.write(a, EvIncCreated, refs{Incident: number, Call: n.Call}, incidentCreated{Number: number, Type: n.Type, Priority: n.Priority,
-		Location: n.Location, Caller: n.Caller, Narrative: strings.TrimSpace(n.Narrative), Call: n.Call})
+		Location: n.Location, Caller: n.Caller, Narrative: strings.TrimSpace(n.Narrative), Call: n.Call,
+		Modifiers: n.Modifiers, CallerAt: n.CallerAt, LocVerified: n.LocVerified})
+	if err == nil && n.Call != "" {
+		if c := e.st.Calls[n.Call]; c != nil && c.State == "data" {
+			_, err = e.write(a, EvCallEnded, refs{Call: n.Call}, nil) // a crash notification, now on an incident
+		}
+	}
+	if err == nil {
+		err = e.modifierEffects(a, e.st.Incidents[number], n.Modifiers)
+	}
 	return number, err
 }
 
@@ -654,6 +683,12 @@ func (e *Engine) AddNote(a Actor, number, text string, priority bool) error {
 // Dispatch assigns units to an incident. recommended is what the recommendation showed, so the ledger
 // records where the dispatcher chose differently. A unit on another incident is reassigned.
 func (e *Engine) Dispatch(a Actor, number string, units, recommended []string) error {
+	return e.DispatchWhy(a, number, units, recommended, "", "")
+}
+
+// DispatchWhy dispatches units, recording why they differ from the recommendation and the response plan it
+// followed. The duty the dispatcher signed in to do limits which units they may send.
+func (e *Engine) DispatchWhy(a Actor, number string, units, recommended []string, reason, plan string) error {
 	if len(units) == 0 {
 		return problem("units", "choose at least one unit")
 	}
@@ -672,11 +707,14 @@ func (e *Engine) Dispatch(a Actor, number string, units, recommended []string) e
 		if u.Incident == number && Committed(u.Status) {
 			return problem("units", "%s is already on %s", id, number)
 		}
+		if err := e.st.mayCommand(a, u); err != nil {
+			return err
+		}
 		if !slices.Contains(ids, id) {
 			ids = append(ids, id)
 		}
 	}
-	parent, err := e.write(a, EvIncDispatch, refs{Incident: number}, dispatchData{Units: ids, Recommended: recommended})
+	parent, err := e.write(a, EvIncDispatch, refs{Incident: number}, dispatchData{Units: ids, Recommended: recommended, Reason: strings.TrimSpace(reason), Plan: plan})
 	if err != nil {
 		return err
 	}
@@ -709,6 +747,9 @@ func (e *Engine) SetStatus(a Actor, unit, status, number, reason string) error {
 	if !ok {
 		return problem("unit", "no unit %s", unit)
 	}
+	if err := e.st.mayCommand(a, u); err != nil {
+		return err
+	}
 	inc := u.Incident
 	if number != "" {
 		if _, err := e.openIncident(number); err != nil {
@@ -738,6 +779,9 @@ func (e *Engine) MarkOutUnit(a Actor, unit, code string, loc *ng911.Location, no
 	u, ok := e.st.Units[unit]
 	if !ok {
 		return problem("unit", "no unit %s", unit)
+	}
+	if err := e.st.mayCommand(a, u); err != nil {
+		return err
 	}
 	t, ok := e.st.Settings.MarkOutType(code)
 	if !ok {
