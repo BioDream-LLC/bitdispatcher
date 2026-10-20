@@ -59,12 +59,17 @@ test('a unit is sent by dragging it onto an incident, and changed by right-click
   const board = page.getByRole('region', { name: 'Unit status board' })
   const tile = board.getByRole('button', { name: /^M2/ })
   const row = page.getByRole('list', { name: 'Open incidents' }).getByRole('button', { name: new RegExp(inc.number) })
-  await tile.hover()
-  await page.mouse.down()
-  const box = (await row.boundingBox())!
-  await page.mouse.move(box.x + 40, box.y + 10, { steps: 12 })
-  await page.mouse.up()
-  await answerAsk(page)
+  const sent = async () => (await api.get('/state')).units.find((u: { id: string }) => u.id === 'M2').incident === inc.number
+  // The list can reorder as calls arrive; measure the row again on each try.
+  for (let i = 0; i < 3 && !(await sent()); i++) {
+    await tile.hover()
+    await page.mouse.down()
+    const box = (await row.boundingBox())!
+    await page.mouse.move(box.x + 40, box.y + 10, { steps: 12 })
+    await page.mouse.up()
+    await answerAsk(page)
+    await page.waitForTimeout(500)
+  }
   await expect.poll(async () => (await api.get('/state')).units.find((u: { id: string }) => u.id === 'M2').incident).toBe(inc.number)
   await board.getByRole('button', { name: /^E2/ }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: /Out of service/ }).click()

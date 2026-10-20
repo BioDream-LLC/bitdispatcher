@@ -141,6 +141,11 @@ export default function Mdt() {
   const notes = (inc?.timeline ?? []).filter((e) => e.kind === 'note' || e.kind === 'priority-note' || e.kind === 'created').slice().reverse()
   return (
     <div className="flex h-full flex-col bg-slate-950 text-slate-100">
+      {me?.training && (
+        <div role="status" className="bg-violet-600 px-3 py-1 text-center text-sm font-bold tracking-wide text-white">
+          TRAINING{me.exercise ? ` · exercise ${me.exercise}` : ''} · nothing here reaches the live board
+        </div>
+      )}
       <header className="flex items-center gap-3 border-b border-slate-800 bg-slate-900 px-3 py-2">
         <Logo size={22} />
         <span className="font-mono text-2xl font-black tracking-tight">{u!.id}</span>

@@ -7,6 +7,8 @@ import type { Contact, Incident, Recommendation, View } from '../types'
 import type { Draft } from './draft'
 
 const KINDS: { kind: Contact['kind']; label: string; who: string; detail: string }[] = [
+  { kind: 'mutualaid', label: 'Mutual aid', who: 'Agency asked', detail: 'What was asked for, and the answer' },
+  { kind: 'resource', label: 'Resource request', who: 'Asked of (tow, utility, Red Cross…)', detail: 'What, and when they expect to arrive' },
   { kind: 'transfer', label: 'Transfer', who: 'To (agency or number)', detail: 'Warm or cold, why' },
   { kind: 'referral', label: 'Referral', who: 'Referred to', detail: 'Why, what the caller was told' },
   { kind: 'outbound', label: 'Outbound call', who: 'Called (name or number)', detail: 'Why, and what was said' },

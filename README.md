@@ -15,7 +15,7 @@
 
 **[[Try bitdispatcher now: the live demonstration, no install]](https://demo.bitdispatcher.com)** · **[bitdispatcher.com](https://bitdispatcher.com)**: the website, the manual and this page
 
-**Press Sign in as the demo user**, or sign in as `demo` with password `try-bitdispatcher-demo` · a dispatcher's console on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
+**Press Sign in as the demo user**, or sign in as `demo` with password `try-bitdispatcher-demo` · choose any duty (call-taker, police, fire or EMS dispatcher, supervisor, records) on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
 
 **[Build bitdispatcher from source](#build-and-run)** · No release yet. Launch state: **Virginia**.
 
@@ -44,6 +44,14 @@ Where something has been tested only against simulators or sample data rather th
 - A command line for everything (`D E1 M2`, `ER E1`, `OS E1`, `NEW SF 12 Main St`, `MO 2A12 MEAL`, `SC 2A12`), with completion, history and the reason shown when a command is refused; a ⌘K palette; drag a unit onto an incident to send it; a right-click menu on every unit.
 - Run-card recommendation by capability and **road time**, counting units already on scene, flagging what is short and which stations would be left empty.
 - Premises and hazards with every incident ("oxygen in use", "large dog", "Knox box"), and the address's history from the previous CAD.
+
+**Call-taking and roles**
+- Sign-in by duty: call-taker, police, fire or EMS dispatcher, all-discipline dispatcher, supervisor, administrator or records. Each opens its own workspace, and the server enforces what each duty may do.
+- Workstations enrolled once by an administrator, so a computer signs in as its position; one-time codes from an authenticator app for everyone or for supervisors and administrators; the console locks with Ctrl+Shift+L or after a set idle time and unlocks for the same person.
+- A call-taker's workspace with nine tabs (Call Entry, Persons, Vehicles, Previous, Hazards, CAD Search, Comments, History, Resources) and the call and narrative always beside them; F4 submits and keeps the incident open for more, F2 clears for the next call.
+- Call types by code or word with CSV import, modifiers that raise the priority or add who to notify, the caller's own location when they are not at the incident, duplicates offered before a second incident is made, and newer caller locations offered to accept or keep.
+- Resources: passages from the agency's approved policies and guides, quoted word for word with their version, and recorded on the incident when shown.
+- For the dispatcher: the reason asked when units other than the recommended ones are sent, a confirmation for an unverified location, response plans with a due order, units flashed NO ACK when they do not acknowledge, talkgroups, a notification checklist, BOLOs, hospital diversion and a shift passdown log; a supervisor's exceptions panel.
 
 **Screens for several monitors**
 - Incidents and call entry, fire houses, police status and mark-outs, unit status, the map, the incident, and a supervisor board: each on its own monitor, opened with one click and remembered per console position.
@@ -78,10 +86,13 @@ Where something has been tested only against simulators or sample data rather th
 - The phone's own device location and floor (altitude), and a trail for a caller on the move; several callers about one fire grouped and attached in one step; non-emergency calls kept to one side, with a person always deciding.
 - Vehicle crash notifications rated for injury risk by delta-V and rollover, with the response to consider (an electric car flagged for the fire crews); drones launched by rule or by a press, flying on the map; radio transmissions' words on the incident; every incident summarised in a paragraph for the crews.
 
+- Review views of each incident (as first entered, summary, detailed, and a full audit with the ledger checked), printed or downloaded, every opening recorded.
+- Records requests: redactions proposed by the agency's own rules, accepted or rejected one by one, released only on a person's approval, made permanent, checked for leaked text, with due dates in working days.
+
 **Looking after the people**
 - Critical calls (a cardiac arrest, a child, an officer down) put everyone who worked them on the supervisor's care list: a break offered, a debrief arranged, and a quiet word on their own console afterwards.
 - Breaks and workload on the supervisor board, with who is free to relieve; a quality review of every incident against the centre's standards and the questions heard on the transcript.
-- A training environment with scripted scenarios on the agency's own map and units, scored, never touching the live board.
+- A training environment with scripted scenarios on the agency's own map and units, scored, never touching the live board; shared exercises where everyone who joins works one board while an instructor injects callers, location changes and radio traffic; configuration changes tried on a training board and published to the live one with a reason.
 - Working through an outage from the last board with an offline log sent when the server is back, and a warning of telephony denial-of-service floods.
 
 **Built to keep running**
@@ -159,7 +170,7 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 
 - `make check`: gofmt, `go vet` and the Go unit suites (the ledger, the state rebuilt from the ledger equals the live state, recommendations, mark-outs, the map importer and router, NIBRS and the Virginia file, scripts, sites).
 - `make web-test`: the web unit tests, including the manual checked against the screens.
-- `make e2e`: Playwright against a real bitdispatcher with demo data and the BitVoice simulator: sign-in, call to incident to dispatch, emergencies both ways, the mobile terminal, mark-outs and status checks, and **three emulated monitors**, each screen landing on its own, the selection shared across windows.
+- `make e2e`: Playwright against a real bitdispatcher with demo data and the BitVoice simulator: sign-in, call to incident to dispatch, emergencies both ways, call entry by a call-taker, the console lock, review views and a records request, the mobile terminal, mark-outs and status checks, and **three emulated monitors**, each screen landing on its own, the selection shared across windows.
 - Golden files for i3 and EIDO generated by BitVoice's own encoder.
 
 ## Status
@@ -170,6 +181,7 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 - **Tested against simulators and samples:** NCIC (training simulator), BitVoice (its simulator and its encoder's output, not yet a live BitVoice), ALI (sample spills).
 - **Multiple monitors** tested with Chrome's emulated monitors, not yet on a real console's monitors.
 - **Transcripts, crash data and drones** tested with the simulator's callers, crash notifications and drone system, not yet a live speech-to-text engine, telematics provider or drone system. The phrasebook translates the language of emergencies, not everything; the injury-risk rating and the quality review are aids, not judgements.
+- **Sign-in and records.** The one-time codes, console lock and audit records have not been reviewed against the CJIS Security Policy. The location hook for providers such as RapidSOS is a documented contract ([docs/LOCATION-HOOK.md](docs/LOCATION-HOOK.md)), not yet connected to any provider. The sample redaction rules and example guidance are placeholders, not legal advice or approved text; the optional language model for redactions is off by default and, when on, sends the record's text to that model. The training board is not a backup.
 - **Open decisions:** when an ALI-only call (no hang-up signal) should end; whether agency scripts may reach outside the sandbox; VGIN's terms for its data outside Virginia.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design, the rules and the phases, and [docs/OPERATIONS.md](docs/OPERATIONS.md) for the ledger and how reports count.

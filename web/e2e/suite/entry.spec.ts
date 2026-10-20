@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { adminAPI, signIn } from './helpers'
+import { adminAPI, creds, signIn } from './helpers'
 
 test('call entry: a call-taker enters, submits and keeps working the incident; a duplicate is offered first', async ({ page, request }) => {
   const api = await adminAPI(request)
@@ -75,4 +75,31 @@ test('records: review views and a records request released with its redactions',
   await dlg.getByRole('button', { name: 'Log request' }).click()
   await page.getByRole('button', { name: /Assemble/ }).click()
   await expect(page.getByText('SMITH, ANNA').first()).toBeVisible()
+})
+
+test('a crew in a shared exercise sees training on its terminal and gets the instructor\'s call', async ({ page, request, playwright, baseURL }) => {
+  const api = await adminAPI(request)
+  expect((await api.put('/admin/users/e4crew', { name: 'Engine 4 crew', role: 'field', password: 'engine-four-crew-e2e', disabled: false })).ok()).toBeTruthy()
+  await page.goto('/')
+  await page.fill('#u', 'e4crew')
+  await page.fill('#p', 'engine-four-crew-e2e')
+  await page.getByRole('checkbox', { name: /Training/ }).check()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.fill('#unit', 'E4')
+  await page.fill('#ex', 'e2e drill')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'TRAINING · exercise e2e drill' })).toBeVisible()
+  // The instructor joins the same exercise and sends the engine.
+  const liveE4 = (await api.get('/state')).units.find((u: { id: string }) => u.id === 'E4')
+  const ins = await playwright.request.newContext({ baseURL, ignoreHTTPSErrors: true })
+  const h = { 'X-BitDispatcher': '1' }
+  expect((await ins.post('api/auth/login', { headers: h, data: { username: 'admin', password: creds().password, console: 'E2E-I', duty: 'supervisor', training: true, exercise: 'e2e drill' } })).ok()).toBeTruthy()
+  const made = await (await ins.post('api/command', { headers: h, data: { line: 'NEW SF 210 Church Ave SW' } })).json()
+  expect(made.ok).toBeTruthy()
+  expect((await (await ins.post('api/command', { headers: h, data: { line: `D E4 #${made.incident} / drill` } })).json()).ok).toBeTruthy()
+  await expect(page.getByText(made.incident)).toBeVisible()
+  // Nothing reached the live board.
+  const after = (await api.get('/state')).units.find((u: { id: string }) => u.id === 'E4')
+  expect([after.status, after.incident ?? '']).toEqual([liveE4.status, liveE4.incident ?? ''])
+  await ins.dispose()
 })
