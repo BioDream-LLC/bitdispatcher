@@ -357,6 +357,27 @@ func addr(in *cad.Incident) string {
 	return "no location"
 }
 
+// groupedWith reports whether the call queue already groups the call with one attached to the incident
+// (the same rule as the queue's "callers about one place"), where it offers to attach it: the advisory
+// panel does not suggest it a second time.
+func groupedWith(s *cad.State, c *cad.Call, number string, now time.Time) bool {
+	near, window := s.Settings.ClusterRule()
+	for _, o := range s.Calls {
+		if o.ID == c.ID || o.Incident != number || o.Location == nil || o.Location.Lat == nil || o.Location.Lon == nil {
+			continue
+		}
+		if o.State == "ended" && now.Sub(o.End) > 10*time.Minute || o.Screen != nil && o.Screen.NonEmergency {
+			continue
+		}
+		d := geo.Distance(*c.Location.Lat, *c.Location.Lon, *o.Location.Lat, *o.Location.Lon)
+		gap := c.Start.Sub(o.Start)
+		if d <= near+min(c.Location.Radius, 300)+min(o.Location.Radius, 300) && gap.Abs() <= window {
+			return true
+		}
+	}
+	return false
+}
+
 func callsNear(r Rule, s *cad.State, open []*cad.Incident, now time.Time) []Suggestion {
 	var out []Suggestion
 	ids := make([]string, 0, len(s.Calls))
@@ -383,7 +404,7 @@ func callsNear(r Rule, s *cad.State, open []*cad.Incident, now time.Time) []Sugg
 				best, bestD = in, d
 			}
 		}
-		if best == nil {
+		if best == nil || groupedWith(s, c, best.Number, now) {
 			continue
 		}
 		out = append(out, Suggestion{Rule: r.ID, Incident: best.Number, Call: c.ID,

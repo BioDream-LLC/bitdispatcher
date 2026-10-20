@@ -97,6 +97,9 @@ func New(s *Server) (*Server, error) {
 	}
 	if !s.isTraining {
 		s.trainer = &trainer{live: s}
+		if s.DataDir != "" {
+			os.RemoveAll(filepath.Join(s.DataDir, "training")) // boards from before a restart are gone
+		}
 	}
 	if s.Maps != nil {
 		if !s.isTraining {

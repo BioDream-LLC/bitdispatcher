@@ -2,6 +2,9 @@
 Description=bitdispatcher public demo (Roanoke, VA; demonstration data)
 After=network-online.target
 Wants=network-online.target
+# The simulated BitVoice runs whenever bitdispatcher does: started again after any restart of it, by hand,
+# by a deploy or after a crash (bvsim's BindsTo stops it whenever bitdispatcher stops).
+Upholds=bvsim.service
 
 [Service]
 User=bitdispatcher

@@ -34,7 +34,8 @@ test('911 calls from the BitVoice simulator reach the queue', async ({ page, req
   const r = await api.put('/admin/integrations', { bitvoiceUrl: 'https://127.0.0.1:9644', bitvoiceToken: 'bv_simulated', bitvoiceFingerprint: fp.fingerprint, eidoToken: 'bd_eido_e2e', radioSecret: 'bd_radio_e2e', aliListen: '' })
   expect(r.ok(), await r.text()).toBeTruthy()
   await signIn(page)
-  await expect(page.locator('text=SIMULATED').first()).toBeVisible({ timeout: 30_000 })
+  // Every simulated call is from a 540-555 number (only one in three carries a "(SIMULATED)" caller name).
+  await expect(page.getByRole('list', { name: '911 calls' }).getByText(/\(540\) 555-\d{4}/).first()).toBeVisible({ timeout: 30_000 })
 })
 
 test('every administration screen opens without an error', async ({ page }) => {

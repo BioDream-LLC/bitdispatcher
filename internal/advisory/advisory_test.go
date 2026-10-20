@@ -246,3 +246,25 @@ func TestScriptRules(t *testing.T) {
 		t.Fatalf("test: %+v %v", r, err)
 	}
 }
+
+// A call near an incident is suggested for it, unless the call queue already groups it with a call on
+// that incident (and offers to attach it there).
+func TestCallNearNotTwice(t *testing.T) {
+	e := engine(t)
+	c := Default()
+	sys := cad.SystemActor
+	now := e.Now()
+	inc, _ := e.CreateIncident(d1, cad.NewIncident{Type: "SF", Location: at(37.2700, -79.9400, "1 Main St")})
+	// A lone caller 100 m away: suggested.
+	e.UpsertCall(sys, "lone", cad.CallData{Source: "bitvoice", State: "answered", Callback: "+15405550001", Start: now, Location: at(37.2709, -79.9400, "")})
+	if find(eval(e, c, 0), "call-near", inc) == nil {
+		t.Fatal("a lone call near the incident was not suggested")
+	}
+	// The first caller is attached to the incident; the second calls from beside them: the queue groups
+	// them and offers the attachment, so the advisory says nothing.
+	e.UpsertCall(sys, "first", cad.CallData{Source: "bitvoice", State: "answered", Callback: "+15405550002", Start: now, Location: at(37.2708, -79.9401, "")})
+	e.AttachCall(d1, "first", inc)
+	if find(eval(e, c, 0), "call-near", inc) != nil {
+		t.Fatal("the call the queue groups with an attached call was suggested a second time")
+	}
+}

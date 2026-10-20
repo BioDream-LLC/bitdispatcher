@@ -24,12 +24,27 @@ import (
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
 )
 
-// trainer holds the training environment, built when the first person signs in to train.
+// trainer holds the training boards: one per training session, built when it first asks, so trainees
+// (and visitors to a public demonstration, who share one account) never see or reset each other's.
 type trainer struct {
-	live *Server
-	mu   sync.Mutex
-	srv  *Server
+	live   *Server
+	mu     sync.Mutex
+	boards map[string]*board
 }
+
+// board is one session's training environment.
+type board struct {
+	srv  *Server
+	dir  string
+	used time.Time
+}
+
+// Training boards are few and short-lived: a board idle this long is closed, and past the limit the
+// longest-idle board makes way for a new one.
+const (
+	maxBoards = 8
+	boardIdle = 2 * time.Hour
+)
 
 // TrainingView is what the console shows of the training environment.
 type TrainingView struct {
@@ -53,7 +68,7 @@ func (s *Server) trainingFor(r *http.Request) *Server {
 	if !ok || !se.Training {
 		return nil
 	}
-	t, err := s.trainer.get()
+	t, err := s.trainer.get(se.Hash)
 	if err != nil {
 		s.Log.Error("training: cannot start", "err", err)
 		return nil
@@ -61,62 +76,93 @@ func (s *Server) trainingFor(r *http.Request) *Server {
 	return t
 }
 
-func (t *trainer) get() (*Server, error) {
+// get is the session's training board, built if it has none.
+func (t *trainer) get(key string) (*Server, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.srv != nil {
-		return t.srv, nil
+	now := time.Now()
+	if b := t.boards[key]; b != nil {
+		b.used = now
+		return b.srv, nil
 	}
-	srv, err := t.build()
+	if t.boards == nil {
+		t.boards = map[string]*board{}
+	}
+	// Close idle boards, then the longest-idle one if still at the limit.
+	for k, b := range t.boards {
+		if now.Sub(b.used) > boardIdle {
+			t.drop(k)
+		}
+	}
+	if len(t.boards) >= maxBoards {
+		oldest := ""
+		for k, b := range t.boards {
+			if oldest == "" || b.used.Before(t.boards[oldest].used) {
+				oldest = k
+			}
+		}
+		t.drop(oldest)
+	}
+	b, err := t.build(key)
 	if err != nil {
 		return nil, err
 	}
-	t.srv = srv
-	return srv, nil
+	b.used = now
+	t.boards[key] = b
+	return b.srv, nil
 }
 
-// reset throws the training board away and builds it again from the live configuration.
-func (t *trainer) reset() (*Server, error) {
+// drop closes a board and removes its ledger. The caller holds t.mu.
+func (t *trainer) drop(key string) {
+	b := t.boards[key]
+	if b == nil {
+		return
+	}
+	delete(t.boards, key)
+	b.srv.stopPlayer()
+	close(b.srv.quit)
+	b.srv.Close()
+	b.srv.Eng.Close()
+	os.RemoveAll(b.dir)
+}
+
+// reset throws the session's training board away and builds it again from the live configuration.
+func (t *trainer) reset(key string) (*Server, error) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	if old := t.srv; old != nil {
-		old.stopPlayer()
-		close(old.quit)
-		old.Close()
-		old.Eng.Close()
-		t.srv = nil
-	}
-	srv, err := t.build()
-	if err == nil {
-		t.srv = srv
-	}
-	return srv, err
+	t.drop(key)
+	t.mu.Unlock()
+	return t.get(key)
 }
 
-func (t *trainer) build() (*Server, error) {
+func (t *trainer) build(key string) (*board, error) {
 	live := t.live
-	dir := filepath.Join(live.DataDir, "training")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	root := filepath.Join(live.DataDir, "training")
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(dir, "ledger.jsonl")
-	os.Remove(path)
-	eng, err := cad.Open(path)
+	dir, err := os.MkdirTemp(root, "board-")
 	if err != nil {
+		return nil, err
+	}
+	eng, err := cad.Open(filepath.Join(dir, "ledger.jsonl"))
+	if err != nil {
+		os.RemoveAll(dir)
 		return nil, err
 	}
 	if err := copyConfig(live.Eng, eng); err != nil {
 		eng.Close()
+		os.RemoveAll(dir)
 		return nil, err
 	}
 	srv, err := New(&Server{Eng: eng, Auth: live.Auth, BV: bitvoice.New(eng, live.Log), Log: live.Log.With("env", "training"),
 		DataDir: dir, Version: live.Version, Tiles: live.Tiles, Maps: live.Maps, GIS: live.GIS, isTraining: true, quit: make(chan struct{})})
 	if err != nil {
 		eng.Close()
+		os.RemoveAll(dir)
 		return nil, err
 	}
-	srv.resetTraining = t.reset
-	return srv, nil
+	srv.resetTraining = func() (*Server, error) { return t.reset(key) }
+	return &board{srv: srv, dir: dir}, nil
 }
 
 // copyConfig gives the training ledger the live configuration: settings, stations, units (available, where

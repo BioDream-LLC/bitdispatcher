@@ -177,6 +177,22 @@ func TestTrainingEnvironment(t *testing.T) {
 	if _, b := live.do("GET", "/api/state", nil, false); strings.Contains(string(b), "t-rob-1") || strings.Contains(string(b), `"training":{`) {
 		t.Fatal("the training call reached the live board")
 	}
+	// A second trainee on the same account has a board of their own: no scenario, and their reset leaves
+	// the first trainee's board alone.
+	jar2, _ := cookiejar.New(nil)
+	tr2 := &client{t: t, base: ts.URL, c: &http.Client{Transport: ts.Client().Transport, Jar: jar2}}
+	if code, b := tr2.do("POST", "/api/auth/login", map[string]any{"username": "d1", "password": pw["d1"], "console": "T2", "training": true}, true); code != 200 {
+		t.Fatalf("second training sign-in: %d %s", code, b)
+	}
+	if _, b := tr2.do("GET", "/api/state", nil, false); strings.Contains(string(b), "t-rob-1") || !strings.Contains(string(b), `"training":{`) {
+		t.Fatal("the second trainee sees the first one's board")
+	}
+	if code, _ := tr2.do("POST", "/api/training/reset", nil, true); code != 204 {
+		t.Fatalf("second reset: %d", code)
+	}
+	if _, b := tr.do("GET", "/api/state", nil, false); !strings.Contains(string(b), "t-rob-1") {
+		t.Fatal("the second trainee's reset cleared the first one's board")
+	}
 	if code, _ := tr.do("PUT", "/api/admin/settings", cad.DefaultSettings(), true); code != 403 {
 		t.Fatalf("administration in training: %d", code)
 	}

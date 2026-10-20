@@ -568,11 +568,11 @@ It names the least busy positions free to relieve someone.`,
   },
   {
     id: 'training', title: 'Training', keys: 'training scenario simulation practice trainee score reset',
-    body: `Tick **Training** when signing in. The console opens a board of its own, marked TRAINING in violet: the agency's units, stations, call types, premises and map, on a ledger of its own. Nothing done there reaches the live board, and administration is closed.
+    body: `Tick **Training** when signing in. The console opens a board of its own, marked TRAINING in violet: the agency's units, stations, call types, premises and map, on a ledger of its own. Each trainee has their own board, even on a shared account; one left idle for two hours is cleared. Nothing done there reaches the live board, and administration is closed.
 
 - **Scenarios** play calls, transcripts, crash data and radio traffic into it on the agency's own map: a house fire with three callers, a cardiac arrest in Spanish, an interstate crash with crash data, an armed robbery, and a flood of calls on the line.
 - **Score** checks what was done: every caller on an incident, the call type, the units sent, a reply in the caller's language, and each incident's [quality review](#quality).
-- **Reset** empties the board for the next trainee.`,
+- **Reset** empties your board and starts it again; other trainees' boards are untouched.`,
   },
   {
     id: 'quality', title: 'Quality review', route: '/admin/quality', keys: 'quality assurance qa review score coaching standards questions',
