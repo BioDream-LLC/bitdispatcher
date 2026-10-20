@@ -8,6 +8,10 @@ test.beforeEach(async ({ request }) => {
   await api.put('/admin/integrations', { bitvoiceUrl: 'https://127.0.0.1:9644', bitvoiceToken: 'bv_simulated', bitvoiceFingerprint: fp.fingerprint, eidoToken: 'bd_eido_e2e', radioSecret: 'bd_radio_e2e', aliListen: '' })
 })
 
+// talking: an emergency caller with a transcript (calls screened as non-emergency are kept in their own list).
+const talking = (c: { transcript?: unknown[]; screen?: { nonEmergency?: boolean }; state?: string }) =>
+  (c.transcript?.length ?? 0) > 1 && !c.screen?.nonEmergency && c.state !== 'ended'
+
 test('a caller is transcribed, the details are pulled out, and crash data is rated', async ({ page, request }) => {
   const errors = await signIn(page)
   await expect(page.getByText('911 CALLS')).toBeVisible()
@@ -21,10 +25,10 @@ test('a caller is transcribed, the details are pulled out, and crash data is rat
   await expect(calls.getByText(/answered/i).first()).toBeVisible({ timeout: 30000 })
   await expect.poll(async () => {
     const st = await (await request.get('api/state')).json()
-    return st.calls.some((c: { transcript?: unknown[] }) => (c.transcript?.length ?? 0) > 1)
+    return st.calls.some(talking)
   }, { timeout: 45000 }).toBeTruthy()
   const st = await (await request.get('api/state')).json()
-  const c = st.calls.find((x: { transcript?: unknown[] }) => (x.transcript?.length ?? 0) > 1)
+  const c = st.calls.find(talking)
   await calls.getByText(c.callback.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3')).first().click()
   await expect(page.getByRole('region', { name: 'Transcript' }).first()).toBeVisible()
   expect(errors).toEqual([])
