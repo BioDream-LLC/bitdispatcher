@@ -16,6 +16,7 @@ import { callerAt, dirty, dupKey, emptyDraft, fromCall, fromIncident, loadDraft,
 import EntryTab from './EntryTab'
 import { PersonsTab, VehiclesTab } from './People'
 import { HazardsTab, PreviousList, SearchTab, useAlerts } from './Lookup'
+import PlaceViews from '../views/PlaceViews'
 import { CommentsTab, HistoryTab } from './Narrative'
 import ResourcesTab, { useResources } from './Resources'
 
@@ -190,6 +191,8 @@ export default function Taker() {
   }, [clear, submit, rebid])
 
   const alerts = useAlerts(view, d, inc)
+  const placeAt: [number, number] | null = inc?.location?.lat != null && inc.location.lon != null ? [inc.location.lat, inc.location.lon]
+    : d.lat && d.lon && !isNaN(+d.lat) && !isNaN(+d.lon) ? [+d.lat, +d.lon] : null
   const res = useResources(view, d, inc, call, tab === 'resources')
   if (!view || !raw) return <div className="grid h-full place-items-center text-sm text-slate-500">Loading the call queue…</div>
   const counts: Partial<Record<TabId, number | string>> = {
@@ -237,6 +240,9 @@ export default function Taker() {
               {tab === 'vehicles' && <VehiclesTab view={raw} d={d} inc={inc} call={call} update={update} />}
               {tab === 'previous' && <PreviousList alerts={alerts} />}
               {tab === 'hazards' && <HazardsTab alerts={alerts} />}
+              {tab === 'hazards' && placeAt && (raw?.placeViews || alerts.premises.some((p) => p.photos?.length)) && (
+                <section className="mt-4"><h3 className="label">Views of the place</h3><PlaceViews lat={placeAt[0]} lon={placeAt[1]} premises={alerts.premises} /></section>
+              )}
               {tab === 'search' && <SearchTab />}
               {tab === 'comments' && <CommentsTab view={raw} d={d} inc={inc} update={update} />}
               {tab === 'history' && <HistoryTab view={raw} inc={inc} />}

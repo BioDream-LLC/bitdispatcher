@@ -193,7 +193,7 @@ export type RouteView = { id: string; ok: boolean; seconds?: number; metres?: nu
 
 export type Verb = { words: string[]; usage: string; meaning: string }
 
-export type View = {
+export type View = { placeViews?: boolean;
   serverTime: string; seq: number; settings: Settings; stations: Station[]; units: Unit[]; callTypes: CallType[]
   incidents: Incident[]; calls: Call[]; emergencies: Emergency[]; health: Health; verbs: Verb[]; statuses: string[]
   premises?: Record<string, Premise[]>; prior?: Record<string, History[]>
@@ -201,7 +201,12 @@ export type View = {
   entry?: EntryView
 }
 
-export type Premise = { id: string; name?: string; address: string; lat: number; lon: number; hazards?: string[]; notes?: string; contacts?: string[]; expires?: string; source?: string; updated: string; by: string }
+export type Premise = { id: string; name?: string; address: string; lat: number; lon: number; hazards?: string[]; notes?: string; contacts?: string[]; expires?: string; source?: string; photos?: PremisePhoto[]; updated: string; by: string }
+export type PremisePhoto = { id: string; caption?: string; facing?: '' | 'N' | 'E' | 'S' | 'W'; type: string; sha256: string; size: number; added: string; by: string }
+/** PlaceView is one picture of a place from a provider: an oblique aerial photo, a straight-down one, or a street photo. */
+export type PlaceView = { ref: string; provider: string; kind: 'oblique' | 'ortho' | 'street'; facing?: string; azimuth?: number; distance: number; captured?: string; attribution: string; license?: string }
+export type PlaceViews = { views: PlaceView[]; problems?: Record<string, string>; google?: string }
+export type ViewsConfig = { eagleviewOn: boolean; eagleviewClientId: string; eagleviewSecretSet: boolean; eagleviewSandbox: boolean; panoramaxOn: boolean; panoramaxUrl: string; mapillaryOn: boolean; mapillaryTokenSet: boolean; googleLink: boolean }
 export type History = { number: string; type?: string; address?: string; lat: number; lon: number; at: string; disposition?: string; note?: string; source?: string }
 
 export type Duty = 'calltaker' | 'police' | 'fire' | 'ems' | 'dispatcher' | 'supervisor' | 'admin' | 'records' | 'field' | 'viewer'

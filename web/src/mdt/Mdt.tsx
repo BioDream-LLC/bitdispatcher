@@ -11,6 +11,7 @@ import { api, errText } from '../api'
 import { signOut, useStore } from '../store'
 import { Logo, StatusChip } from '../ui'
 import PremiseBox from '../console/PremiseBox'
+import { ViewsButton } from '../views/PlaceViews'
 import { clock, cx, mi, prio, statusMeta, useNow } from '../util'
 import type { BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, View } from '../types'
 import { dispatchStyle } from '../console/mapStyle'
@@ -21,7 +22,7 @@ type MDTView = {
   serverTime: string; unit: Unit; station?: Station; incident?: Incident; typeName?: string; summary?: string; partners: Unit[]; premises?: Premise[]
   emergency?: { key: string; raised: string; ackedBy?: string }; pending: Incident[]; statuses: string[]; bolos?: BOLO[]
   settings: { agency: string; mapCenter: [number, number]; mapZoom: number; avlStaleSeconds: number; markOuts?: MarkOutType[] }
-  health: View['health']
+  health: View['health']; placeViews?: boolean
 }
 
 // The next status a crew normally gives, so it is the big button.
@@ -194,6 +195,9 @@ export default function Mdt() {
                 {m.summary && <p className="mt-2 rounded border border-sky-900/60 bg-sky-950/30 p-2 text-sm leading-snug text-slate-100" aria-label="Summary">{m.summary}</p>}
                 <MdtEntry inc={inc} unit={m.unit.id} />
                 {(m.premises?.length ?? 0) > 0 && <div className="mt-2"><PremiseBox premises={m.premises} compact /></div>}
+                {inc.location?.lat != null && inc.location.lon != null && (m.placeViews || (m.premises ?? []).length > 0) && (
+                  <div className="mt-2"><ViewsButton lat={inc.location.lat} lon={inc.location.lon} premises={m.premises} label="Views of the place · pre-plan photos" className="h-10 w-full justify-center text-base" /></div>
+                )}
                 {m.partners.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {m.partners.map((p) => <span key={p.id} className={cx('chip ring-1', statusMeta(p.status).fg, statusMeta(p.status).ring)}>{p.id} {statusMeta(p.status).code}</span>)}

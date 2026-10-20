@@ -7,6 +7,7 @@ import { Field } from '../ui'
 import { cx } from '../util'
 import type { Premise } from '../types'
 import { Page } from './Admin'
+import PlaceViews from '../views/PlaceViews'
 
 type List = { total: number; matched: number; premises: Premise[] }
 const blank = (): Premise => ({ id: '', address: '', lat: 0, lon: 0, hazards: [], contacts: [], updated: '', by: '' })
@@ -47,7 +48,7 @@ export default function Premises() {
   }
   const toggle = (h: string) => d && setD({ ...d, hazards: d.hazards?.includes(h) ? d.hazards.filter((x) => x !== h) : [...(d.hazards ?? []), h] })
   return (
-    <Page title="Premises" intro="What the centre knows about a place before anyone calls: hazards to the crews, notes and contacts. A premise is shown with every incident within 40 m of it, on the console and the mobile terminal, hazards first. Bring premises over from an earlier system in Migration."
+    <Page title="Premises" intro="What the centre knows about a place before anyone calls: hazards to the crews, notes, contacts and pre-plan photos. A premise is shown with every incident within 40 m of it, on the console and the mobile terminal, hazards first. Bring premises over from an earlier system in Migration."
       actions={<button className="btn btn-go" onClick={() => setD(blank())}><Plus size={14} aria-hidden /> Add a premise</button>}>
       <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
         <section className="panel rounded-lg">
@@ -94,6 +95,17 @@ export default function Premises() {
             <Field label="Contacts" htmlFor="pc" hint="one per line: key holder, owner, alarm company"><textarea id="pc" className="input min-h-14" value={(d.contacts ?? []).join('\n')} onChange={(e) => setD({ ...d, contacts: e.target.value.split('\n') })} /></Field>
             <Field label="Expires" htmlFor="pe" hint="optional: a temporary hazard"><input id="pe" type="date" className="input" value={d.expires ?? ''} onChange={(e) => setD({ ...d, expires: e.target.value })} /></Field>
             {d.source && <p className="text-[11px] text-slate-500">From {d.source}</p>}
+            {d.id && d.lat !== 0 && (
+              <div>
+                <div className="label">Pre-plan photos and views</div>
+                <PlaceViews lat={d.lat} lon={d.lon} premises={[d]} onChanged={async () => {
+                  const r = await api.get<List>(`/premises?q=${encodeURIComponent(d.id)}`)
+                  const p = r.premises.find((x) => x.id === d.id)
+                  if (p) setD((cur) => (cur && cur.id === p.id ? { ...cur, photos: p.photos } : cur))
+                  load()
+                }} />
+              </div>
+            )}
             <div className="flex gap-2">
               <button className="btn btn-go" onClick={save}><Save size={13} aria-hidden /> Save</button>
               {d.id && <button className="btn ml-auto" onClick={() => remove(d)}><Trash2 size={13} aria-hidden /> Remove</button>}

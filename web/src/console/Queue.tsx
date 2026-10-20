@@ -232,7 +232,7 @@ export default function Queue({ view, onCreateFromCall, onNew, callsOnly }: { vi
   const nonEmergency = calls.filter((c) => c.screen?.nonEmergency)
   const headed = new Set<string>()
   return (
-    <aside className="panel flex min-h-0 flex-1 flex-col" aria-label="Calls and incidents">
+    <aside className="panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-label="Calls and incidents">
       <div className="panel-head">
         <Phone size={12} aria-hidden /> 911 calls
         <span className="font-mono text-slate-300">{calls.filter((c) => c.state !== 'ended').length}</span>

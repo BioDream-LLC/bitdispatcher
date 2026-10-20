@@ -19,19 +19,38 @@ import (
 
 // Premise is one place's information.
 type Premise struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name,omitempty"`
-	Address  string    `json:"address"`
-	Lat      float64   `json:"lat"`
-	Lon      float64   `json:"lon"`
-	Hazards  []string  `json:"hazards,omitempty"`
-	Notes    string    `json:"notes,omitempty"`
-	Contacts []string  `json:"contacts,omitempty"`
-	Expires  string    `json:"expires,omitempty"` // YYYY-MM-DD; after it the premise is shown as expired
-	Source   string    `json:"source,omitempty"`  // where it was imported from
-	Updated  time.Time `json:"updated"`
-	By       string    `json:"by"`
+	ID       string   `json:"id"`
+	Name     string   `json:"name,omitempty"`
+	Address  string   `json:"address"`
+	Lat      float64  `json:"lat"`
+	Lon      float64  `json:"lon"`
+	Hazards  []string `json:"hazards,omitempty"`
+	Notes    string   `json:"notes,omitempty"`
+	Contacts []string `json:"contacts,omitempty"`
+	Expires  string   `json:"expires,omitempty"` // YYYY-MM-DD; after it the premise is shown as expired
+	Source   string   `json:"source,omitempty"`  // where it was imported from
+	// Photos are pre-plan pictures of the place (the back door, the Knox box, the hydrant side), kept on
+	// this server. They are added and removed one by one (AddPremisePhoto), never by saving the premise.
+	Photos  []PremisePhoto `json:"photos,omitempty"`
+	Updated time.Time      `json:"updated"`
+	By      string         `json:"by"`
 }
+
+// PremisePhoto is one pre-plan picture. The file is kept beside the ledger; its SHA-256 is in the
+// ledger, so a changed file is found.
+type PremisePhoto struct {
+	ID      string    `json:"id"`
+	Caption string    `json:"caption,omitempty"`
+	Facing  string    `json:"facing,omitempty"` // N, E, S, W: the side it shows the place from, or empty
+	Type    string    `json:"type"`             // image/jpeg, image/png, image/webp
+	SHA256  string    `json:"sha256"`
+	Size    int64     `json:"size"`
+	Added   time.Time `json:"added"`
+	By      string    `json:"by"`
+}
+
+// MaxPremisePhotos is how many pictures a premise keeps.
+const MaxPremisePhotos = 24
 
 // History is one incident from an earlier system.
 type History struct {
@@ -130,9 +149,74 @@ func (e *Engine) SavePremise(a Actor, p Premise) (string, error) {
 			p.ID = fmt.Sprintf("P%s%06d", e.sitePrefix, e.st.premCount)
 		}
 	}
+	if old := e.st.Premises[p.ID]; old != nil {
+		p.Photos = old.Photos // pictures are kept: they are added and removed on their own
+	} else {
+		p.Photos = nil
+	}
 	p.Updated, p.By = e.now(), a.User
 	_, err := e.write(a, EvPremiseSaved, refs{}, p)
 	return p.ID, err
+}
+
+var reFacing = regexp.MustCompile(`^(N|E|S|W)?$`)
+
+// AddPremisePhoto adds a pre-plan picture to a premise (the file is already stored under ph.ID).
+func (e *Engine) AddPremisePhoto(a Actor, id string, ph PremisePhoto) error {
+	ph.Caption = strings.TrimSpace(ph.Caption)
+	if len(ph.Caption) > 200 {
+		return problem("caption", "a caption is up to 200 characters")
+	}
+	if !reFacing.MatchString(ph.Facing) {
+		return problem("facing", "facing is N, E, S, W or nothing")
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	old := e.st.Premises[id]
+	if old == nil {
+		return problem("id", "no premise %s", id)
+	}
+	if len(old.Photos) >= MaxPremisePhotos {
+		return problem("photo", "a premise keeps up to %d pictures: remove one first", MaxPremisePhotos)
+	}
+	p := *old
+	ph.Added, ph.By = e.now(), a.User
+	p.Photos = append(slices.Clone(old.Photos), ph)
+	p.Updated, p.By = e.now(), a.User
+	_, err := e.write(a, EvPremiseSaved, refs{}, p)
+	return err
+}
+
+// RemovePremisePhoto removes a picture from a premise; it returns the picture removed.
+func (e *Engine) RemovePremisePhoto(a Actor, id, photo string) (PremisePhoto, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	old := e.st.Premises[id]
+	if old == nil {
+		return PremisePhoto{}, problem("id", "no premise %s", id)
+	}
+	i := slices.IndexFunc(old.Photos, func(x PremisePhoto) bool { return x.ID == photo })
+	if i < 0 {
+		return PremisePhoto{}, problem("photo", "no picture %s on %s", photo, id)
+	}
+	p := *old
+	gone := old.Photos[i]
+	p.Photos = slices.Delete(slices.Clone(old.Photos), i, i+1)
+	p.Updated, p.By = e.now(), a.User
+	_, err := e.write(a, EvPremiseSaved, refs{}, p)
+	return gone, err
+}
+
+// PremiseByID is a copy of a premise, or nil.
+func (e *Engine) PremiseByID(id string) *Premise {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if p := e.st.Premises[id]; p != nil {
+		c := *p
+		c.Photos = slices.Clone(p.Photos)
+		return &c
+	}
+	return nil
 }
 
 // RemovePremise deletes a premise.
@@ -162,6 +246,10 @@ func (e *Engine) ImportPremises(a Actor, source string, ps []Premise) (int, erro
 		if ps[i].ID == "" {
 			e.st.premCount++
 			ps[i].ID = fmt.Sprintf("P%s%06d", e.sitePrefix, e.st.premCount)
+		}
+		ps[i].Photos = nil
+		if old := e.st.Premises[ps[i].ID]; old != nil {
+			ps[i].Photos = old.Photos // a second import keeps the pictures
 		}
 	}
 	for i := 0; i < len(ps); i += 500 {

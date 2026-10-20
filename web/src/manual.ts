@@ -8,7 +8,7 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'signin', 'taker', 'resources', 'console', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'command', 'keys'] },
+    ids: ['start', 'signin', 'taker', 'resources', 'console', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
@@ -200,9 +200,9 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
     body: `The map is drawn from bitdispatcher's own [recorded map](#admin-map): roads by class with route shields and one-way arrows, county and town lines, house numbers and hydrants at street level, fire, police, EMS and hospitals in their own colours.
 
 - **Search** (top right): an address (\`2001 Crystal Spring Ave\`), an intersection (\`Orange & Williamson\`, \`and\`, \`/\` or \`at\`), a street, or a place. Arrow keys and Enter; New incident from a result. A house number not on file offers the nearest numbers on the same street.
-- **Right-click** anywhere: what is here (the nearest address or road) and New incident here.
+- **Right-click** anywhere: what is here (the nearest address or road), New incident here, and [Views of this place](#views) when a provider is on.
 - **Routes**: for the selected incident, the road route of each recommended, chosen and assigned unit, with its arrival time on the unit.
-- **Day / Night** switches the palette; **Photos** (\`F7\`) puts aerial photos under the streets; **Fit all** shows every unit and incident; OOS and Stations show or hide those.
+- **Day / Night** switches the palette; **Photos** (\`F7\`) puts aerial photos under the streets; **3D** stands the buildings up (OpenStreetMap's storeys where mapped) and tilts the map, and right-drag turns it; **Fit all** shows every unit and incident; OOS and Stations show or hide those.
 - The dashed cyan line is the edge of the recorded map: beyond it the online map is shown, muted, and drive times are estimates.`,
   },
   {
@@ -214,6 +214,19 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 - Photos are recorded in Admin › Map: full detail near the centre, less detail out to the edge. Zooming in past what was recorded enlarges the photo below it, so the map never goes blank.
 - The chip beside the button says when the photo at the map centre was taken, where the source publishes it (\"2023, 12 inch ortho\"): an old photo is never taken for today.
 - Where nothing is recorded the server fetches the photo when asked and keeps it, unless that is switched off.`,
+  },
+  {
+    id: 'views', title: 'Views: the place from every side', keys: 'views oblique pictometry eagleview street view panoramax mapillary side back of house pre-plan preplan photo 3d buildings',
+    body: `Aerial photos show the roof. **Views** show the front, the back and the sides: where the back door is, the fence, the stairs, the side the hydrant is on.
+
+- **Views** on the incident panel (beside the location), in the call-taker's **Hazards** tab, on the crews' [mobile terminal](#mdt), and from a right-click on the map.
+- **N E S W**: the four oblique aerial photos, looking north, east, south and west, from the agency's own EagleView licence. Looking north shows the south side of a building. The arrow keys turn the compass.
+- **Street** photos that look at the place, nearest first and at most two per direction, from Panoramax or Mapillary (open photos, CC-BY-SA, coverage depends on who has photographed the street).
+- **Pre-plan** photos: the agency's own pictures of a premise (the Knox box, the gas shut-off, the rear entrance), offline and on this server. Crews add them from the terminal with the device's camera, dispatchers and administrators from here or [Premises](#admin-premises); supervisors remove them.
+- Every picture says where it came from and when it was taken, so an old picture is never taken for today. The expand button shows it full size.
+- **Google Street View**, when offered, opens Google in a new tab; nothing from Google is shown inside bitdispatcher.
+
+> Looking a place up tells the provider where the incident is. Each provider is off until an administrator turns it on in [Integrations](#admin-integrations), and the pictures pass through this server, so keys never reach a browser.`,
   },
   {
     id: 'command', title: 'The command line', keys: 'command line verbs keyboard type d rec er os new mu ret help',
@@ -397,14 +410,22 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 - **Dispositions** an incident can be closed with.`,
   },
   {
-    id: 'admin-integrations', title: 'Integrations', route: '/admin/integrations', keys: 'integrations bitvoice ali eido radio webhook token certificate',
+    id: 'admin-integrations', title: 'Integrations', route: '/admin/integrations', keys: 'integrations bitvoice ali eido radio webhook token certificate views eagleview panoramax mapillary',
     body: `How bitdispatcher connects to call handling and radio. Each integration shows its live state and a checklist of the hooks in use.
 
 - **BitVoice**: its address and API token, and its certificate pinned with Read it. See [BitVoice](#bitvoice).
 - **EIDO**: the token a call-handling system uses to push EIDO to \`/api/ng911/eido\`.
 - **Radio**: the secret for radio webhooks to \`/api/radio/events\`.
 - **ALI spill**: the TCP address bitdispatcher listens on, and Test.
-- **Hooks, drones and translation**: the hook token for transcripts, crash data, drone reports and radio words, the drone system, and the optional language model. See [Hooks and connections](#hooks).`,
+- **Hooks, drones and translation**: the hook token for transcripts, crash data, drone reports and radio words, the drone system, and the optional language model. See [Hooks and connections](#hooks).
+
+**Views** (the place from every side, see [Views](#views)):
+
+- **EagleView**: an application on EagleView's developer portal with Imagery API access under the agency's licence; its client ID and secret. **Sandbox** uses EagleView's test area (Omaha) to try it.
+- **Panoramax**: no key; empty uses the catalogue of every instance, or give the agency's own instance.
+- **Mapillary**: a client token from Mapillary's developer dashboard.
+- **Google Street View link**: a link only.
+- **Test at the map's centre** looks the centre up with each provider that is on and says what came back. Save first.`,
   },
   {
     id: 'bitvoice', title: 'BitVoice', keys: 'bitvoice call handling integration hooks sse eido radio rebid text video',
@@ -459,6 +480,7 @@ Passwords are generated or at least 12 characters. Five wrong passwords lock an 
 - **Add a premise**: type the address and pick it from the suggestions (that places it), click the common hazards or type others, add notes and contacts.
 - **Search** by address, name, hazard or id; click one to change or remove it.
 - Supervisors and administrators change premises; everyone sees them. Each change is a ledger event.
+- **Pre-plan photos and views**: on a premise, add photos (with a caption and the side they show it from) and see the [views](#views) of the place. A photo's SHA-256 is in the ledger: a file changed on the server is refused, not shown.
 
 Premises from an earlier system come in through **Migration**.`,
   },

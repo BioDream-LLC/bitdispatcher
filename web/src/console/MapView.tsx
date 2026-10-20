@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as maplibregl from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
-import { Crosshair, Image as ImageIcon, Layers, MapPinPlus, Moon, Move, Search, Sun } from 'lucide-react'
+import PlaceViews from '../views/PlaceViews'
+import { Modal } from '../ui'
+import { Box, Crosshair, Image as ImageIcon, Layers, MapPinPlus, Moon, Move, Search, Sun } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
@@ -42,10 +44,10 @@ export function mapBaseStyle(view: View, theme: Theme, photos: boolean): maplibr
   return style(view, theme, photos)
 }
 
-function style(view: View, theme: Theme, photos: boolean): maplibregl.StyleSpecification {
+function style(view: View, theme: Theme, photos: boolean, threeD = false): maplibregl.StyleSpecification {
   const ph = photos && view.health.photos?.available ? { attribution: view.health.photos.attribution } : undefined
   if (view.health.map?.recorded || ph) {
-    return dispatchStyle({ theme, base: base(), online: view.health.tiles && !ph, recorded: !!view.health.map?.recorded, bounds: areaBounds(view), attribution: view.settings.mapAttribution, photos: ph, gis: !!view.health.map?.gis })
+    return dispatchStyle({ theme, base: base(), online: view.health.tiles && !ph, recorded: !!view.health.map?.recorded, bounds: areaBounds(view), attribution: view.settings.mapAttribution, photos: ph, gis: !!view.health.map?.gis, threeD: threeD && !!view.health.map?.recorded })
   }
   const s: maplibregl.StyleSpecification = {
     version: 8,
@@ -86,6 +88,7 @@ type Menu = { x: number; y: number; lat: number; lon: number; place?: SearchResu
 
 const THEME_KEY = 'bd.mapTheme'
 const PHOTOS_KEY = 'bd.mapPhotos'
+const THREE_D_KEY = 'bd.map3d'
 
 export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Recommendation | null; onCreateAt: (lat: number, lon: number, address?: string) => void }) {
   const box = useRef<HTMLDivElement>(null)
@@ -107,6 +110,8 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
   const photosOK = !!view.health.photos?.available
   const [photosOn, setPhotosOn] = useState(() => localStorage.getItem(PHOTOS_KEY) === '1')
   const photos = photosOn && photosOK
+  const [viewsAt, setViewsAt] = useState<[number, number] | null>(null)
+  const [threeD, setThreeD] = useState(() => localStorage.getItem(THREE_D_KEY) === '1')
   const [photoDate, setPhotoDate] = useState('')
   // Where the dispatcher was looking, so switching photos or day and night does not move the map.
   const cam = useRef<{ center: [number, number]; zoom: number } | null>(null)
@@ -118,13 +123,16 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
     if (!box.current) return
     const m = new maplibregl.Map({
       container: box.current,
-      style: style(view, theme, photos),
+      style: style(view, theme, photos, threeD),
       center: cam.current?.center ?? [view.settings.mapCenter[1], view.settings.mapCenter[0]],
       zoom: cam.current?.zoom ?? view.settings.mapZoom,
       maxZoom: 21,
       attributionControl: { compact: true },
-      dragRotate: false,
-      pitchWithRotate: false,
+      // In 3D the map tilts and turns (right-drag or Ctrl-drag), to see a building's sides and height.
+      dragRotate: threeD,
+      pitchWithRotate: threeD,
+      pitch: threeD ? 55 : 0,
+      maxPitch: 70,
     })
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     m.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-right')
@@ -155,7 +163,7 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
       setReady(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tilesOn, recorded, builtAt, theme, photos, !!view.health.map?.gis])
+  }, [tilesOn, recorded, builtAt, theme, photos, !!view.health.map?.gis, threeD])
 
   // How old the photo under the map centre is, so no one takes an old photo for today.
   useEffect(() => {
@@ -485,6 +493,19 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
             <ImageIcon size={11} aria-hidden /> Photos
           </button>
         )}
+        {recorded && (
+          <button
+            className={cx('btn h-6 px-1.5 py-0 text-[10px]', threeD && 'ring-1 ring-sky-400 text-sky-200')}
+            title="Buildings in 3D: the map tilts; right-drag turns it"
+            aria-pressed={threeD}
+            onClick={() => setThreeD((v) => {
+              localStorage.setItem(THREE_D_KEY, v ? '0' : '1')
+              return !v
+            })}
+          >
+            <Box size={11} aria-hidden /> 3D
+          </button>
+        )}
         {photos && photoDate && <span className="chip h-6 bg-black/70 text-[10px] text-amber-200" title="When the photo at the map centre was taken">photo {photoDate}</span>}
         {recorded && !photos && (
           <button
@@ -575,8 +596,17 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
             </button>
           )}
           {inc && inc.status !== 'closed' && !hasPoint(inc.location) && <div className="px-3 pb-1 text-[10px] text-amber-300">{inc.number} has no map position yet</div>}
+          {view.placeViews && (
+            <button role="menuitem" className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-800"
+              onClick={() => { setViewsAt([menu.lat, menu.lon]); setMenu(null) }}>
+              <ImageIcon size={13} aria-hidden /> Views of this place
+            </button>
+          )}
         </div>
       )}
+      <Modal open={!!viewsAt} onClose={() => setViewsAt(null)} title="Views of this place" xl>
+        {viewsAt && <PlaceViews lat={viewsAt[0]} lon={viewsAt[1]} big />}
+      </Modal>
       {inc && !hasPoint(inc.location) && inc.status !== 'closed' && (
         <div className="absolute inset-x-0 bottom-10 mx-auto w-fit rounded-md bg-amber-500/90 px-3 py-1 text-xs font-semibold text-slate-950 shadow-lg">
           {inc.number} has no map position: right-click the map to place it (needed to rank units by distance)

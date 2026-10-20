@@ -192,7 +192,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
       }}>
       {screen === 'full' && (
         <main className="grid min-h-0 flex-1 grid-cols-[minmax(300px,22%)_1fr_minmax(380px,28%)] grid-rows-[1fr_minmax(150px,26%)] gap-px bg-slate-800">
-          <div className="row-span-2 flex min-h-0 bg-slate-950"><div className="flex min-h-0 flex-1 flex-col">{queue}</div></div>
+          <div className="row-span-2 flex min-h-0 min-w-0 overflow-hidden bg-slate-950"><div className="flex min-h-0 min-w-0 flex-1 flex-col">{queue}</div></div>
           {map}
           <div className={cx('row-span-2', cell)}>{panel}</div>
           <Boundary name="unit board"><UnitBoard view={view} /></Boundary>

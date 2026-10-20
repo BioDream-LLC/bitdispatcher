@@ -67,6 +67,7 @@ Where something has been tested only against simulators or sample data rather th
 - OpenStreetMap recorded for a circle around the centre (100 miles by default) into bitdispatcher's own store: a night and day dispatch map, road routing, address, intersection and landmark search.
 - County GIS (address points, hydrants, zones, place names) from ArcGIS REST or GeoJSON, searched first; Virginia's statewide address points are a preset. Centreline ranges and Overture's open addresses fill in the gaps.
 - Aerial photos recorded in tiers (Virginia's VBMP, USGS elsewhere) under the map, on the console and the mobile terminal.
+- Views of a place from every side: the four oblique aerial photos (north, east, south, west) from the agency's own EagleView licence, street photos that look at the place from Panoramax or Mapillary, and the agency's own pre-plan photos of each premise, taken by crews from the mobile terminal. On the incident, in the call-taker's Hazards tab, on the terminal and from a right-click on the map; each says where and when it was taken. Buildings in 3D from OpenStreetMap.
 
 **In the field**
 - A mobile data terminal for crews: assignment, route, premises, notes, one-tap statuses on F-keys, mark-outs, GPS, and the emergency button.
@@ -182,6 +183,7 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 - **Multiple monitors** tested with Chrome's emulated monitors, not yet on a real console's monitors.
 - **Transcripts, crash data and drones** tested with the simulator's callers, crash notifications and drone system, not yet a live speech-to-text engine, telematics provider or drone system. The phrasebook translates the language of emergencies, not everything; the injury-risk rating and the quality review are aids, not judgements.
 - **Sign-in and records.** The one-time codes, console lock and audit records have not been reviewed against the CJIS Security Policy. The location hook for providers such as RapidSOS is a documented contract ([docs/LOCATION-HOOK.md](docs/LOCATION-HOOK.md)), not yet connected to any provider. The sample redaction rules and example guidance are placeholders, not legal advice or approved text; the optional language model for redactions is off by default and, when on, sends the record's text to that model. The training board is not a backup.
+- **Views.** EagleView is built to its published Imagery API and tested against a stand-in, not yet against EagleView itself (that needs an agency's licence or EagleView's sandbox credentials). Panoramax is tested live; Mapillary against a stand-in. Looking a place up tells the provider where the incident is, so each provider is off until an administrator turns it on.
 - **Open decisions:** when an ALI-only call (no hang-up signal) should end; whether agency scripts may reach outside the sandbox; VGIN's terms for its data outside Virginia.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design, the rules and the phases, and [docs/OPERATIONS.md](docs/OPERATIONS.md) for the ledger and how reports count.

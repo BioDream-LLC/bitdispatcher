@@ -63,7 +63,7 @@ const PHOTO: Pal = { ...NIGHT, halo: '#000000', minor: '#e2e8f0', service: '#cbd
   labelMinor: '#f1f5f9', suburb: '#e2e8f0', casing: '#000000' }
 
 export function dispatchStyle(opts: { theme: Theme; base: string; online: boolean; recorded: boolean; bounds?: [number, number, number, number]; attribution: string
-  photos?: { attribution: string }; gis?: boolean }): StyleSpecification {
+  photos?: { attribution: string }; gis?: boolean; threeD?: boolean }): StyleSpecification {
   const photos = !!opts.photos
   const p = photos ? PHOTO : opts.theme === 'day' ? DAY : NIGHT
   const night = photos || opts.theme === 'night'
@@ -90,7 +90,7 @@ export function dispatchStyle(opts: { theme: Theme; base: string; online: boolea
   if (!opts.recorded) return style
   style.sources.bd = { type: 'vector', tiles: [opts.base + 'api/map/tiles/{z}/{x}/{y}'], minzoom: 0, maxzoom: 15, bounds: opts.bounds, attribution: '© OpenStreetMap contributors (recorded)' }
   // Layer options are checked by MapLibre when the style loads; the type here keeps the table readable.
-  type VL = { id: string; type: 'fill' | 'line' | 'symbol' | 'circle'; 'source-layer': string; minzoom?: number; maxzoom?: number; filter?: unknown; layout?: Record<string, unknown>; paint?: Record<string, unknown> }
+  type VL = { id: string; type: 'fill' | 'fill-extrusion' | 'line' | 'symbol' | 'circle'; 'source-layer': string; minzoom?: number; maxzoom?: number; filter?: unknown; layout?: Record<string, unknown>; paint?: Record<string, unknown> }
   const L = (l: VL) => layers.push({ source: 'bd', ...l } as unknown as LayerSpecification)
 
   // Land inside the recorded area.
@@ -111,7 +111,13 @@ export function dispatchStyle(opts: { theme: Theme; base: string; online: boolea
   if (!photos) L({ id: 'runway', type: 'line', 'source-layer': 'aeroway', filter: ['==', ['geometry-type'], 'LineString'],
     paint: { 'line-color': night ? '#334155' : '#b8bcc6',
       'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 10, ['match', ['get', 'kind'], 'runway', 2, 0.3], 14, ['match', ['get', 'kind'], 'runway', 18, 3], 18, ['match', ['get', 'kind'], 'runway', 120, 30]] } })
-  if (!photos) L({ id: 'building', type: 'fill', 'source-layer': 'building', minzoom: 14,
+  if (opts.threeD) {
+    // Buildings standing up: OpenStreetMap's storeys where mapped (about 3.2 m each), else one storey.
+    L({ id: 'building-3d', type: 'fill-extrusion', 'source-layer': 'building', minzoom: 15,
+      paint: { 'fill-extrusion-color': ['match', ['get', 'kind'], 'hospital', night ? '#5a2a4a' : '#f0b8c8', 'fire', night ? '#5a2424' : '#f3b2b2', 'school', night ? '#383058' : '#d9cdf2', photos ? '#cbd5e1' : p.building],
+        'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.6, ['*', 3.2, ['max', 1, ['to-number', ['coalesce', ['get', 'levels'], 1], 1]]]],
+        'fill-extrusion-opacity': photos ? 0.55 : 0.9 } })
+  } else if (!photos) L({ id: 'building', type: 'fill', 'source-layer': 'building', minzoom: 14,
     paint: { 'fill-color': ['match', ['get', 'kind'], 'hospital', night ? '#47213a' : '#f0b8c8', 'fire', night ? '#4a1d1d' : '#f3b2b2', 'school', night ? '#2c2547' : '#d9cdf2', p.building],
       'fill-outline-color': p.buildingLine, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.5, 16, 1] } })
 

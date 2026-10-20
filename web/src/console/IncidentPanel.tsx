@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { AdvisoryCards, useAdvisory } from './Advisory'
 import PremiseBox from './PremiseBox'
+import { ViewsButton } from '../views/PlaceViews'
 import CallAssist from './CallAssist'
 import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
@@ -480,6 +481,9 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
                 {inc.location?.source ? ` · ${inc.location.source}` : ''}
               </div>
             </div>
+            {hasPoint(inc.location) && (view.placeViews || view.premises?.[inc.number]?.some((p) => p.photos?.length)) && (
+              <ViewsButton lat={inc.location.lat} lon={inc.location.lon} premises={view.premises?.[inc.number]} className="ml-auto shrink-0" />
+            )}
           </div>
           {inc.caller && (inc.caller.name || inc.caller.callback) && (
             <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-300">

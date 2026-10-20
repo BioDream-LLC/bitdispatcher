@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { CheckCircle2, CircleDashed, Copy, Fingerprint, KeyRound, PlugZap, Save, Server, XCircle } from 'lucide-react'
+import { CheckCircle2, CircleDashed, Copy, Fingerprint, Images, KeyRound, PlugZap, Save, Server, XCircle } from 'lucide-react'
 import { api, errText } from '../api'
 import { Field } from '../ui'
 import { ago, cx, useNow } from '../util'
-import type { View } from '../types'
+import type { View, ViewsConfig } from '../types'
 import { Page } from './Admin'
 
 type IV = { bitvoiceUrl: string; bitvoiceFingerprint: string; bitvoiceTokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean; aliListen: string }
@@ -180,6 +180,7 @@ export default function Integrations({ view }: { view: View }) {
         </div>
       )}
       <Connections view={view} />
+      <ViewsSettings />
     </Page>
   )
 }
@@ -261,5 +262,67 @@ function Connections({ view }: { view: View }) {
         <div className="flex justify-end"><button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save connections</button></div>
       </section>
     </div>
+  )
+}
+
+// ViewsSettings: where pictures of a place from the side come from. Each provider is told where the
+// incident is when it is looked up, so each is off until an administrator turns it on.
+function ViewsSettings() {
+  const [c, setC] = useState<ViewsConfig | null>(null)
+  const [secret, setSecret] = useState('')
+  const [token, setToken] = useState('')
+  const [test, setTest] = useState<Record<string, string> | null>(null)
+  useEffect(() => {
+    api.get<ViewsConfig>('/admin/views').then(setC).catch((e) => toast.error(errText(e)))
+  }, [])
+  if (!c) return null
+  const set = (p: Partial<ViewsConfig>) => setC({ ...c, ...p })
+  const save = async () => {
+    try {
+      setC(await api.put<ViewsConfig>('/admin/views', { ...c, eagleviewSecret: secret, mapillaryToken: token }))
+      setSecret('')
+      setToken('')
+      toast.success('Views saved')
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  return (
+    <section className="panel mt-4 space-y-3 rounded-lg p-4" aria-labelledby="views-h">
+      <h2 id="views-h" className="flex items-center gap-2 font-semibold text-slate-100"><Images size={15} className="text-sky-300" aria-hidden /> Views: the place from every side</h2>
+      <p className="text-xs text-slate-400">
+        Oblique aerial photos (the front, back and sides of a building) and street photos, shown on the incident, in the call-taker's Hazards tab and on the crews' terminals, beside the agency's own pre-plan photos of each premise.
+        Pictures are fetched by this server, so keys never reach a browser. <b className="text-amber-200">Looking a place up tells the provider where the incident is</b>: turn a provider on only under your agency's agreement with it.
+      </p>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-2 rounded-md border border-slate-800 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-100"><input type="checkbox" checked={c.eagleviewOn} onChange={(e) => set({ eagleviewOn: e.target.checked })} /> EagleView (oblique, your licence)</label>
+          <p className="text-xs text-slate-500">An application on EagleView's developer portal with Imagery API access under your agency's licence: its client ID and secret.</p>
+          <Field label="Client ID" htmlFor="evid"><input id="evid" className="input font-mono" value={c.eagleviewClientId} onChange={(e) => set({ eagleviewClientId: e.target.value })} autoComplete="off" /></Field>
+          <Field label={`Client secret ${c.eagleviewSecretSet ? '(set)' : ''}`} htmlFor="evs" hint="Leave empty to keep it; - clears it">
+            <input id="evs" type="password" className="input font-mono" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={c.eagleviewSecretSet ? '••••••••' : ''} autoComplete="new-password" />
+          </Field>
+          <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={c.eagleviewSandbox} onChange={(e) => set({ eagleviewSandbox: e.target.checked })} /> EagleView's sandbox (a test area in Omaha)</label>
+        </div>
+        <div className="space-y-2 rounded-md border border-slate-800 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-100"><input type="checkbox" checked={c.panoramaxOn} onChange={(e) => set({ panoramaxOn: e.target.checked })} /> Panoramax (street, open)</label>
+          <p className="text-xs text-slate-500">Open street-level photos (CC-BY-SA). Free, no key; coverage depends on who has photographed your streets.</p>
+          <Field label="Instance" htmlFor="pxu" hint="Empty: the catalogue of every instance"><input id="pxu" className="input font-mono" value={c.panoramaxUrl} onChange={(e) => set({ panoramaxUrl: e.target.value })} placeholder="https://api.panoramax.xyz" /></Field>
+        </div>
+        <div className="space-y-2 rounded-md border border-slate-800 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-100"><input type="checkbox" checked={c.mapillaryOn} onChange={(e) => set({ mapillaryOn: e.target.checked })} /> Mapillary (street)</label>
+          <p className="text-xs text-slate-500">Street-level photos (CC-BY-SA) with a free client token from Mapillary's developer dashboard.</p>
+          <Field label={`Client token ${c.mapillaryTokenSet ? '(set)' : ''}`} htmlFor="mlt" hint="Leave empty to keep it; - clears it">
+            <input id="mlt" type="password" className="input font-mono" value={token} onChange={(e) => setToken(e.target.value)} placeholder={c.mapillaryTokenSet ? '••••••••' : 'MLY|…'} autoComplete="new-password" />
+          </Field>
+          <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={c.googleLink} onChange={(e) => set({ googleLink: e.target.checked })} /> Offer a link to Google Street View (opens Google in a new tab; nothing is fetched here)</label>
+        </div>
+      </div>
+      {test && <ul className="space-y-0.5 text-xs" aria-label="Test results">{Object.entries(test).map(([k, v]) => <li key={k}><b>{k}</b>: {v}</li>)}{!Object.keys(test).length && <li>No provider is on.</li>}</ul>}
+      <div className="flex justify-end gap-2">
+        <button className="btn" onClick={async () => { try { setTest((await api.post<{ results: Record<string, string> }>('/admin/views/test', {})).results) } catch (e) { toast.error(errText(e)) } }}>Test at the map's centre</button>
+        <button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save views</button>
+      </div>
+    </section>
   )
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/biodream-llc/bitdispatcher/internal/ledger"
 	"github.com/biodream-llc/bitdispatcher/internal/mapdata"
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
+	"github.com/biodream-llc/bitdispatcher/internal/views"
 )
 
 // Integrations is the integration configuration kept in the data directory (with its secrets, mode 0600).
@@ -36,6 +37,7 @@ type Integrations struct {
 	BitVoice  bitvoice.Config `json:"bitvoice"`
 	ALIListen string          `json:"aliListen"` // host:port to accept ALI spills on; empty: off
 	Extra     Extra           `json:"extra"`     // hooks, the drone system, the language model
+	Views     views.Config    `json:"views"`     // pictures of a place from the side
 }
 
 // Server is the API.
@@ -54,6 +56,7 @@ type Server struct {
 	Photos         *imagery.Service  // recorded aerial photos
 	Advisory       *advisory.Service // the advisory panel
 	GIS            *gis.Service      // the county's GIS layers
+	Views          *views.Service    // oblique and street-level pictures of a place
 	trees          treeCache
 	sites          sites
 	TLSFingerprint string // this site's certificate, for other sites to pin
@@ -90,6 +93,9 @@ const csrfHeader = "X-BitDispatcher"
 // New builds the server and starts the configured integrations.
 func New(s *Server) (*Server, error) {
 	s.mux = http.NewServeMux()
+	if s.Views == nil {
+		s.Views = &views.Service{Agent: "bitdispatcher/" + s.Version + " (+https://github.com/biodream-llc/bitdispatcher)"}
+	}
 	if err := s.loadIntegrations(); err != nil {
 		return nil, err
 	}
@@ -136,6 +142,9 @@ func (s *Server) loadIntegrations() error {
 
 func (s *Server) applyIntegrations() {
 	s.BV.Configure(s.integ.BitVoice)
+	if !s.isTraining {
+		s.Views.Configure(s.integ.Views) // a training board shares the live board's
+	}
 	if s.ali != nil {
 		s.ali.Close()
 		s.ali = nil
@@ -314,6 +323,7 @@ func (s *Server) routes() {
 	})
 	m.HandleFunc("POST /api/auth/login", s.signIn)
 	s.entryRoutes()
+	s.viewRoutes()
 	s.recordsRoutes()
 	s.lockRoutes()
 	s.workstationRoutes()
@@ -508,6 +518,7 @@ type View struct {
 	Calls       []*cad.Call      `json:"calls"`
 	Emergencies []*cad.Emergency `json:"emergencies"`
 	Health      HealthView       `json:"health"`
+	PlaceViews  bool             `json:"placeViews,omitempty"` // a provider of pictures from the side is on
 	Verbs       []cad.Verb       `json:"verbs"`
 	Statuses    []string         `json:"statuses"`
 	// What is known about each incident's place: premises (hazards first) and the earlier system's
@@ -569,12 +580,13 @@ func (s *Server) health() HealthView {
 }
 
 func (s *Server) view() ([]byte, error) {
+	vc := s.Views.Config()
 	now := s.Eng.Now()
 	h := s.health()
 	var out []byte
 	var err error
 	s.Eng.Read(func(st *cad.State) {
-		v := View{ServerTime: now.UTC(), Seq: st.Seq, Settings: st.Settings, Health: h, Verbs: cad.Verbs, Statuses: cad.Statuses,
+		v := View{ServerTime: now.UTC(), Seq: st.Seq, Settings: st.Settings, Health: h, PlaceViews: vc.Any() || vc.GoogleLink, Verbs: cad.Verbs, Statuses: cad.Statuses,
 			Stations: []*cad.Station{}, Units: []UnitView{}, CallTypes: []*cad.CallType{}, Incidents: []*cad.Incident{}, Calls: []*cad.Call{}, Emergencies: []*cad.Emergency{}}
 		for _, x := range st.Stations {
 			v.Stations = append(v.Stations, x)

@@ -75,7 +75,8 @@ type MDTView struct {
 		// MarkOuts are the mark-outs this unit may use.
 		MarkOuts []cad.MarkOutType `json:"markOuts"`
 	} `json:"settings"`
-	Health HealthView `json:"health"`
+	Health     HealthView `json:"health"`
+	PlaceViews bool       `json:"placeViews,omitempty"` // pictures of the place from the side can be looked up
 }
 
 func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -84,6 +85,9 @@ func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a
 		return
 	}
 	v := MDTView{ServerTime: time.Now().UTC(), Partners: []UnitView{}, Premises: []*cad.Premise{}, Pending: []*cad.Incident{}, Statuses: cad.Statuses, Health: s.health()}
+	if vc := s.Views.Config(); vc.Any() || vc.GoogleLink {
+		v.PlaceViews = true
+	}
 	s.Eng.Read(func(st *cad.State) {
 		u := st.Units[unit]
 		cp := *u
