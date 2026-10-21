@@ -117,7 +117,7 @@ everything; BitVoice did not push (it needs to reach and trust bitdispatcher: se
 | Radio unit positions on the map | Works |
 | Answer-time report, exposure record, i3 log in Reports | Works |
 | Silent-line and machine-against-caller advice | bitdispatcher's own advisory panel (unit tested), advice only |
-| Real-time text, TTY, SIP MESSAGE, CAMA, ALI lookup by callback, ESRP routing and PSAP states, recordings, transcripts and AI summaries | Built to BitVoice's payloads and unit tested; not exercised live (needs a TTY, a CAMA trunk, an ALI link, an ESRP policy, or BitVoice's AI configured) |
+| Real-time text, TTY, SIP MESSAGE, CAMA, ALI lookup by callback, ESRP routing and PSAP states | Built to BitVoice's payloads and unit tested; not exercised live (needs a TTY, a CAMA trunk, an ALI link or an ESRP policy) |
 | BitVoice pushing EIDO, ALI spill and radio events to bitdispatcher | Not tested here: bitdispatcher ran where BitVoice could not reach it (see the retest below) |
 
 Retested against BitVoice a83099c (its fixes for what this testing found):
@@ -130,6 +130,8 @@ Retested against BitVoice a83099c (its fixes for what this testing found):
 | The video link says why it was not texted | Works |
 | BitVoice pushing to bitdispatcher on the same computer (`-hooks-addr`): the EIDO and the ALI spill at answer, a P25 radio emergency by webhook | Works: the call came by all three paths (event stream, ALI, EIDO), the emergency as M1 "Medic 1" |
 | Live transcripts (`call.transcript`): a caller speaking (a recorded sentence, `i3caller -wav`), written out by BitVoice's local speech-to-text and shown on the call as the caller's words | Works: the sentence arrived word for word while the call was in progress |
+| The recording, its transcript and its AI summary after the call (`call.recorded`, `transcript.done`; BitVoice recording all calls, speech-to-text on its own computer, the summary by a hosted language model) | Works: a few seconds after the caller hung up, the call carried its recording and a summary marked "BitVoice (AI)" |
+| A briefing when a call is transferred (`call.briefing`): the lab phone (`i3caller -phone 100 -transfer 101`) passes an answered call on | Works: about ten seconds after the transfer, while the call was still going, the call carried the briefing, marked "BitVoice briefing (AI)". After the call, the fuller summary takes its place |
 
 Retested against BitVoice 29f2ae7 (its rule against plain http off this computer): the EIDO, ALI spill and
 radio pushes to `http://127.0.0.1:9450` still arrive; saving an `http://` EIDO or radio address to another

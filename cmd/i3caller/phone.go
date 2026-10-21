@@ -13,7 +13,8 @@ import (
 
 // A lab call-taker's phone: it registers as an extension (digest authentication) and answers each call
 // after a few seconds, sending silence back, until the call ends. With it, a 911 call rings, is answered
-// and is hung up as at a real position.
+// and is hung up as at a real position. With a transfer number it passes each answered call on (a blind
+// transfer, SIP REFER) after a while, as a call-taker sending a caller to another position.
 
 type phone struct {
 	conn               *net.UDPConn
@@ -21,6 +22,8 @@ type phone struct {
 	ext, secret, local string
 	ringFor            time.Duration
 	rtp                *net.UDPConn
+	xferTo             string        // pass answered calls to this number ("": keep them)
+	xferAfter          time.Duration // after this long
 }
 
 func md5hex(s string) string { h := md5.Sum([]byte(s)); return hex.EncodeToString(h[:]) }
@@ -58,7 +61,7 @@ func header(msg, h string) string {
 	return m[1]
 }
 
-func runPhone(server, bind, ext, secret string, ringFor time.Duration) error {
+func runPhone(server, bind, ext, secret string, ringFor time.Duration, xferTo string, xferAfter time.Duration) error {
 	srv, err := net.ResolveUDPAddr("udp", server)
 	if err != nil {
 		return err
@@ -71,7 +74,7 @@ func runPhone(server, bind, ext, secret string, ringFor time.Duration) error {
 	if err != nil {
 		return err
 	}
-	p := &phone{conn: conn, server: srv, ext: ext, secret: secret, local: conn.LocalAddr().String(), ringFor: ringFor, rtp: rtp}
+	p := &phone{conn: conn, server: srv, ext: ext, secret: secret, local: conn.LocalAddr().String(), ringFor: ringFor, rtp: rtp, xferTo: xferTo, xferAfter: xferAfter}
 	go func() { // drop the caller's sound
 		b := make([]byte, 2048)
 		for {
@@ -104,6 +107,7 @@ func runPhone(server, bind, ext, secret string, ringFor time.Duration) error {
 	fmt.Printf("phone: registering %s at %s\n", ext, server)
 	buf := make([]byte, 65535)
 	calls := map[string]chan struct{}{}
+	refers := map[string]func(hdr, chal string){} // Call-ID: send the REFER again, answering the challenge
 	for {
 		n, from, err := conn.ReadFromUDP(buf)
 		if err != nil {
@@ -116,6 +120,19 @@ func runPhone(server, bind, ext, secret string, ringFor time.Duration) error {
 		}
 		if strings.HasPrefix(first, "SIP/2.0 ") {
 			code, _ := strconv.Atoi(strings.Fields(first)[1])
+			if strings.Contains(header(msg, "CSeq"), "REFER") {
+				if again := refers[header(msg, "Call-ID")]; again != nil && (code == 401 || code == 407) {
+					hdr, chal := "Authorization", header(msg, "WWW-Authenticate")
+					if code == 407 {
+						hdr, chal = "Proxy-Authorization", header(msg, "Proxy-Authenticate")
+					}
+					delete(refers, header(msg, "Call-ID"))
+					again(hdr, chal)
+				} else if code >= 200 {
+					fmt.Println("phone: transfer:", strings.TrimSpace(first))
+				}
+				continue
+			}
 			if strings.Contains(header(msg, "CSeq"), "REGISTER") {
 				switch {
 				case code == 401 || code == 407:
@@ -173,6 +190,17 @@ func runPhone(server, bind, ext, secret string, ringFor time.Duration) error {
 				sdpAns := "v=0\r\no=phone 1 1 IN IP4 " + host + "\r\ns=-\r\nc=IN IP4 " + host + "\r\nt=0 0\r\nm=audio " + strconv.Itoa(port) + " RTP/AVP 0 101\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:101 telephone-event/8000\r\na=sendrecv\r\n"
 				resp("200 OK", "Contact: <sip:"+ext+"@"+p.local+">\r\nContent-Type: application/sdp\r\n", sdpAns)
 				fmt.Println("phone: answered")
+				if p.xferTo != "" {
+					go func() {
+						select {
+						case <-done:
+							return
+						case <-time.After(p.xferAfter):
+						}
+						fmt.Println("phone: transferring to", p.xferTo)
+						p.refer(msg, tag, func(again func(hdr, chal string)) { refers[header(msg, "Call-ID")] = again })
+					}()
+				}
 				if ip, pt := reConn.FindStringSubmatch(offer), reAudio.FindStringSubmatch(offer); ip != nil && pt != nil {
 					n, _ := strconv.Atoi(pt[1])
 					dst := &net.UDPAddr{IP: net.ParseIP(ip[1]), Port: n}
@@ -210,4 +238,32 @@ func runPhone(server, bind, ext, secret string, ringFor time.Duration) error {
 			resp("200 OK", "", "")
 		}
 	}
+}
+
+var reURI = regexp.MustCompile(`<([^>]+)>`)
+
+// refer sends a blind transfer (REFER) inside the dialog the INVITE invite began, which this phone
+// answered with the tag tag. keep is given a function that sends it again with a challenge's answer.
+func (p *phone) refer(invite, tag string, keep func(func(hdr, chal string))) {
+	target := p.server.String()
+	if m := reURI.FindStringSubmatch(header(invite, "Contact")); m != nil {
+		target = m[1]
+	}
+	if !strings.HasPrefix(target, "sip:") {
+		target = "sip:" + target
+	}
+	referTo := "sip:" + p.xferTo + "@" + p.server.IP.String()
+	send := func(cseq int, hdr, auth string) {
+		var b strings.Builder
+		fmt.Fprintf(&b, "REFER %s SIP/2.0\r\nVia: SIP/2.0/UDP %s;branch=z9hG4bK%s;rport\r\nMax-Forwards: 70\r\n", target, p.local, token(6))
+		fmt.Fprintf(&b, "From: %s;tag=%s\r\nTo: %s\r\nCall-ID: %s\r\nCSeq: %d REFER\r\n", header(invite, "To"), tag, header(invite, "From"), header(invite, "Call-ID"), cseq)
+		fmt.Fprintf(&b, "Contact: <sip:%s@%s>\r\nRefer-To: <%s>\r\nReferred-By: <sip:%s@%s>\r\n", p.ext, p.local, referTo, p.ext, p.server.IP.String())
+		if auth != "" {
+			fmt.Fprintf(&b, "%s: %s\r\n", hdr, auth)
+		}
+		b.WriteString("Content-Length: 0\r\n\r\n")
+		p.conn.WriteToUDP([]byte(b.String()), p.server)
+	}
+	keep(func(hdr, chal string) { send(2, hdr, digest(chal, "REFER", target, p.ext, p.secret)) })
+	send(1, "", "")
 }

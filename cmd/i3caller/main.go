@@ -62,6 +62,8 @@ func main() {
 	phoneExt := flag.String("phone", "", "instead of calling: register as this extension (a call-taker's phone) and answer every call")
 	secretFile := flag.String("secret-file", "", "with -phone: a file holding the extension's SIP password")
 	ring := flag.Duration("ring", 4*time.Second, "with -phone: how long a call rings before it is answered")
+	xferTo := flag.String("transfer", "", "with -phone: pass each answered call to this number (a blind transfer), as a call-taker would")
+	xferAfter := flag.Duration("transfer-after", 20*time.Second, "with -phone -transfer: how long after the answer")
 	radioAt := flag.String("radio", "", "instead of calling: be a P25 radio system's home RFSS at this address (host:port), and have a radio call the console")
 	issi := flag.String("issi", "127.0.0.1:5062", "with -radio: the console's ISSI SIP address")
 	wacn := flag.String("wacn", "BEE00", "with -radio: the WACN (5 hex digits)")
@@ -100,7 +102,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "i3caller: the extension's password:", err)
 			os.Exit(1)
 		}
-		if err := runPhone(o.psap, o.bind, *phoneExt, strings.TrimSpace(string(b)), *ring); err != nil {
+		if err := runPhone(o.psap, o.bind, *phoneExt, strings.TrimSpace(string(b)), *ring, *xferTo, *xferAfter); err != nil {
 			fmt.Fprintln(os.Stderr, "i3caller:", err)
 			os.Exit(1)
 		}
