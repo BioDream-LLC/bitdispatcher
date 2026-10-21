@@ -94,6 +94,15 @@ func (f *fakeBitVoice) handler(t *testing.T) http.Handler {
 		f.mu.Unlock()
 		w.Write([]byte(`{}`))
 	}))
+	mux.HandleFunc("GET /api/calls/{id}/media", auth(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"call":"x","held":false,"items":[{"n":1,"name":"p.jpg","type":"image/jpeg","kind":"photo","size":2280,"sha256":"d81a","received":"2026-10-21T09:02:27Z","takenLocal":"2026-10-15 14:05:30","hasGps":true,"lat":40.2633,"lon":-76.8823}]}`))
+	}))
+	mux.HandleFunc("POST /api/core/validate", auth(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"invalid":["RD"],"matched":"","position":{"checked":false,"within":false,"why":"no point"},"suggestions":[{"civic":{"HNO":"215","RD":"Church","STS":"Ave","POD":"SW","A3":"Roanoke","A1":"VA"},"why":"a street of a similar name"}]}`))
+	}))
+	mux.HandleFunc("GET /api/core/states", auth(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"items":[{"uri":"sip:sos@east","name":"East","queue":"Full","length":8,"max":8,"service":"Normal"}]}`))
+	}))
 	return mux
 }
 
@@ -279,4 +288,49 @@ func TestFingerprint(t *testing.T) {
 	if err != nil || fp != hex.EncodeToString(sum[:]) {
 		t.Fatalf("%s %v", fp, err)
 	}
+}
+
+// What BitVoice says beyond the basics, in its real shapes (from live testing): the caller ID's check,
+// the location check, text channels, photos as evidence, the LVF, transcripts, routing and PSAP states.
+func TestHandlingFromBitVoice(t *testing.T) {
+	eng, b, f, _ := setup(t)
+	f.calls = []map[string]any{{"id": "c9", "state": "answered", "from": "+15405550144", "start": time.Now(),
+		"screen": map[string]any{"verified": "passed", "attest": "A", "why": "the provider verified the caller ID"},
+		"emergency": map[string]any{"esinet": true, "service": "urn:service:sos", "textVia": []string{"msrp"}, "takenName": "Call taker 1",
+			"location": map[string]any{"lat": 37.28, "lon": -79.90, "radius": 8, "method": "GPS",
+				"civic": map[string]any{"country": "US", "state": "VA", "city": "Roanoke", "number": "215", "street": "Chruch", "streetType": "Ave", "postDir": "SW"}},
+			"locationCheck": map[string]any{"show": "new", "text": "Show the new location first", "reasons": []string{"the latest"}},
+			"additional":    map[string]any{}}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go b.Run(ctx)
+	get := func() *cad.Handling {
+		var h *cad.Handling
+		eng.Read(func(s *cad.State) {
+			if c := s.Calls["c9"]; c != nil && c.Handling != nil {
+				v := *c.Handling
+				h = &v
+			}
+		})
+		return h
+	}
+	waitFor(t, "the handling, evidence and LVF", func() bool {
+		h := get()
+		return h != nil && h.CallerID != nil && h.CallerID.Verified == "passed" && h.LocCheck != nil && h.Evidence != nil && len(h.Evidence.Items) == 1 &&
+			h.LVF != nil && !h.LVF.Valid && len(h.LVF.Suggestions) == 1 && h.LVF.Suggestions[0].Address == "215 Church Ave SW, Roanoke VA"
+	})
+	if h := get(); !h.ESInet || h.TextVia[0] != "msrp" || h.Taker != "Call taker 1" || !h.Evidence.Items[0].HasGPS {
+		t.Fatalf("%+v", h)
+	}
+	f.events <- sse("transcript.done", map[string]any{"callId": "c9", "recording": "2026-10/c9.wav", "status": "done", "summary": "A caller reports a fall.",
+		"lines": []any{map[string]any{"second": 1.2, "side": "caller", "text": "my mother fell"}}})
+	f.events <- sse("esrp.route", map[string]any{"call": "c9", "service": "urn:service:sos", "psap": "sip:sos@east", "why": "the caller's location is in East", "at": time.Now()})
+	f.events <- sse("core.states", nil)
+	waitFor(t, "the transcript, summary and route", func() bool {
+		h := get()
+		var lines int
+		eng.Read(func(s *cad.State) { lines = len(s.Calls["c9"].Transcript) })
+		return h.Summary == "A caller reports a fall." && h.Recording != "" && len(h.Routes) == 1 && lines == 1
+	})
+	waitFor(t, "the PSAP states", func() bool { p := b.Health().PSAPs; return len(p) == 1 && p[0].Queue == "Full" })
 }

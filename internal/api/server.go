@@ -383,10 +383,26 @@ func (s *Server) routes() {
 	s.handle("POST /api/calls/{id}/attach", auth.Dispatcher, s.attachCall)
 	s.handle("POST /api/calls/{id}/rebid", auth.Dispatcher, s.rebid)
 	s.handle("POST /api/calls/{id}/text", auth.Dispatcher, s.textCaller)
+	s.handle("GET /api/bitvoice/records/{kind}", auth.Supervisor, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+		out, err := s.BV.Records(r.Context(), r.PathValue("kind"), r.URL.Query())
+		if err != nil {
+			fail(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(out)
+	})
+	s.handle("POST /api/calls/{id}/take", auth.Dispatcher, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+		id := r.PathValue("id")
+		s.callAction(w, a, id, "text taken", func() (string, error) { return "taken by " + a.User, s.BV.TakeText(r.Context(), id) })
+	})
 	s.handle("POST /api/calls/{id}/video-link", auth.Dispatcher, s.videoLink)
 	s.handle("POST /api/calls/{id}/eido", auth.Dispatcher, s.refreshEIDO)
 	s.handle("POST /api/calls/{id}/whep", auth.Dispatcher, s.whep)
 	s.handle("GET /api/calls/{id}/media/{n}", auth.Dispatcher, s.media)
+	s.handle("GET /api/calls/{id}/evidence/{n}", auth.Dispatcher, s.evidence)
+	s.handle("POST /api/calls/{id}/evidence/hold", auth.Dispatcher, s.holdEvidence)
+	s.handle("POST /api/calls/{id}/video/reveal", auth.Dispatcher, s.revealVideo)
 	s.handle("POST /api/emergencies/{key}/ack", auth.Dispatcher, s.ackEmergency)
 
 	s.handle("PUT /api/admin/settings", auth.Admin, s.saveSettings)
@@ -1119,6 +1135,9 @@ func (s *Server) videoLink(w http.ResponseWriter, r *http.Request, se *auth.Sess
 		if v.Sent {
 			return "link texted to the caller", nil
 		}
+		if v.Problem == "" {
+			return "BitVoice has no texting number for video links (its 911 settings): read the link to the caller", nil
+		}
 		return "link not texted (" + v.Problem + "): read it to the caller", nil
 	}()
 	if err != nil {
@@ -1196,6 +1215,73 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request, se *auth.Session,
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("Content-Disposition", "inline")
 	io.Copy(w, io.LimitReader(resp.Body, 200<<20))
+}
+
+// evidence serves one of a caller's photos or clips from BitVoice, once a person chose to reveal it; each
+// look is in the ledger with who looked (and in BitVoice's exposure record).
+func (s *Server) evidence(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+	id := r.PathValue("id")
+	n, err := strconv.Atoi(r.PathValue("n"))
+	var item *cad.EvidenceItem
+	s.Eng.Read(func(st *cad.State) {
+		if c, ok := st.Calls[id]; ok && err == nil && c.Handling != nil && c.Handling.Evidence != nil {
+			for _, x := range c.Handling.Evidence.Items {
+				if x.N == n {
+					v := x
+					item = &v
+				}
+			}
+		}
+	})
+	if item == nil {
+		fail(w, 404, "no such photo or clip")
+		return
+	}
+	resp, err := s.BV.Evidence(r.Context(), id, n)
+	if err != nil {
+		fail(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fail(w, http.StatusBadGateway, "BitVoice said "+resp.Status)
+		return
+	}
+	s.Eng.RecordCallAction(a, id, "evidence revealed", true, fmt.Sprintf("%s (SHA-256 %s)", item.Name, item.SHA256))
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "image/") && !strings.HasPrefix(ct, "video/") {
+		ct = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+	w.Header().Set("Content-Disposition", "inline")
+	io.Copy(w, io.LimitReader(resp.Body, 200<<20))
+}
+
+func (s *Server) holdEvidence(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+	var b struct {
+		Hold bool `json:"hold"`
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	id := r.PathValue("id")
+	err := s.BV.HoldEvidence(r.Context(), id, b.Hold)
+	s.Eng.RecordCallAction(a, id, map[bool]string{true: "evidence held", false: "evidence released"}[b.Hold], err == nil, errString(err))
+	if err != nil {
+		fail(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) revealVideo(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+	id := r.PathValue("id")
+	err := s.BV.RevealVideo(r.Context(), id)
+	s.Eng.RecordCallAction(a, id, "live video revealed", true, errString(err))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) ackEmergency(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {

@@ -54,6 +54,20 @@ type Health struct {
 	Failures    []Failure `json:"failures"` // BitVoice could not deliver to bitdispatcher
 	Events      int       `json:"events"`
 	Version     string    `json:"version,omitempty"`
+	// PSAPs is the NENA state of the PSAPs BitVoice's ESRP routes to (queue and service), when it routes.
+	PSAPs []PSAPState `json:"psaps,omitempty"`
+}
+
+// PSAPState is one PSAP's NENA queue and service state, as BitVoice's ESRP sees it.
+type PSAPState struct {
+	URI     string    `json:"uri"`
+	Name    string    `json:"name"`
+	Queue   string    `json:"queue,omitempty"` // Active, Inactive, Disabled, Full, Standby, Unreachable ...
+	Length  int       `json:"length"`
+	Max     int       `json:"max"`
+	Service string    `json:"service,omitempty"` // Normal, Unstaffed, Down ...
+	Reason  string    `json:"reason,omitempty"`
+	QueueAt time.Time `json:"queueAt,omitzero"`
 }
 
 // Failure is a delivery BitVoice reported it could not make.
@@ -75,6 +89,7 @@ type Bridge struct {
 	health Health
 	cancel context.CancelFunc
 	wake   chan struct{}
+	lvf    map[string]bool // call|address|position already checked with the LVF
 }
 
 // New makes a bridge. Call Configure, then Run.
@@ -390,6 +405,9 @@ func (b *Bridge) resync(ctx context.Context) {
 		for _, c := range calls.Items {
 			live[c.ID] = true
 			b.call(c)
+			if c.Emergency != nil {
+				b.pullEvidence(ctx, c.ID) // photos and clips sent while the link was down
+			}
 		}
 		// 911 calls bitdispatcher thinks are live but BitVoice no longer has ended while the link was down.
 		var stale []string
@@ -412,6 +430,7 @@ func (b *Bridge) resync(ctx context.Context) {
 			b.location(f)
 		}
 	}
+	b.pullStates(ctx)
 }
 
 func containsStr(s []string, v string) bool {
@@ -479,8 +498,78 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 			b.eng.Read(func(s *cad.State) { _, known = s.Calls[m.Call] })
 			if known {
 				go b.pullEIDO(ctx, m.Call)
+				if env.Type == "call.media" {
+					go b.pullEvidence(ctx, m.Call)
+				}
 			}
 		}
+	case "transcript.done":
+		// BitVoice's transcript and summary of a recorded call, after it ends.
+		var t struct {
+			Recording string `json:"recording"`
+			CallID    string `json:"callId"`
+			Status    string `json:"status"`
+			Summary   string `json:"summary"`
+			Lines     []struct {
+				Second float64 `json:"second"`
+				Side   string  `json:"side"`
+				Text   string  `json:"text"`
+			} `json:"lines"`
+		}
+		if json.Unmarshal(env.Data, &t) == nil && t.CallID != "" {
+			known, have := false, 0
+			b.eng.Read(func(s *cad.State) {
+				if c, ok := s.Calls[t.CallID]; ok {
+					known, have = true, len(c.Transcript)
+				}
+			})
+			if !known {
+				return
+			}
+			d := cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Recording: t.Recording, Summary: strings.TrimSpace(t.Summary), SummaryBy: "BitVoice (AI)"}}
+			if have == 0 { // a live transcript wins over the one made afterwards
+				for _, l := range t.Lines {
+					sp := "taker"
+					if l.Side == "caller" {
+						sp = "caller"
+					}
+					if s := strings.TrimSpace(l.Text); s != "" {
+						d.Transcript = append(d.Transcript, cad.TranscriptLine{Speaker: sp, Text: s})
+					}
+				}
+			}
+			b.eng.UpsertCall(cad.BitVoiceActor, t.CallID, d)
+		}
+	case "call.briefing":
+		var br struct {
+			CallID  string `json:"callId"`
+			Summary string `json:"summary"`
+			By      string `json:"by"`
+		}
+		if json.Unmarshal(env.Data, &br) == nil && br.CallID != "" && br.Summary != "" {
+			b.upsertKnown(br.CallID, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Summary: br.Summary, SummaryBy: "BitVoice briefing (AI)"}})
+		}
+	case "call.recorded":
+		var r struct {
+			ID        string `json:"id"`
+			Recording string `json:"recording"`
+		}
+		if json.Unmarshal(env.Data, &r) == nil && r.ID != "" && r.Recording != "" {
+			b.upsertKnown(r.ID, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Recording: r.Recording}})
+		}
+	case "esrp.route":
+		var r cad.Route
+		var raw struct {
+			Call string `json:"call"`
+		}
+		if json.Unmarshal(env.Data, &r) == nil && json.Unmarshal(env.Data, &raw) == nil && raw.Call != "" && r.Why != "" {
+			if r.At.IsZero() {
+				r.At = time.Now()
+			}
+			b.upsertKnown(raw.Call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Routes: []cad.Route{r}}})
+		}
+	case "core.states":
+		go b.pullStates(ctx)
 	case "emergency.cad_failed":
 		var f struct {
 			Call  string `json:"call"`
@@ -645,6 +734,11 @@ type CallInfo struct {
 	To        string    `json:"to"`
 	Start     time.Time `json:"start"`
 	Answer    time.Time `json:"answer"`
+	Screen    *struct {
+		Attest   string `json:"attest"`
+		Verified string `json:"verified"`
+		Why      string `json:"why"`
+	} `json:"screen,omitempty"`
 	Emergency *struct {
 		Location    *Location        `json:"location,omitempty"`
 		LocationURI string           `json:"locationUri,omitempty"`
@@ -657,7 +751,16 @@ type CallInfo struct {
 		Text        []cad.TextLine   `json:"text,omitempty"`
 		TextOnly    bool             `json:"textOnly,omitempty"`
 		ALIClass    string           `json:"aliClass,omitempty"`
-		Video       *struct {
+		TextVia     []string         `json:"textVia,omitempty"`
+		CAMA        string           `json:"cama,omitempty"`
+		ALILookup   string           `json:"aliLookup,omitempty"`
+		LocCheck    *struct {
+			Show     string    `json:"show"`
+			Text     string    `json:"text"`
+			Reasons  []string  `json:"reasons"`
+			Previous *Location `json:"previous,omitempty"`
+		} `json:"locationCheck,omitempty"`
+		Video *struct {
 			ViewToken string `json:"viewToken,omitempty"`
 			Live      bool   `json:"live"`
 			Source    string `json:"source,omitempty"`
@@ -690,6 +793,14 @@ func (b *Bridge) call(c CallInfo) {
 	if len(em.Additional.Providers) > 0 {
 		d.Provider = em.Additional.Providers[0].Name
 	}
+	h := &cad.Handling{ESInet: em.ESInet, Service: em.Service, CAMA: em.CAMA, ALILookup: em.ALILookup, TextVia: em.TextVia, Taker: firstNonEmpty(em.TakenName, em.TakenBy)}
+	if s := c.Screen; s != nil && (s.Verified != "" || s.Attest != "") {
+		h.CallerID = &cad.CallerIDCheck{Verified: s.Verified, Attest: s.Attest, Why: s.Why}
+	}
+	if lc := em.LocCheck; lc != nil && lc.Text != "" {
+		h.LocCheck = &cad.LocCheck{Show: lc.Show, Text: lc.Text, Reasons: lc.Reasons, Previous: lc.Previous.loc("bitvoice")}
+	}
+	d.Handling = h
 	if v := em.Video; v != nil && v.ViewToken != "" {
 		b.mu.Lock()
 		base := b.cfg.URL
@@ -697,6 +808,37 @@ func (b *Bridge) call(c CallInfo) {
 		d.Video = &cad.Video{Live: v.Live, Source: v.Source, ViewURL: base + "/whep/" + v.ViewToken}
 	}
 	b.eng.UpsertCall(cad.BitVoiceActor, c.ID, d)
+	b.checkAddress(c.ID, d.Location)
+}
+
+// checkAddress validates a caller's civic address and position with BitVoice's LVF, once per change.
+func (b *Bridge) checkAddress(call string, l *ng911.Location) {
+	if l == nil || l.Civic == nil {
+		return
+	}
+	key := call + "|" + l.Civic.String()
+	if l.HasPoint() {
+		key += fmt.Sprintf("|%.5f,%.5f", *l.Lat, *l.Lon)
+	}
+	b.mu.Lock()
+	if b.lvf == nil || len(b.lvf) > 5000 {
+		b.lvf = map[string]bool{}
+	}
+	seen := b.lvf[key]
+	b.lvf[key] = true
+	b.mu.Unlock()
+	if seen {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		r, err := b.Validate(ctx, l)
+		if err != nil || r == nil {
+			return
+		}
+		b.upsertKnown(call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{LVF: r}})
+	}()
 }
 
 func firstNonEmpty(v ...string) string {
@@ -1015,4 +1157,161 @@ func (b *Bridge) WHEP(ctx context.Context, viewURL string, offer []byte) ([]byte
 		return nil, "", fmt.Errorf("BitVoice said %s", resp.Status)
 	}
 	return answer, resp.Header.Get("Location"), nil
+}
+
+// upsertKnown updates a call bitdispatcher already has (a 911 call), and ignores the rest.
+func (b *Bridge) upsertKnown(id string, d cad.CallData) {
+	known := false
+	b.eng.Read(func(s *cad.State) { _, known = s.Calls[id] })
+	if known {
+		b.eng.UpsertCall(cad.BitVoiceActor, id, d)
+	}
+}
+
+// pullEvidence reads a call's photos and clips: their hash, the camera's time and GPS, and whether
+// they are held as evidence. The files stay in BitVoice.
+func (b *Bridge) pullEvidence(ctx context.Context, call string) {
+	var ix struct {
+		Held  bool               `json:"held"`
+		Items []cad.EvidenceItem `json:"items"`
+	}
+	if err := b.do(ctx, "GET", "/api/calls/"+url.PathEscape(call)+"/media", nil, &ix); err != nil {
+		b.log.Warn("bitvoice: caller media", "call", call, "err", err)
+		return
+	}
+	if ix.Items == nil {
+		ix.Items = []cad.EvidenceItem{}
+	}
+	b.upsertKnown(call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Evidence: &cad.Evidence{Held: ix.Held, Items: ix.Items}}})
+}
+
+// pullStates reads the PSAPs' NENA states from BitVoice's ESRP.
+func (b *Bridge) pullStates(ctx context.Context) {
+	var v struct {
+		Items []PSAPState `json:"items"`
+	}
+	if err := b.do(ctx, "GET", "/api/core/states", nil, &v); err != nil {
+		return
+	}
+	b.mu.Lock()
+	b.health.PSAPs = v.Items
+	b.mu.Unlock()
+}
+
+// Evidence fetches one of a call's photos or clips from BitVoice's own store (BitVoice logs the look).
+func (b *Bridge) Evidence(ctx context.Context, call string, n int) (*http.Response, error) {
+	b.mu.Lock()
+	cfg, client := b.cfg, b.client
+	b.mu.Unlock()
+	if cfg.URL == "" || cfg.Token == "" {
+		return nil, errors.New("BitVoice is not configured (Admin › Integrations)")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/calls/%s/media/%d", cfg.URL, url.PathEscape(call), n), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	return client.Do(req)
+}
+
+// HoldEvidence marks a call's photos and clips as held (kept past the retention), or not, in BitVoice.
+func (b *Bridge) HoldEvidence(ctx context.Context, call string, hold bool) error {
+	if err := b.do(ctx, http.MethodPost, "/api/calls/"+url.PathEscape(call)+"/media/hold", map[string]bool{"hold": hold}, nil); err != nil {
+		return err
+	}
+	b.pullEvidence(ctx, call)
+	return nil
+}
+
+// RevealVideo tells BitVoice a person in CAD unblurred the caller's live video, for its exposure record.
+func (b *Bridge) RevealVideo(ctx context.Context, call string) error {
+	return b.do(ctx, http.MethodPost, "/api/calls/"+url.PathEscape(call)+"/video/reveal", map[string]string{"item": "live"}, nil)
+}
+
+// TakeText takes a text-only 911 call that is waiting on BitVoice's 911 screen, so replies can go to it.
+func (b *Bridge) TakeText(ctx context.Context, call string) error {
+	return b.do(ctx, http.MethodPost, "/api/calls/"+url.PathEscape(call)+"/take", map[string]any{}, nil)
+}
+
+// Validate checks a civic address (and a position against it) with BitVoice's LVF. It returns nil when
+// BitVoice has no address data loaded.
+func (b *Bridge) Validate(ctx context.Context, l *ng911.Location) (*cad.LVFCheck, error) {
+	if l == nil || l.Civic == nil {
+		return nil, nil
+	}
+	c := l.Civic
+	in := map[string]string{"country": firstNonEmpty(c.Country, "US"), "A1": c.State, "A2": c.County, "A3": c.City, "PRD": c.PreDir, "RD": c.Street,
+		"STS": c.StreetType, "POD": c.PostDir, "HNO": c.Number, "HNS": c.NumberSuf, "PC": c.PostalCode}
+	for k, v := range in {
+		if v == "" {
+			delete(in, k)
+		}
+	}
+	if l.HasPoint() {
+		in["lat"], in["lon"] = fmt.Sprint(*l.Lat), fmt.Sprint(*l.Lon)
+		if l.Radius > 0 {
+			in["radius"] = fmt.Sprint(l.Radius)
+		}
+	}
+	var out struct {
+		Invalid  []string `json:"invalid"`
+		Matched  string   `json:"matched"`
+		Position *struct {
+			Checked bool   `json:"checked"`
+			Within  bool   `json:"within"`
+			Why     string `json:"why"`
+		} `json:"position"`
+		Suggestions []struct {
+			Civic map[string]string `json:"civic"`
+			Why   string            `json:"why"`
+		} `json:"suggestions"`
+	}
+	if err := b.do(ctx, http.MethodPost, "/api/core/validate", in, &out); err != nil {
+		if strings.Contains(err.Error(), "409") {
+			return nil, nil // no address data in BitVoice
+		}
+		return nil, err
+	}
+	r := &cad.LVFCheck{Address: c.String(), Valid: out.Matched != "" && len(out.Invalid) == 0, Matched: out.Matched, Invalid: out.Invalid, At: time.Now()}
+	if p := out.Position; p != nil {
+		r.Position = p.Why
+		if p.Checked {
+			w := p.Within
+			r.Within = &w
+		}
+	}
+	for _, s := range out.Suggestions {
+		v := s.Civic
+		addr := strings.Join(strings.Fields(strings.Join([]string{v["HNO"] + v["HNS"], v["PRD"], v["RD"], v["STS"], v["POD"]}, " ")), " ")
+		if v["A3"] != "" {
+			addr += ", " + v["A3"]
+		}
+		if v["A1"] != "" {
+			addr += " " + v["A1"]
+		}
+		r.Suggestions = append(r.Suggestions, cad.LVFSuggestion{Address: addr, Why: s.Why})
+	}
+	return r, nil
+}
+
+// Records reads one of BitVoice's 911 records for CAD's reports: the answer-time report, the exposure
+// record (who looked at callers' photos and video), or the i3 log events received. The answer is passed on
+// as BitVoice wrote it.
+func (b *Bridge) Records(ctx context.Context, kind string, q url.Values) (json.RawMessage, error) {
+	path := map[string]string{"answer": "/api/psap/report", "exposure": "/api/psap/exposure", "i3log": "/api/core/i3log", "states": "/api/core/states"}[kind]
+	if path == "" {
+		return nil, errors.New("no such record")
+	}
+	keep := url.Values{}
+	for _, k := range []string{"from", "to", "day"} {
+		if v := q.Get(k); v != "" {
+			keep.Set(k, v)
+		}
+	}
+	if len(keep) > 0 {
+		path += "?" + keep.Encode()
+	}
+	var out json.RawMessage
+	err := b.do(ctx, http.MethodGet, path, nil, &out)
+	return out, err
 }

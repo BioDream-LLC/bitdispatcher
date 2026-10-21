@@ -510,7 +510,20 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 | Radio webhooks | BitVoice → bitdispatcher | Emergency button, acknowledgement, transmissions, GPS |
 | Callbacks | bitdispatcher → BitVoice | Rebid, text to caller, video link, live video, emergency acknowledgement |
 
-Delivery failures BitVoice reports show on the Situation panel.`,
+Delivery failures BitVoice reports show on the Situation panel.
+
+**What a 911 call from BitVoice shows** on the call (incident panel and the call-taker's ANI / ALI):
+
+- **number verified** (or **NOT verified**) from the caller ID's STIR/SHAKEN check, with the attestation. A failed check is a reason to doubt the number, not the emergency.
+- **ESInet**, the service asked for, a **CAMA** legacy trunk and how its location was looked up, and the ways text came (MSRP, SIP, RTT, TTY).
+- **Address in the address data** or **NOT**, from BitVoice's LVF: missing parts, *Did they mean…* corrections, and whether the caller's position agrees with the address.
+- **Location check (BitVoice)** after a rebid: which location to show first and why.
+- **Caller photos and clips**: each with its SHA-256, the camera's time and GPS, shown as facts until you press **Reveal (recorded)**; every reveal is in the ledger with who looked. **Hold as evidence** keeps them past BitVoice's retention.
+- Caller video opens blurred and muted; **Reveal** is recorded in BitVoice's exposure record.
+- A text-to-911 call waiting for a call-taker: **Take this text**, then reply in the box.
+- After the call: the recording's name and its summary, marked as written by a language model.
+
+Reports › Operations report shows BitVoice's answer times (the NENA standard: 90% within 15 seconds), who looked at callers' photos and video, and the i3 log events received. The BitVoice light in the status bar turns amber when a PSAP the ESInet routes to is full, down or unstaffed.`,
   },
   {
     id: 'admin-users', title: 'Users and positions', route: '/admin/users', keys: 'users roles password viewer field dispatcher supervisor admin positions sessions demo demonstration public',

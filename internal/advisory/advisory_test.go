@@ -268,3 +268,58 @@ func TestCallNearNotTwice(t *testing.T) {
 		t.Fatal("the call the queue groups with an attached call was suggested a second time")
 	}
 }
+
+// A silent 911 call on no incident is raised; once the caller says anything, or it is on an incident, it is not.
+func TestSilentLine(t *testing.T) {
+	e := engine(t)
+	c := Default()
+	e.UpsertCall(cad.BitVoiceActor, "s1", cad.CallData{Source: "bitvoice", State: "answered", Callback: "+15405550100", Emergency: true, Location: at(37.27, -79.94, "1 Main St")})
+	e.UpsertCall(cad.BitVoiceActor, "s2", cad.CallData{Source: "bitvoice", State: "ringing", Callback: "+15405550101", Emergency: true})
+	e.UpsertCall(cad.BitVoiceActor, "s3", cad.CallData{Source: "bitvoice", State: "ringing", Callback: "+15405550102", Emergency: true})
+	e.EndCall(cad.BitVoiceActor, "s3") // a hang-up before answer
+	got := map[string]*Suggestion{}
+	for _, s := range eval(e, c, time.Minute) {
+		if s.Rule == "silent" {
+			got[s.Call] = &s
+		}
+	}
+	if got["s1"] == nil || got["s3"] == nil || got["s2"] != nil {
+		t.Fatalf("silent calls: %v", got)
+	}
+	if !strings.Contains(got["s3"].Detail, "hung up before it was answered") || len(got["s1"].Absent) == 0 {
+		t.Fatalf("%+v", got["s3"])
+	}
+	e.UpsertCall(cad.BitVoiceActor, "s1", cad.CallData{Source: "bitvoice", Transcript: []cad.TranscriptLine{{Speaker: "caller", Text: "help"}}})
+	for _, s := range eval(e, c, time.Minute) {
+		if s.Rule == "silent" && s.Call == "s1" {
+			t.Fatal("a caller who spoke is not silent")
+		}
+	}
+	if len(eval(e, c, time.Hour)) != 0 {
+		for _, s := range eval(e, c, time.Hour) {
+			if s.Rule == "silent" {
+				t.Fatal("silent calls are raised for 30 minutes only")
+			}
+		}
+	}
+}
+
+// An alarm that says fire is a machine; a caller who sees no smoke outweighs it.
+func TestMachineAgainstCaller(t *testing.T) {
+	e := engine(t)
+	c := Default()
+	n, _ := e.CreateIncident(d1, cad.NewIncident{Type: "FA", Location: at(37.27, -79.94, "1 Main St")})
+	al := cad.Alert{Kind: cad.AlertAlarm, Sender: "Valley Alarm", ID: "A1", Event: "Fire", Detail: "smoke detector zone 3", Status: "new"}
+	e.UpsertCall(cad.BitVoiceActor, "a1", cad.CallData{Source: "alarm", State: "data", Alert: &al, Notes: []string{"smoke detector zone 3"}})
+	e.AttachCall(d1, "a1", n)
+	sg := find(eval(e, c, 0), "fire-words", n)
+	if sg == nil || sg.Relied[0].Source != SrcMachine {
+		t.Fatalf("the alarm's smoke: %+v", sg)
+	}
+	e.UpsertCall(cad.BitVoiceActor, "v1", cad.CallData{Source: "bitvoice", State: "answered", Emergency: true,
+		Transcript: []cad.TranscriptLine{{Speaker: "caller", Text: "the alarm is going off but there is no smoke at all"}}})
+	e.AttachCall(d1, "v1", n)
+	if sg = find(eval(e, c, 0), "fire-words", n); sg != nil {
+		t.Fatalf("the caller's no smoke outweighs the alarm: %+v", sg)
+	}
+}

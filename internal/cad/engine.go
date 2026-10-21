@@ -457,6 +457,9 @@ func (e *Engine) UpsertCall(a Actor, id string, d CallData) error {
 }
 
 func changes(c *Call, d CallData) bool {
+	if handlingChanges(c, d.Handling) {
+		return true
+	}
 	if d.Source != "" && !slices.Contains(c.Sources, d.Source) {
 		return true
 	}

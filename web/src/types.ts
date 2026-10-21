@@ -101,7 +101,7 @@ export type Need = { duties?: string[]; last?: string; code?: boolean; enrol?: {
 export type Media = { id: string; url: string; purpose: string }
 export type TextLine = { at: string; from: string; name?: string; via: string; text: string }
 
-export type Call = {
+export type Call = { handling?: Handling;
   id: string; sources: string[]; state: 'ringing' | 'answered' | 'data' | 'ended'; callback?: string; callerName?: string; class?: string
   provider?: string; location?: Location; locations: number; agent?: string; position?: string; start: string; answer?: string; end?: string
   media?: Media[]; video?: { live: boolean; viewUrl?: string; source?: string }; text?: TextLine[]; textOnly?: boolean; notes?: string[]
@@ -156,6 +156,7 @@ export type Failure = { at: string; what: string; call?: string; error: string }
 export type BitVoiceHealth = {
   configured: boolean; connected: boolean; since?: string; lastEvent?: string; lastError?: string; lastErrorAt?: string
   lastEido?: string; lastPush?: string; lastRadio?: string; lastRadioWebhook?: string; emergencyMode: boolean; emergencyModeBy?: string
+  psaps?: { uri: string; name: string; queue?: string; length: number; max: number; service?: string; reason?: string }[]
   failures: Failure[]; events: number
 }
 
@@ -256,3 +257,11 @@ export type Protocol = { id: string; name: string; version: string; approved: bo
   questions: { id: string; text: string; answers: { label: string; next?: string; determinant?: string }[] }[]; determinants: Determinant[]; updated?: string; by?: string }
 export type ProtocolRun = { protocol: string; version: string; system?: string; answers: { question: string; text: string; answer: string; at: string; by: string }[]; current?: string; determinant?: Determinant; at?: string; by?: string }
 export type IncidentFile = { id: string; name: string; caption?: string; type: string; sha256: string; size: number; added: string; by: string; unit?: string; hidden?: boolean; hiddenBy?: string; why?: string }
+export type EvidenceItem = { n: number; name: string; type: string; kind?: string; size: number; sha256: string; received: string; recording?: boolean; taken?: string; takenLocal?: string; hasGps?: boolean; lat?: number; lon?: number }
+export type Handling = {
+  callerId?: { verified?: string; attest?: string; why?: string }; esinet?: boolean; service?: string; cama?: string; aliLookup?: string
+  locCheck?: { show: string; text: string; reasons?: string[]; previous?: Location }; textVia?: string[]
+  routes?: { service?: string; psap?: string; why: string; at: string }[]; evidence?: { held: boolean; items: EvidenceItem[] }
+  recording?: string; summary?: string; summaryBy?: string; taker?: string
+  lvf?: { address: string; valid: boolean; matched?: string; invalid?: string[]; position?: string; within?: boolean; suggestions?: { address: string; why: string }[]; at: string }
+}

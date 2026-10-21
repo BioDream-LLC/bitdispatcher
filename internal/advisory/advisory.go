@@ -24,12 +24,13 @@ import (
 
 // Rule kinds.
 const (
-	KindDuplicate = "duplicate"  // two open incidents close in place and time
-	KindCallNear  = "call-near"  // a call not attached to anything, near an open incident
-	KindWords     = "words"      // what was said does not fit the call type, judged by source precedence
-	KindRepeat    = "repeat"     // the address has had incidents recently
-	KindPending   = "pending"    // a high-priority incident still has no unit
-	KindNoUnit    = "unit-quiet" // a committed unit not heard from for a while
+	KindDuplicate = "duplicate"   // two open incidents close in place and time
+	KindCallNear  = "call-near"   // a call not attached to anything, near an open incident
+	KindWords     = "words"       // what was said does not fit the call type, judged by source precedence
+	KindRepeat    = "repeat"      // the address has had incidents recently
+	KindPending   = "pending"     // a high-priority incident still has no unit
+	KindNoUnit    = "unit-quiet"  // a committed unit not heard from for a while
+	KindSilent    = "silent-line" // a 911 call with no words from the caller, on no incident
 )
 
 // Rule is one codebook rule. Only the fields its kind uses matter.
@@ -100,6 +101,8 @@ func Default() Codebook {
 				Explain: "The address has had two or more incidents in the last 30 days; the history may matter to responders."},
 			{ID: "pending-p1", Kind: KindPending, Name: "Priority 1 waiting", Enabled: true, Severity: "urgent", Minutes: 1, Priority: 1,
 				Explain: "A priority 1 incident has had no unit for more than a minute."},
+			{ID: "silent", Kind: KindSilent, Name: "Silent or abandoned 911 call", Enabled: true, Severity: "urgent", Minutes: 30,
+				Explain: "A 911 call in the last 30 minutes with no words from the caller (an open line, a hang-up, a dropped call) that is on no incident. A silent line is never taken as safe: call back, listen, or send someone."},
 			{ID: "quiet", Kind: KindNoUnit, Name: "Unit not heard", Enabled: true, Severity: "info", Minutes: 20,
 				Explain: "A unit on scene that has not been heard on the radio or given a status for 20 minutes may need a status check. Not hearing from a unit is never taken as evidence that it is fine."},
 		},
@@ -139,7 +142,7 @@ func (c Codebook) Check() error {
 			if r.Days <= 0 || r.Count <= 0 {
 				return fmt.Errorf("rule %s needs days and a count", r.ID)
 			}
-		case KindPending, KindNoUnit:
+		case KindPending, KindNoUnit, KindSilent:
 			if r.Minutes <= 0 {
 				return fmt.Errorf("rule %s needs minutes", r.ID)
 			}
@@ -236,6 +239,8 @@ func Evaluate(c Codebook, s *cad.State, now time.Time) []Suggestion {
 						Action: &Action{Label: "Dispatch the recommendation", Command: "REC #" + in.Number}, Since: in.Created.Add(minutes(r.Minutes))})
 				}
 			}
+		case KindSilent:
+			out = append(out, silent(r, s, now)...)
 		case KindNoUnit:
 			for _, u := range s.Units {
 				if u.Status != cad.OnScene {
@@ -460,11 +465,23 @@ func statements(s *cad.State, in *cad.Incident) []statement {
 		if !ok {
 			continue
 		}
-		machine := strings.Contains(strings.ToLower(c.Class), "alarm") || strings.Contains(strings.ToLower(c.Class), "telematic") || strings.Contains(strings.ToLower(c.Class), "acn")
+		machine := strings.Contains(strings.ToLower(c.Class), "alarm") || strings.Contains(strings.ToLower(c.Class), "telematic") || strings.Contains(strings.ToLower(c.Class), "acn") || c.Alert != nil || c.Crash != nil
 		for _, t := range c.Text {
 			if t.From == "caller" {
 				out = append(out, statement{text: t.Text, source: SrcCaller, call: id})
 			}
+		}
+		for _, l := range c.Transcript {
+			if l.Speaker == "caller" {
+				out = append(out, statement{text: firstNonEmpty(l.English, l.Text), source: SrcCaller, call: id})
+			}
+		}
+		// Machines: an alarm panel, a plate reader, gunshot detection, a vehicle's crash notification.
+		if c.Alert != nil {
+			out = append(out, statement{text: c.Alert.Summary(), source: SrcMachine, call: id})
+		}
+		if c.Crash != nil {
+			out = append(out, statement{text: "vehicle crash notification", source: SrcMachine, call: id})
 		}
 		for _, n := range c.Notes {
 			src := SrcCaller
@@ -619,4 +636,47 @@ func repeats(r Rule, s *cad.State, open []*cad.Incident, now time.Time) []Sugges
 		out = append(out, sg)
 	}
 	return out
+}
+
+// silent finds 911 calls with nothing from the caller that are on no incident: a person decides what they were.
+func silent(r Rule, s *cad.State, now time.Time) []Suggestion {
+	var out []Suggestion
+	for _, c := range s.Calls {
+		if c.Incident != "" || c.Alert != nil || c.Crash != nil || (c.Screen != nil && c.Screen.NonEmergency && c.Screen.By != "") {
+			continue
+		}
+		if !slices.Contains(c.Sources, "bitvoice") && !slices.Contains(c.Sources, "eido") && !slices.Contains(c.Sources, "ali") {
+			continue
+		}
+		if now.Sub(c.Start) > minutes(r.Minutes) || strings.TrimSpace(c.CallerWords()) != "" || len(c.Notes) > 0 {
+			continue
+		}
+		what := "an open line: nothing heard from the caller"
+		switch {
+		case c.State == "ended" && c.Answer.IsZero():
+			what = "hung up before it was answered"
+		case c.State == "ended":
+			what = "ended with nothing from the caller"
+		case c.State == "ringing":
+			continue // not answered yet: the queue shows it
+		}
+		where := "no location"
+		if c.Location != nil {
+			where = firstNonEmpty(c.Location.Address, fmt.Sprintf("%.5f, %.5f", deref(c.Location.Lat), deref(c.Location.Lon)))
+		}
+		cb := firstNonEmpty(c.Callback, "no callback number")
+		out = append(out, Suggestion{Rule: r.ID, Title: "Silent 911 call from " + cb, Call: c.ID,
+			Detail: fmt.Sprintf("The call %s, at %s. It is on no incident.", what, where),
+			Relied: []Evidence{{Text: fmt.Sprintf("911 call at %s, %s", c.Start.Local().Format("15:04:05"), what), Source: SrcMachine}},
+			Absent: []string{"any words from the caller (silence is not taken as safe)"}, Since: c.Start})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Since.Before(out[j].Since) })
+	return out
+}
+
+func deref(p *float64) float64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }

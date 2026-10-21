@@ -746,6 +746,7 @@ func (s *State) mergeCall(id string, d CallData, at time.Time) {
 	if d.Problems != nil {
 		c.Problems = d.Problems
 	}
+	mergeHandling(c, d.Handling)
 	s.mergeDream(c, d, at)
 	c.Updated = at
 }

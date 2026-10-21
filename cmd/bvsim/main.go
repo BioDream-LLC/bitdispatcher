@@ -73,6 +73,8 @@ type emergency struct {
 	TakenName   string         `json:"takenName,omitempty"`
 	Text        []textLine     `json:"text,omitempty"`
 	TextOnly    bool           `json:"textOnly,omitempty"`
+	TextVia     []string       `json:"textVia,omitempty"`
+	LocCheck    map[string]any `json:"locationCheck,omitempty"`
 	Video       *struct {
 		ViewToken string `json:"viewToken,omitempty"`
 		Live      bool   `json:"live"`
@@ -81,15 +83,16 @@ type emergency struct {
 }
 
 type call struct {
-	ID        string     `json:"id"`
-	State     string     `json:"state"`
-	Direction string     `json:"direction"`
-	From      string     `json:"from"`
-	FromName  string     `json:"fromName"`
-	To        string     `json:"to"`
-	Start     time.Time  `json:"start"`
-	Answer    time.Time  `json:"answer,omitzero"`
-	Emergency *emergency `json:"emergency,omitempty"`
+	ID        string            `json:"id"`
+	State     string            `json:"state"`
+	Direction string            `json:"direction"`
+	From      string            `json:"from"`
+	FromName  string            `json:"fromName"`
+	To        string            `json:"to"`
+	Start     time.Time         `json:"start"`
+	Answer    time.Time         `json:"answer,omitzero"`
+	Screen    map[string]string `json:"screen,omitempty"`
+	Emergency *emergency        `json:"emergency,omitempty"`
 }
 
 type radioUnit struct {
@@ -236,8 +239,17 @@ func (s *sim) newCall() {
 		c.Emergency.Location = &location{Civic: &civic{Country: "US", State: "VA", City: st.city, Number: st.num, PreDir: st.pre, Street: st.name, StreetType: st.typ, PostDir: st.post, PostalCode: st.zip},
 			Lat: &la, Lon: &lo, Method: "Manual", Time: time.Now().UTC()}
 	}
+	// The caller ID's STIR/SHAKEN check, as the carrier reported it: most pass, a few fail.
+	switch mrand.IntN(10) {
+	case 0:
+		c.Screen = map[string]string{"verified": "failed", "attest": "C", "why": "SIMULATED: the caller ID's signature did not verify"}
+	case 1, 2:
+	default:
+		c.Screen = map[string]string{"verified": "passed", "attest": "A", "why": "SIMULATED: the provider verified the caller ID"}
+	}
 	if mrand.IntN(8) == 0 {
 		c.Emergency.TextOnly = true
+		c.Emergency.TextVia = []string{"msrp"}
 		c.Emergency.Text = []textLine{{At: time.Now().UTC(), From: "caller", Via: "msrp", Text: "SIMULATED: I can't talk, someone is in my house"}}
 	}
 	s.calls[id] = c
@@ -513,6 +525,8 @@ func main() {
 		l := c.Emergency.Location
 		la, lo := *l.Lat+(mrand.Float64()-0.5)*0.0002, *l.Lon+(mrand.Float64()-0.5)*0.0002
 		nl := &location{Lat: &la, Lon: &lo, Radius: math.Max(5, math.Round(l.Radius/2)), Confidence: 95, Method: "GPS", Time: time.Now().UTC()}
+		c.Emergency.LocCheck = map[string]any{"show": "new", "text": "Show the new location first", "previous": l,
+			"reasons": []string{"SIMULATED: the new location is the latest and as precise as the first."}}
 		c.Emergency.Location = nl
 		s.mu.Unlock()
 		s.publish("call.updated", c)
@@ -565,6 +579,35 @@ func main() {
 	mux.HandleFunc("POST /whep/{tok}", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the simulator has no video", 503)
 	})
+	// The rest of what BitVoice offers a CAD, as an empty lab system would answer.
+	mux.HandleFunc("GET /api/calls/{id}/media", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"call": r.PathValue("id"), "held": false, "items": []any{}})
+	}))
+	mux.HandleFunc("POST /api/core/validate", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"no address data is loaded"}`, 409)
+	}))
+	mux.HandleFunc("GET /api/core/states", s.auth(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"items": []any{}}) }))
+	mux.HandleFunc("GET /api/core/i3log", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"day": time.Now().UTC().Format("2006-01-02"), "items": []any{}})
+	}))
+	mux.HandleFunc("GET /api/psap/exposure", s.auth(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"people": []any{}}) }))
+	mux.HandleFunc("GET /api/psap/report", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		n, ans, sum := 0, 0, 0.0
+		for _, c := range s.calls {
+			n++
+			if !c.Answer.IsZero() {
+				ans++
+				sum += c.Answer.Sub(c.Start).Seconds()
+			}
+		}
+		s.mu.Unlock()
+		avg := 0.0
+		if ans > 0 {
+			avg = sum / float64(ans)
+		}
+		writeJSON(w, map[string]any{"target": 15, "calls": n, "answered": ans, "abandoned": n - ans, "withinTarget": 100.0, "within20": 100.0, "average": avg, "longest": avg, "byTaker": []any{}})
+	}))
 	mux.HandleFunc("GET /api/radio/locations", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		out := []any{}

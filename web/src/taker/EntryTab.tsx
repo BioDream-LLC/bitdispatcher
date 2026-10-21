@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { api, errText } from '../api'
 import { toast } from 'sonner'
 import ProtocolPanel from './Protocol'
+import HandlingBox, { CallerIDChip } from '../console/Handling'
 import { CheckCircle2, Link2, MapPin, PhoneForwarded, X } from 'lucide-react'
 import AddressInput from '../AddressInput'
 import { cx, phone, prio } from '../util'
@@ -125,6 +126,7 @@ export default function EntryTab({ view, d, inc, call, update, dups, onAttach, o
                 <div key={k} className="contents"><dt className="text-slate-500">{k}</dt><dd className="truncate font-mono text-slate-200">{v}</dd></div>
               ))}
               {call.ali && <><dt className="text-slate-500">ALI</dt><dd className="whitespace-pre-wrap font-mono text-[10px] text-slate-400">{call.ali}</dd></>}
+              {call.handling && <div className="col-span-2 space-y-1 pt-1"><CallerIDChip call={call} /><HandlingBox call={call} /></div>}
               {view.health.lis && call.callback && call.state !== 'ended' && (
                 <div className="col-span-2 pt-1"><AskLIS id={call.id} name={view.health.lis} /></div>
               )}

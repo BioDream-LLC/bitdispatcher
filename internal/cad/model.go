@@ -276,6 +276,7 @@ type CallData struct {
 	Line         string            `json:"line,omitempty"` // the line it came in on: 911, or a non-emergency number
 	Crash        *acn.Crash        `json:"crash,omitempty"`
 	Alert        *Alert            `json:"alert,omitempty"` // an alarm, plate-reader hit, gunshot or camera alert
+	Handling     *Handling         `json:"handling,omitempty"`
 }
 
 // Call is a call from call handling, as bitdispatcher knows it from every source.
@@ -313,6 +314,7 @@ type Call struct {
 	Alert      *Alert           `json:"alert,omitempty"`
 	Fixes      []Fix            `json:"fixes,omitempty"`
 	Screen     *Screen          `json:"screen,omitempty"`
+	Handling   *Handling        `json:"handling,omitempty"` // what the call-handling system knows beyond the basics
 }
 
 // Emergency is an emergency button or duress alert from a radio, open until a person acknowledges it.

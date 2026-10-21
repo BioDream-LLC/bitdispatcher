@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import BitVoiceRecords from './BitVoiceRecords'
 import * as Dialog from '@radix-ui/react-dialog'
 import { toast } from 'sonner'
 import { BadgeCheck, Download, FileText, Printer, X } from 'lucide-react'
@@ -297,6 +298,7 @@ export default function Reports({ view }: { view: View }) {
         </div>
       )}
       <Drill drill={drill} onClose={() => setDrill(null)} />
+      <BitVoiceRecords view={view} from={from} to={to} />
     </Page>
   )
 }

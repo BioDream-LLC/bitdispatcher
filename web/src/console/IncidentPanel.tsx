@@ -11,6 +11,7 @@ import { AdvisoryCards, useAdvisory } from './Advisory'
 import PremiseBox from './PremiseBox'
 import { ViewsButton } from '../views/PlaceViews'
 import CallAssist from './CallAssist'
+import HandlingBox, { CallerIDChip } from './Handling'
 import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
 import { run as runLine } from './UnitBoard'
@@ -84,7 +85,7 @@ function CallerVideo({ call }: { call: Call }) {
         <span className={cx('chip', call.video?.live ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400')}>{call.video?.live ? 'LIVE' : 'not streaming'}</span>
         {state === 'idle' && <button className="btn ml-auto h-6 px-2 py-0" onClick={start}>Watch</button>}
         {state === 'playing' && (
-          <button className="btn ml-auto h-6 px-2 py-0" onClick={() => setReveal(!reveal)}>
+          <button className="btn ml-auto h-6 px-2 py-0" onClick={() => { if (!reveal) api.post(`/calls/${encodeURIComponent(call.id)}/video/reveal`).catch(() => {}); setReveal(!reveal) }}>
             <Eye size={12} aria-hidden /> {reveal ? 'Blur' : 'Reveal'}
           </button>
         )}
@@ -119,14 +120,16 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
       setBusy('')
     }
   }
-  const photos = (call.media ?? []).map((m, n) => ({ m, n })).filter(({ m }) => m.purpose === 'caller-photo' || m.purpose === 'caller-video')
+  // Photos the call-handling system lists as evidence are shown there (revealed one by one); the rest here.
+  const photos = call.handling?.evidence?.items.length ? [] : (call.media ?? []).map((m, n) => ({ m, n })).filter(({ m }) => m.purpose === 'caller-photo' || m.purpose === 'caller-video')
   const stale = locationStale(view, call.location, now)
   return (
     <div className="space-y-1.5 rounded-md border border-sky-900/60 bg-sky-950/20 p-2">
       <div className="flex items-center gap-1.5 text-xs">
         <Phone size={13} className="text-sky-300" aria-hidden />
-        <span className="font-mono font-bold text-slate-50">{phone(call.callback)}</span>
+        <span className="whitespace-nowrap font-mono font-bold text-slate-50">{phone(call.callback)}</span>
         {call.class && <span className="chip bg-slate-800 font-mono text-slate-300">{call.class}</span>}
+        <CallerIDChip call={call} />
         <span className={cx('chip uppercase', call.state === 'ended' ? 'bg-slate-700 text-slate-300' : 'bg-emerald-500/20 text-emerald-300')}>{call.state}</span>
         <span className="font-mono text-slate-400 tnum">{clock(call.start, call.end ? ms(call.end) : now)}</span>
         <span className="ml-auto truncate font-mono text-[10px] text-slate-500">{call.sources.join('+')}{call.agent ? ` · taker ${call.agent}` : ''}</span>
@@ -147,6 +150,7 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
       {(call.problems ?? []).map((p) => (
         <div key={p} className="text-[11px] text-amber-300">⚠ {p}</div>
       ))}
+      <HandlingBox call={call} />
       <CallAssist call={call} view={view} />
       {can.dispatch(me) && live && fromBV && (
         <div className="flex flex-wrap gap-1">
@@ -167,7 +171,7 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
           {photos.map(({ m, n }) => (
             <a key={m.id} href={`./api/calls/${encodeURIComponent(call.id)}/media/${n}`} target="_blank" rel="noreferrer" className="group relative h-14 w-20 shrink-0 overflow-hidden rounded border border-slate-700 bg-slate-950" title="Open caller media (blurred here)">
               {m.purpose === 'caller-photo' ? (
-                <img src={`./api/calls/${encodeURIComponent(call.id)}/media/${n}`} alt="Caller photo" className="h-full w-full object-cover blur-md group-hover:blur-none" />
+                <img src={`./api/calls/${encodeURIComponent(call.id)}/media/${n}`} alt="Caller photo" className="h-full w-full object-cover blur-md" />
               ) : (
                 <span className="grid h-full place-items-center text-[10px] text-slate-400"><ImageIcon size={14} aria-hidden /> clip</span>
               )}
@@ -179,6 +183,9 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
         <div className="rounded border border-violet-900/60 bg-violet-950/20 p-1.5">
           <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-violet-300">
             <MessageSquareText size={12} aria-hidden /> Text with caller {call.textOnly && <span className="chip bg-violet-500 text-white">TEXT ONLY</span>}
+            {call.textOnly && !call.agent && live && can.dispatch(me) && bvOK && (
+              <button className="btn btn-go ml-auto h-6 px-2 py-0 text-[11px]" disabled={!!busy} onClick={() => act('Take', 'take')}>Take this text</button>
+            )}
           </div>
           <ul className="max-h-28 space-y-0.5 overflow-y-auto text-xs">
             {(call.text ?? []).map((l, i) => (

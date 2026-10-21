@@ -137,14 +137,19 @@ export default function StatusBar({ view, screen = 'full', onScreens }: { view: 
         />
         {bv.configured ? (
           <Health
-            ok={bv.connected && bv.failures.length === 0}
-            warn={bv.connected && bv.failures.length > 0}
+            ok={bv.connected && bv.failures.length === 0 && !psapTrouble(bv.psaps)}
+            warn={bv.connected && (bv.failures.length > 0 || psapTrouble(bv.psaps))}
             icon={<Server size={12} aria-hidden />}
             label="BitVoice"
             detail={
               <div className="space-y-0.5">
                 <div>{bv.connected ? `Event stream connected, last event ${bvAge} ago (${bv.events} events)` : `Not connected${bv.lastError ? ': ' + bv.lastError : ''}`}</div>
                 <div>Last EIDO {bv.lastEido ? ago(bv.lastEido, now) + ' ago' : 'never'}{bv.lastPush ? ` · last pushed ${ago(bv.lastPush, now)} ago` : ''}</div>
+                {(bv.psaps ?? []).map((p) => (
+                  <div key={p.uri} className={psapTrouble([p]) ? 'text-amber-300' : 'text-slate-300'}>
+                    {p.name || p.uri}: queue {p.queue || 'unknown'} {p.max ? `${p.length}/${p.max}` : ''} · service {p.service || 'unknown'}{p.reason ? ` (${p.reason})` : ''}
+                  </div>
+                ))}
                 {bv.emergencyMode && <div className="text-rose-300">BitVoice emergency mode ON{bv.emergencyModeBy ? ` (by ${bv.emergencyModeBy})` : ''}</div>}
                 {bv.failures.slice(0, 3).map((f, i) => (
                   <div key={i} className="text-amber-300">BitVoice could not deliver {f.what} {ago(f.at, now)} ago: {f.error}</div>
@@ -216,4 +221,9 @@ export default function StatusBar({ view, screen = 'full', onScreens }: { view: 
       </div>
     </header>
   )
+}
+
+// psapTrouble: a PSAP the ESInet routes to whose queue or service is not normal (NENA state events).
+function psapTrouble(ps?: { queue?: string; service?: string }[]) {
+  return (ps ?? []).some((p) => (p.queue && p.queue !== 'Active') || (p.service && p.service !== 'Normal'))
 }
