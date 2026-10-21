@@ -186,6 +186,16 @@ func TestAPIFlow(t *testing.T) {
 	if code != 200 || strings.Contains(string(b), "bv_secret") || !strings.Contains(string(b), `"bitvoiceTokenSet":true`) {
 		t.Fatalf("integrations: %d %s", code, b)
 	}
+	// A field left out keeps its value; one sent empty clears it.
+	code, b = admin.do("PUT", "/api/admin/integrations", map[string]string{"eidoToken": "eido-1"}, true)
+	if code != 200 || !strings.Contains(string(b), `"bitvoiceUrl":"https://bv.example:8443"`) || !strings.Contains(string(b), `"bitvoiceTokenSet":true`) {
+		t.Fatalf("a partial save lost the address or token: %d %s", code, b)
+	}
+	code, b = admin.do("PUT", "/api/admin/integrations", map[string]string{"bitvoiceUrl": ""}, true)
+	if code != 200 || !strings.Contains(string(b), `"bitvoiceUrl":""`) {
+		t.Fatalf("clearing the address: %d %s", code, b)
+	}
+	admin.do("PUT", "/api/admin/integrations", map[string]string{"bitvoiceUrl": "https://bv.example:8443"}, true)
 	fi, _ := os.Stat(s.integrationsPath())
 	if fi.Mode().Perm() != 0o600 {
 		t.Fatalf("integrations.json mode %v", fi.Mode())

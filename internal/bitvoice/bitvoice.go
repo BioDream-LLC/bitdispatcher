@@ -1345,10 +1345,13 @@ func (b *Bridge) Validate(ctx context.Context, l *ng911.Location) (*cad.LVFCheck
 // Records reads one of BitVoice's 911 records for CAD's reports: the answer-time report, the exposure
 // record (who looked at callers' photos and video), or the i3 log events received. The answer is passed on
 // as BitVoice wrote it.
+// ErrNoRecord: Records was asked for a kind it does not offer.
+var ErrNoRecord = errors.New("no such record: answer, exposure, i3log or states")
+
 func (b *Bridge) Records(ctx context.Context, kind string, q url.Values) (json.RawMessage, error) {
 	path := map[string]string{"answer": "/api/psap/report", "exposure": "/api/psap/exposure", "i3log": "/api/core/i3log", "states": "/api/core/states"}[kind]
 	if path == "" {
-		return nil, errors.New("no such record")
+		return nil, ErrNoRecord
 	}
 	keep := url.Values{}
 	for _, k := range []string{"from", "to", "day"} {

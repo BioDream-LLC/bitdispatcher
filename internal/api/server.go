@@ -218,6 +218,16 @@ func (s *Server) spill(a ng911.ALI, from string) {
 }
 
 // ServeHTTP serves the API and the web interface, with security headers on everything.
+// HooksHandler serves only the endpoints a call-handling system pushes to (EIDO, radio events), each
+// bearer-authenticated, for a plain-HTTP listener on this computer's loopback (-hooks-addr) when the
+// sender cannot be made to trust bitdispatcher's certificate. Nothing else is reachable through it.
+func (s *Server) HooksHandler() http.Handler {
+	m := http.NewServeMux()
+	m.Handle("POST /api/ng911/eido", s.BV.EIDOHandler())
+	m.Handle("POST /api/radio/events", s.BV.RadioHandler())
+	return m
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")
@@ -393,6 +403,10 @@ func (s *Server) routes() {
 	s.handle("POST /api/calls/{id}/text", auth.Dispatcher, s.textCaller)
 	s.handle("GET /api/bitvoice/records/{kind}", auth.Supervisor, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		out, err := s.BV.Records(r.Context(), r.PathValue("kind"), r.URL.Query())
+		if errors.Is(err, bitvoice.ErrNoRecord) {
+			fail(w, 404, err.Error())
+			return
+		}
 		if err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
@@ -1494,17 +1508,30 @@ func (s *Server) getIntegrations(w http.ResponseWriter, r *http.Request, se *aut
 
 // saveIntegrations changes the integrations. A secret left empty keeps the current one; "-" clears it.
 func (s *Server) saveIntegrations(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
-	var b struct {
-		BitVoiceURL         string `json:"bitvoiceUrl"`
-		BitVoiceFingerprint string `json:"bitvoiceFingerprint"`
-		BitVoiceToken       string `json:"bitvoiceToken"`
-		EIDOToken           string `json:"eidoToken"`
-		RadioSecret         string `json:"radioSecret"`
-		ALIListen           string `json:"aliListen"`
+	// A field left out keeps its value (so a script can change one thing); the address, pin and ALI
+	// listener sent empty clear, the secrets sent empty keep and "-" clears them.
+	var in struct {
+		BitVoiceURL         *string `json:"bitvoiceUrl"`
+		BitVoiceFingerprint *string `json:"bitvoiceFingerprint"`
+		BitVoiceToken       string  `json:"bitvoiceToken"`
+		EIDOToken           string  `json:"eidoToken"`
+		RadioSecret         string  `json:"radioSecret"`
+		ALIListen           *string `json:"aliListen"`
 	}
-	if !readJSON(w, r, &b) {
+	if !readJSON(w, r, &in) {
 		return
 	}
+	s.mu.Lock()
+	cur := s.integ
+	s.mu.Unlock()
+	or := func(p *string, v string) string {
+		if p == nil {
+			return v
+		}
+		return *p
+	}
+	b := struct{ BitVoiceURL, BitVoiceFingerprint, BitVoiceToken, EIDOToken, RadioSecret, ALIListen string }{
+		or(in.BitVoiceURL, cur.BitVoice.URL), or(in.BitVoiceFingerprint, cur.BitVoice.Fingerprint), in.BitVoiceToken, in.EIDOToken, in.RadioSecret, or(in.ALIListen, cur.ALIListen)}
 	b.BitVoiceURL = strings.TrimRight(strings.TrimSpace(b.BitVoiceURL), "/")
 	if b.BitVoiceURL != "" && !strings.HasPrefix(b.BitVoiceURL, "https://") {
 		fail(w, 422, "BitVoice's address starts with https://")

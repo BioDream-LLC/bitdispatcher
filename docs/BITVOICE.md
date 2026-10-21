@@ -15,9 +15,13 @@ bitdispatcher never needs BitVoice to run.
 | EIDO | HTTPS POST, `application/emergency.eido+json`, NENA-STA-024 v1.0 | `POST /api/ng911/eido` | `Authorization: Bearer <token>` (BitVoice `psap.eidoToken`) | Sent at answer and again whenever caller media changes. No retry |
 | Radio events | HTTPS POST, JSON `{type, agency, data}` | `POST /api/radio/events` | `Authorization: Bearer <secret>` (BitVoice `radio.cadSecret`) | `radio.unit`, `radio.emergency` (3 tries), `radio.emergency.ack`, `radio.transmission`, `radio.location` |
 
-BitVoice's HTTP client verifies TLS certificates, so the bitdispatcher address it posts to must carry a
-certificate BitVoice trusts. Where that is not yet possible, bitdispatcher still gets every call and radio
-event through the pull path (section 2), which BitVoice cannot fail to deliver while the link is up.
+BitVoice's HTTP client verifies TLS certificates, so an https address it posts to must carry a certificate
+BitVoice trusts. When both run on the same computer, `bitdispatcher -hooks-addr 127.0.0.1:9450` also takes
+the two pushes over plain HTTP on loopback only (it refuses any other address, and serves nothing but
+`/api/ng911/eido` and `/api/radio/events`, each still needing its token): set BitVoice's `psap.eidoUrl` to
+`http://127.0.0.1:9450/api/ng911/eido` and `radio.cadUrl` to `http://127.0.0.1:9450/api/radio/events`.
+Where neither is possible, bitdispatcher still gets every call and radio event through the pull path
+(section 2), which BitVoice cannot fail to deliver while the link is up.
 
 ## 2. What bitdispatcher pulls from BitVoice
 
@@ -114,7 +118,7 @@ everything; BitVoice did not push (it needs to reach and trust bitdispatcher: se
 | Answer-time report, exposure record, i3 log in Reports | Works |
 | Silent-line and machine-against-caller advice | bitdispatcher's own advisory panel (unit tested), advice only |
 | Real-time text, TTY, SIP MESSAGE, CAMA, ALI lookup by callback, ESRP routing and PSAP states, recordings, transcripts and AI summaries | Built to BitVoice's payloads and unit tested; not exercised live (needs a TTY, a CAMA trunk, an ALI link, an ESRP policy, or BitVoice's AI configured) |
-| BitVoice pushing EIDO, ALI spill and radio events to bitdispatcher | Not tested: bitdispatcher ran where BitVoice could not reach it |
+| BitVoice pushing EIDO, ALI spill and radio events to bitdispatcher | Not tested here: bitdispatcher ran where BitVoice could not reach it (see the retest below) |
 
 Retested against BitVoice a83099c (its fixes for what this testing found):
 
@@ -124,4 +128,5 @@ Retested against BitVoice a83099c (its fixes for what this testing found):
 | A caller who vanishes without a hang-up: BitVoice ends the call after 60 s of silence, bitdispatcher shows "the caller's audio stopped" and raises the silent-line advice | Works |
 | The dispatcher named in BitVoice's exposure log, text calls taken and audit log (token that names the person) | Works |
 | The video link says why it was not texted | Works |
+| BitVoice pushing to bitdispatcher on the same computer (`-hooks-addr`): the EIDO and the ALI spill at answer, a P25 radio emergency by webhook | Works: the call came by all three paths (event stream, ALI, EIDO), the emergency as M1 "Medic 1" |
 | Live transcripts (`call.transcript`) | Unit tested with BitVoice's shape; not live (BitVoice's AI is not set up in the lab) |

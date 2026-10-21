@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -18,6 +19,9 @@ import (
 	"flag"
 	"fmt"
 	"html"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"log"
 	"math"
 	"math/big"
@@ -117,6 +121,36 @@ type sim struct {
 	story      map[string]story
 	addr       map[string]string
 	droneToken string
+	// Callers' photos, as BitVoice keeps them per call.
+	media map[string][]photo
+	held  map[string]bool
+}
+
+// photo is a simulated caller's photo: a small picture, its hash and where the "camera" was.
+type photo struct {
+	n          int
+	data       []byte
+	sha        string
+	at         time.Time
+	lat, lon   float64
+	takenLocal string
+}
+
+// simPhoto draws a small picture marked SIMULATED (a striped JPEG), as a caller's photo.
+func simPhoto() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 160, 120))
+	for y := 0; y < 120; y++ {
+		for x := 0; x < 160; x++ {
+			c := color.RGBA{0x33, 0x44, 0x55, 0xff}
+			if (x+y)/12%2 == 0 {
+				c = color.RGBA{0xe0, 0x8a, 0x2c, 0xff}
+			}
+			img.Set(x, y, c)
+		}
+	}
+	var b bytes.Buffer
+	jpeg.Encode(&b, img, &jpeg.Options{Quality: 70})
+	return b.Bytes()
 }
 
 type pusher struct {
@@ -453,7 +487,7 @@ func main() {
 	flag.Parse()
 	cert, fp := selfSigned()
 	s := &sim{calls: map[string]*call{}, subs: map[chan string]struct{}{}, token: *token, agency: "psap.sim.invalid", base: "https://" + *addr,
-		story: map[string]story{}, addr: map[string]string{}, droneToken: *droneToken}
+		story: map[string]story{}, addr: map[string]string{}, droneToken: *droneToken, media: map[string][]photo{}, held: map[string]bool{}}
 	if *eidoURL != "" || *radioURL != "" || *ali != "" || *hookURL != "" {
 		s.push = &pusher{eidoURL: *eidoURL, eidoToken: *eidoToken, radioURL: *radioURL, radioSecret: *radioSecret, ali: *ali,
 			hookURL: strings.TrimRight(*hookURL, "/"), hookToken: *hookToken,
@@ -581,8 +615,42 @@ func main() {
 	})
 	// The rest of what BitVoice offers a CAD, as an empty lab system would answer.
 	mux.HandleFunc("GET /api/calls/{id}/media", s.auth(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"call": r.PathValue("id"), "held": false, "items": []any{}})
+		id := r.PathValue("id")
+		s.mu.Lock()
+		items := []any{}
+		for _, p := range s.media[id] {
+			items = append(items, map[string]any{"n": p.n, "name": fmt.Sprintf("caller-photo-%d.jpg", p.n), "type": "image/jpeg", "kind": "photo", "size": len(p.data),
+				"sha256": p.sha, "received": p.at, "takenLocal": p.takenLocal, "hasGps": true, "lat": p.lat, "lon": p.lon})
+		}
+		held := s.held[id]
+		s.mu.Unlock()
+		writeJSON(w, map[string]any{"call": id, "held": held, "items": items})
 	}))
+	mux.HandleFunc("GET /api/calls/{id}/media/{n}", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		var data []byte
+		for _, p := range s.media[r.PathValue("id")] {
+			if fmt.Sprint(p.n) == r.PathValue("n") {
+				data = p.data
+			}
+		}
+		s.mu.Unlock()
+		if data == nil {
+			http.Error(w, `{"message":"no such photo"}`, 404)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(data)
+	}))
+	mux.HandleFunc("POST /api/calls/{id}/media/hold", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		var b struct{ Hold bool }
+		json.NewDecoder(r.Body).Decode(&b)
+		s.mu.Lock()
+		s.held[r.PathValue("id")] = b.Hold
+		s.mu.Unlock()
+		writeJSON(w, map[string]any{"held": b.Hold})
+	}))
+	mux.HandleFunc("POST /api/calls/{id}/video/reveal", s.auth(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{}) }))
 	mux.HandleFunc("POST /api/core/validate", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"message":"no address data is loaded"}`, 409)
 	}))
@@ -631,6 +699,35 @@ func main() {
 	mux.HandleFunc("POST /sim/call", func(w http.ResponseWriter, r *http.Request) {
 		s.newCall()
 		w.Write([]byte("ok\n"))
+	})
+	// A caller sends a photo (to the newest call in progress, or ?call=ID).
+	mux.HandleFunc("POST /sim/photo", func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		id := r.URL.Query().Get("call")
+		var newest *call
+		for _, c := range s.calls {
+			if c.State != "ended" && (id == "" || c.ID == id) && (newest == nil || c.Start.After(newest.Start)) {
+				newest = c
+			}
+		}
+		if newest == nil {
+			s.mu.Unlock()
+			http.Error(w, "no call in progress", 409)
+			return
+		}
+		data := simPhoto()
+		sum := sha256.Sum256(data)
+		lat, lon := 37.27, -79.94
+		if l := newest.Emergency.Location; l != nil && l.Lat != nil {
+			lat, lon = *l.Lat, *l.Lon
+		}
+		p := photo{n: len(s.media[newest.ID]) + 1, data: data, sha: hex.EncodeToString(sum[:]), at: time.Now().UTC(), lat: lat, lon: lon,
+			takenLocal: time.Now().Add(-2 * time.Minute).Format("2006-01-02 15:04:05")}
+		s.media[newest.ID] = append(s.media[newest.ID], p)
+		id = newest.ID
+		s.mu.Unlock()
+		s.publish("call.media", map[string]any{"call": id, "n": p.n})
+		writeJSON(w, map[string]any{"call": id, "n": p.n, "sha256": p.sha})
 	})
 	mux.HandleFunc("POST /sim/cadfailed", func(w http.ResponseWriter, r *http.Request) {
 		s.publish("emergency.cad_failed", map[string]any{"call": "", "what": "ALI", "error": "SIMULATED: dial tcp: connection refused"})

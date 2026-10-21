@@ -164,13 +164,15 @@ make web build sim
 ./bin/bvsim                    # optional: a simulated BitVoice with 911 calls and radio traffic
 ```
 
+**A lab NG9-1-1 caller.** `go build -o bin/i3caller ./cmd/i3caller` builds a test tool for a lab call-handling system (never a real 911 line). It places NG9-1-1 calls over SIP with a PIDF-LO location, RFC 7852 Additional Data and a STIR/SHAKEN verstat, as G.711 voice or MSRP text, and serves the location by reference so each rebid finds the caller about 40 m further on. It can also stand in for a call-taker's phone (`-phone EXT -secret-file F`), a P25 radio system's home RFSS making an emergency call (`-radio host:port`), or the ESInet at a trunk's address answering keepalives (`-esinet host:port`). `i3caller -h` lists every option.
+
 `-demo` adds fictional stations and units around Roanoke, Virginia, labelled as demo data. Then, in the browser:
 
 1. **Admin › Map:** record the map for your area (the centre and radius are chosen on the map).
 2. **Admin › Units, Stations, Call types & run cards:** your agency.
 3. **Admin › Integrations:** BitVoice or another call-handling system; for the simulator, `https://127.0.0.1:9444` with the token `bv_simulated`, and press *Read it* to pin its certificate.
 
-`bitdispatcher -data <dir>` chooses where the ledger, users and recorded map live; `-tls-cert` and `-tls-key` use your own certificate instead of the self-signed one; `bitdispatcher reset-password <user>` sets a new password from the command line.
+`-hooks-addr 127.0.0.1:PORT` takes BitVoice's EIDO and radio pushes over plain HTTP on loopback, when both run on one computer. `bitdispatcher -data <dir>` chooses where the ledger, users and recorded map live; `-tls-cert` and `-tls-key` use your own certificate instead of the self-signed one; `bitdispatcher reset-password <user>` sets a new password from the command line.
 
 **Memory.** 25 MB at rest with the demonstration units and no recorded map. With a 100-mile recorded map (about 620 MB on disk), aerial photos and county GIS loaded, about 500 MB.
 
@@ -178,13 +180,13 @@ make web build sim
 
 bitdispatcher takes caller location from any standards-compliant call-handling system: **ALI spill** over TCP or serial, **NENA i3 PIDF-LO**, and **EIDO** incidents (NENA-STA-024).
 
-With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice's live event stream (calls ringing before answer, rebids, caller photos), sends EIDO both ways, texts the caller, sends a video link and shows live video, takes radio emergencies, acknowledges them both ways and shows unit positions from the radio system. The full list is in [docs/BITVOICE.md](docs/BITVOICE.md). BitVoice is never required.
+With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice's live event stream (calls ringing before answer, rebids, caller photos), sends EIDO both ways, texts the caller and takes text-to-911 calls, sends a video link and shows live video (blurred until revealed), shows whether the caller's number was verified (STIR/SHAKEN), checks the caller's address against BitVoice's address data (LVF), shows BitVoice's check of a rebid location, keeps callers' photos as evidence (hash, the camera's time and GPS; each look recorded, naming the dispatcher in BitVoice's records too), takes radio emergencies and acknowledges them both ways, shows unit positions from the radio system, and puts BitVoice's answer times, exposure record and i3 log beside CAD reports. The full list is in [docs/BITVOICE.md](docs/BITVOICE.md). BitVoice is never required.
 
 ## How it is tested
 
 - `make check`: gofmt, `go vet` and the Go unit suites (the ledger, the state rebuilt from the ledger equals the live state, recommendations, mark-outs, the map importer and router, NIBRS and the Virginia file, scripts, sites).
 - `make web-test`: the web unit tests, including the manual checked against the screens.
-- `make e2e`: Playwright against a real bitdispatcher with demo data and the BitVoice simulator: sign-in, call to incident to dispatch, emergencies both ways, call entry by a call-taker, the console lock, review views and a records request, the mobile terminal with messages and photos, call-taking protocols, a correction and a replay of a closed incident, mark-outs and status checks, and **three emulated monitors**, each screen landing on its own, the selection shared across windows.
+- `make e2e`: Playwright against a real bitdispatcher with demo data and the BitVoice simulator: sign-in, call to incident to dispatch, emergencies both ways, call entry by a call-taker, the console lock, review views and a records request, a caller's photo kept hidden until revealed and recorded, the mobile terminal with messages and photos, call-taking protocols, a correction and a replay of a closed incident, mark-outs and status checks, and **three emulated monitors**, each screen landing on its own, the selection shared across windows.
 - Golden files for i3 and EIDO generated by BitVoice's own encoder.
 
 ## Status
@@ -192,7 +194,8 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 **Version 0.0.0: built and tested, not yet in service anywhere.** It is on a lab and design-partner track, like BitVoice's public-safety side. Before a centre relies on it:
 
 - **Not certified.** Not CJIS-audited, no VCIN certification yet, and the Virginia IBR file has not yet been accepted by the State Police.
-- **Tested against simulators and samples:** NCIC (training simulator), BitVoice (its simulator and its encoder's output, not yet a live BitVoice), ALI (sample spills).
+- **Tested against simulators and samples:** NCIC (training simulator), ALI (sample spills).
+- **Tested against a live BitVoice** in a lab, with `cmd/i3caller` placing the NG9-1-1 calls and standing in for the radio system: what works end to end, and what is built but not yet exercised (real-time text, TTY, CAMA, ESRP, live transcripts), is in [docs/BITVOICE.md](docs/BITVOICE.md) section 6.
 - **Multiple monitors** tested with Chrome's emulated monitors, not yet on a real console's monitors.
 - **Transcripts, crash data and drones** tested with the simulator's callers, crash notifications and drone system, not yet a live speech-to-text engine, telematics provider or drone system. The phrasebook translates the language of emergencies, not everything; the injury-risk rating and the quality review are aids, not judgements.
 - **Sign-in and records.** The one-time codes, console lock, sign-in notice and audit records have not been reviewed against the CJIS Security Policy; there is no FBI certification for software, and no FIPS 140-validated crypto module is used yet. What it does towards each control, and the gaps, are in [docs/COMPLIANCE.md](docs/COMPLIANCE.md). Supplemental location by HELD (RapidSOS's clearinghouse or a state LIS) and the location hook are tested against stand-ins, not RapidSOS itself ([docs/SUPPLEMENTAL-LOCATION.md](docs/SUPPLEMENTAL-LOCATION.md)). The sample redaction rules and example guidance are placeholders, not legal advice or approved text; the optional language model for redactions is off by default and, when on, sends the record's text to that model. The training board is not a backup.

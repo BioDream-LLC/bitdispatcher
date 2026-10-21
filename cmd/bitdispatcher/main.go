@@ -59,6 +59,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	certFile := fs.String("tls-cert", "", "TLS certificate (PEM); empty uses a self-signed certificate kept in the data directory")
 	keyFile := fs.String("tls-key", "", "TLS private key (PEM) for -tls-cert")
 	redirect := fs.String("http-redirect", "", "also listen on this plain-HTTP address and redirect to HTTPS (such as :8080)")
+	hooksAddr := fs.String("hooks-addr", "", "also take EIDO and radio pushes over plain HTTP on this loopback address (such as 127.0.0.1:9450), for a call-handling system on this computer that cannot trust the certificate")
 	demo := fs.Bool("demo", false, "on a new system, add demonstration stations and units (labelled as demo data)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -145,6 +146,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 		log.Error("listen", "addr", *addr, "err", err)
 		return 1
 	}
+	if *hooksAddr != "" {
+		hl, err := hooksListener(*hooksAddr)
+		if err != nil {
+			log.Error("hooks", "addr", *hooksAddr, "err", err)
+			return 1
+		}
+		hsrv := &http.Server{Handler: srv.HooksHandler(), ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 16 << 10,
+			ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
+		go hsrv.Serve(hl)
+		go func() { <-ctx.Done(); hsrv.Close() }()
+		log.Info("taking EIDO and radio pushes over plain HTTP on loopback", "addr", "http://"+hl.Addr().String())
+	}
 	if *redirect != "" {
 		go func() {
 			rs := &http.Server{Addr: *redirect, ReadHeaderTimeout: 5 * time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,4 +230,24 @@ func resetPassword(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "New password for %s: %s\n(restart bitdispatcher if it is running, so it reads the change)\n", name, pw)
 	return 0
+}
+
+// hooksListener listens on a loopback address only: plain HTTP never leaves this computer.
+func hooksListener(addr string) (net.Listener, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(host)
+	if host == "localhost" {
+		ip = net.IPv4(127, 0, 0, 1)
+	}
+	if ip == nil || !ip.IsLoopback() {
+		return nil, fmt.Errorf("plain HTTP is only for this computer: use 127.0.0.1:PORT, not %s", addr)
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	return ln, nil
 }

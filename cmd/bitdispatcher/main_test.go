@@ -22,3 +22,22 @@ func TestUnknownFlag(t *testing.T) {
 		t.Fatalf("exit code %d, want 2", code)
 	}
 }
+
+func TestHooksListenerIsLoopbackOnly(t *testing.T) {
+	for _, a := range []string{"0.0.0.0:0", ":0", "192.0.2.1:0", "example.com:0"} {
+		if ln, err := hooksListener(a); err == nil {
+			ln.Close()
+			t.Errorf("%s was accepted", a)
+		}
+	}
+	for _, a := range []string{"127.0.0.1:0", "localhost:0", "[::1]:0"} {
+		ln, err := hooksListener(a)
+		if err != nil {
+			if a == "[::1]:0" {
+				continue // no IPv6 loopback here
+			}
+			t.Fatalf("%s: %v", a, err)
+		}
+		ln.Close()
+	}
+}
