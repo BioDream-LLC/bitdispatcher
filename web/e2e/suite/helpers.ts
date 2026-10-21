@@ -45,5 +45,6 @@ export async function adminAPI(request: APIRequestContext) {
     get: async (p: string) => (await request.get('api' + p)).json(),
     post: async (p: string, data: unknown = {}) => request.post('api' + p, { headers: { 'X-BitDispatcher': '1' }, data }),
     put: async (p: string, data: unknown) => request.put('api' + p, { headers: { 'X-BitDispatcher': '1' }, data }),
+    del: async (p: string) => request.delete('api' + p, { headers: { 'X-BitDispatcher': '1' } }),
   }
 }

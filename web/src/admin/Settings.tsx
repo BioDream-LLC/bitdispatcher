@@ -78,6 +78,8 @@ export default function SettingsPage({ view }: { view: View }) {
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2"><Field label="Sign-in notice" htmlFor="sin" hint="The system use notice shown before sign-in (CJIS AC-8): authorised use only, use is monitored and recorded. Empty: none"><textarea id="sin" rows={3} className="input text-xs" value={s.signInNotice ?? ''} onChange={(e) => up({ signInNotice: e.target.value })} placeholder="This is a law enforcement and emergency services system for authorised users only. Use is monitored and recorded…" /></Field></div>
+            <Field label="Auto-dispatch waits (s)" htmlFor="ad" hint="For call types set to auto-dispatch: how long a call waits for a dispatcher before the recommended units are sent (empty: 60)"><input id="ad" type="number" min={0} max={3600} className="input font-mono" value={s.autoDispatchSeconds ?? ''} onChange={(e) => up({ autoDispatchSeconds: Number(e.target.value) || undefined })} /></Field>
             <Field label="AVL stale after (s)" htmlFor="avl" hint="Older positions are drawn dashed and not used to rank units"><input id="avl" type="number" className="input font-mono" value={s.avlStaleSeconds} onChange={(e) => up({ avlStaleSeconds: Number(e.target.value) })} /></Field>
             <Field label="Caller location stale after (s)" htmlFor="ls" hint="Older caller locations are marked STALE"><input id="ls" type="number" className="input font-mono" value={s.locationStaleSeconds} onChange={(e) => up({ locationStaleSeconds: Number(e.target.value) })} /></Field>
           </div>
@@ -133,6 +135,7 @@ export default function SettingsPage({ view }: { view: View }) {
           <h2 className="font-semibold text-slate-100">Roles and sign-in</h2>
           <p className="text-xs text-slate-400">What each duty may do is enforced by the server. A one-time code (any authenticator app) protects access to criminal justice information: confirm your state's CJIS requirements before relying on it.</p>
           <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!!s.duties?.callTakersDispatch} onChange={(e) => up({ duties: { ...s.duties, callTakersDispatch: e.target.checked } })} /> Call-takers may also send and change units</label>
+          <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!!s.duties?.selfAttach} onChange={(e) => up({ duties: { ...s.duties, selfAttach: e.target.checked } })} /> Crews may attach their own unit to a waiting incident from the mobile terminal</label>
           <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!!s.duties?.crossDiscipline} onChange={(e) => up({ duties: { ...s.duties, crossDiscipline: e.target.checked } })} /> Police, fire and EMS dispatchers may send any discipline's units</label>
           <div className="grid grid-cols-2 gap-2">
             <Field label="One-time codes at sign-in" htmlFor="mfa">

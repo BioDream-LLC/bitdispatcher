@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import { api, errText } from '../api'
+import { toast } from 'sonner'
+import ProtocolPanel from './Protocol'
 import { CheckCircle2, Link2, MapPin, PhoneForwarded, X } from 'lucide-react'
 import AddressInput from '../AddressInput'
 import { cx, phone, prio } from '../util'
@@ -21,7 +24,7 @@ const ALI_FIELDS = (c?: Call) => {
 
 /** Call Entry: the call type and modifiers, priority, the incident's location (verified on the map) and the
  * caller (and where they are, when not at the incident), with the call's ANI/ALI beside it. */
-export default function EntryTab({ view, d, call, update, dups, onAttach, onDismissDups, map }: {
+export default function EntryTab({ view, d, inc, call, update, dups, onAttach, onDismissDups, map }: {
   view: View; d: Draft; inc?: Incident; call?: Call; update: (p: Partial<Draft>) => void; dups: Dup[]; onAttach: (n: string) => void; onDismissDups: () => void; map: React.ReactNode
 }) {
   const ct = view.callTypes.find((c) => c.code === d.type)
@@ -122,9 +125,13 @@ export default function EntryTab({ view, d, call, update, dups, onAttach, onDism
                 <div key={k} className="contents"><dt className="text-slate-500">{k}</dt><dd className="truncate font-mono text-slate-200">{v}</dd></div>
               ))}
               {call.ali && <><dt className="text-slate-500">ALI</dt><dd className="whitespace-pre-wrap font-mono text-[10px] text-slate-400">{call.ali}</dd></>}
+              {view.health.lis && call.callback && call.state !== 'ended' && (
+                <div className="col-span-2 pt-1"><AskLIS id={call.id} name={view.health.lis} /></div>
+              )}
             </dl>
           ) : <p className="px-2 py-1.5 text-xs text-slate-500">No call: a walk-in, an officer's report or a radio call.</p>}
         </div>
+        <ProtocolPanel inc={inc} type={inc?.type ?? d.type} />
         <div className="relative grid h-[340px] overflow-hidden rounded-md border border-slate-800">{map}</div>
       </div>
     </div>
@@ -179,5 +186,16 @@ function TypePicker({ view, value, onPick }: { view: View; value: string; onPick
         </ul>
       )}
     </div>
+  )
+}
+
+/** AskLIS asks the location server (RapidSOS or another HELD server) where the caller's phone is now. */
+function AskLIS({ id, name }: { id: string; name: string }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <button type="button" className="btn h-6 px-2 text-[11px]" disabled={busy} onClick={async () => {
+      setBusy(true)
+      try { await api.post(`/calls/${encodeURIComponent(id)}/lis`); toast.success(`${name}: location updated`) } catch (e) { toast.error(errText(e)) } finally { setBusy(false) }
+    }}><MapPin size={11} aria-hidden /> {busy ? 'Asking…' : `Ask ${name}`}</button>
   )
 }

@@ -37,7 +37,7 @@ export type MarkOut = { code: string; location?: Location; note?: string }
 export type MarkOutType = { code: string; name: string; minutes: number; discipline?: string; interruptible?: boolean }
 
 export type Requirement = { capability: string; count: number }
-export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null; critical?: boolean; drone?: boolean; notify?: string[]; group?: string }
+export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string }
 
 export type Assignment = {
   unit: string; status: string; recommended: boolean; dispatched: string
@@ -46,7 +46,7 @@ export type Assignment = {
 
 export type Entry = { seq: number; at: string; actor: string; kind: string; text: string; unit?: string; priority?: boolean }
 
-export type Incident = {
+export type Incident = { files?: IncidentFile[]; protocol?: ProtocolRun; neris?: { id?: string; at: string; ok: boolean; status: number; error?: string; by: string };
   reports?: string[]
   number: string; type: string; priority: number; status: 'pending' | 'active' | 'closed'
   location?: Location; caller?: { name?: string; callback?: string }; calls: string[]; units: Assignment[]
@@ -106,7 +106,7 @@ export type Call = {
   provider?: string; location?: Location; locations: number; agent?: string; position?: string; start: string; answer?: string; end?: string
   media?: Media[]; video?: { live: boolean; viewUrl?: string; source?: string }; text?: TextLine[]; textOnly?: boolean; notes?: string[]
   canRebid?: boolean; problems?: string[]; ali?: string; incident?: string; updated: string
-  transcript?: TranscriptLine[]; lang?: string; details?: Detail[]; line?: string; crash?: Crash; crashRisk?: CrashRisk; fixes?: Fix[]; screen?: Screen
+  transcript?: TranscriptLine[]; lang?: string; details?: Detail[]; line?: string; crash?: Crash; crashRisk?: CrashRisk; alert?: Alert; fixes?: Fix[]; screen?: Screen
 }
 
 export type TranscriptLine = { at: string; speaker: 'caller' | 'taker' | 'other'; text: string; lang?: string; english?: string; by?: string; gist?: boolean }
@@ -140,13 +140,13 @@ export type Emergency = {
 }
 
 export type Settings = {
-  agency: string; incidentPrefix: string; timers: Record<string, number>; avlStaleSeconds: number; locationStaleSeconds: number
+  agency: string; incidentPrefix: string; timers: Record<string, number>; avlStaleSeconds: number; autoDispatchSeconds?: number; signInNotice?: string; locationStaleSeconds: number
   roadFactor: number; speedKmh: number; mapTiles: string; mapAttribution: string; mapCenter: [number, number]; mapZoom: number
   dispositions: string[]; unitTypes: UnitType[]; markOuts?: MarkOutType[]; shifts?: string[]; photosRecordedOnly?: boolean; ori?: string; ncicMode?: string; ncicAddr?: string
   nonEmergencyLines?: string[]; nonEmergencyWords?: string[]; nonEmergencyReply?: string; criticalWords?: string[]; careOff?: boolean; supportLine?: string
   breakMinutes?: number; crashHighKmh?: number; crashMediumKmh?: number; tdosPerMinute?: number; clusterMeters?: number; clusterMinutes?: number
   qa?: { answerSeconds?: number; entrySeconds?: number; dispatchSeconds?: number; questions?: Record<string, string[]> }
-  modifiers?: Modifier[]; duties?: { callTakersDispatch?: boolean; crossDiscipline?: boolean }
+  modifiers?: Modifier[]; duties?: { callTakersDispatch?: boolean; crossDiscipline?: boolean; selfAttach?: boolean }
   security?: { mfa?: '' | 'off' | 'admins' | 'everyone'; lockMinutes?: number; stagedChanges?: boolean }
   ackSeconds?: number; overrideReasonOff?: boolean; talkgroups?: string[]; moveMeters?: number; foiaDays?: number
 }
@@ -169,7 +169,7 @@ export type Health = {
   advisory?: AdvisoryStatus
   site?: string
   sites?: { name: string; url: string; ok: boolean; last?: string; error?: string; copied: number }[]
-  drone?: boolean; hooks?: boolean; model?: boolean
+  drone?: boolean; hooks?: boolean; model?: boolean; neris?: boolean; lis?: string
 }
 
 export type PhotoHealth = { available: boolean; recorded: boolean; attribution: string; job?: string; jobFrac?: number }
@@ -193,7 +193,7 @@ export type RouteView = { id: string; ok: boolean; seconds?: number; metres?: nu
 
 export type Verb = { words: string[]; usage: string; meaning: string }
 
-export type View = { placeViews?: boolean;
+export type View = { placeViews?: boolean; messages?: UnitMessage[]; stationAlerts?: StationAlert[];
   serverTime: string; seq: number; settings: Settings; stations: Station[]; units: Unit[]; callTypes: CallType[]
   incidents: Incident[]; calls: Call[]; emergencies: Emergency[]; health: Health; verbs: Verb[]; statuses: string[]
   premises?: Record<string, Premise[]>; prior?: Record<string, History[]>
@@ -241,3 +241,18 @@ export type Suggestion = {
   relied: AdvisoryEvidence[]; assumedAbsent: string[]; since: string
 }
 export type AdvisoryStatus = { mode: 'off' | 'shadow' | 'live'; version: number; lastRun?: string; error?: string; current: number; degraded: boolean; faults?: { rule: string; name: string; message: string }[] }
+
+/** UnitMessage is a message between the floor and the crews' terminals (or between units). */
+export type UnitMessage = { id: string; at: string; from: string; fromUnit: boolean; to: string[]; incident?: string; text: string; urgent?: boolean; read?: Record<string, string> }
+
+/** Alert is what an outside system reported: an alarm, a plate-reader hit, a gunshot detection, a camera. */
+export type Alert = { kind: 'alarm' | 'lpr' | 'gunshot' | 'camera' | 'cad' | 'other'; sender: string; id: string; event: string; detail?: string; status?: string
+  account?: string; premise?: string; zone?: string; permit?: string; verified?: boolean; callback?: string; operator?: string; keyholder?: string
+  plate?: string; state?: string; vehicle?: string; hotlist?: string; camera?: string; heading?: string; image?: string; rounds?: number; confidence?: string }
+export type NERISConfig = { on: boolean; clientId: string; secretSet: boolean; department: string; center: string; test: boolean; auto: boolean }
+export type StationAlert = { id: string; at: string; station: string; units: string[]; incident: string; type: string; typeName: string; priority: number; address?: string; lat?: number; lon?: number; speech: string; again?: boolean; acked?: string; ackedBy?: string }
+export type Determinant = { code: string; text: string; priority?: number; callType?: string; instructions?: string[] }
+export type Protocol = { id: string; name: string; version: string; approved: boolean; example?: boolean; callTypes: string[]; start: string
+  questions: { id: string; text: string; answers: { label: string; next?: string; determinant?: string }[] }[]; determinants: Determinant[]; updated?: string; by?: string }
+export type ProtocolRun = { protocol: string; version: string; system?: string; answers: { question: string; text: string; answer: string; at: string; by: string }[]; current?: string; determinant?: Determinant; at?: string; by?: string }
+export type IncidentFile = { id: string; name: string; caption?: string; type: string; sha256: string; size: number; added: string; by: string; unit?: string; hidden?: boolean; hiddenBy?: string; why?: string }

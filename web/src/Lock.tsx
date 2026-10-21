@@ -28,7 +28,8 @@ export function LockGuard() {
   }, [])
   // Input at the console: kept locally for the timer, and told to the server at most once a minute.
   useEffect(() => {
-    if (!me || me.role === 'field') return
+    // Crews' terminals, and a station's screen on a read-only account (a wall display), are not locked.
+    if (!me || me.role === 'field' || (me.role === 'viewer' && (me.console ?? '').startsWith('STATION-'))) return
     const on = () => {
       last.current = Date.now()
       if (Date.now() - sent.current > 60_000 && !store.get().me?.locked) {

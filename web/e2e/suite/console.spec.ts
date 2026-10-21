@@ -27,6 +27,22 @@ test('a call to a closed incident from the keyboard', async ({ page }) => {
   await page.keyboard.type('CL Handled')
   await page.keyboard.press('Enter')
   await expect(page.getByText(new RegExp(`Closed ${number}|${number} closed`))).toBeVisible()
+  // The supervisor corrects the closed record without reopening it.
+  const panel = page.getByRole('complementary', { name: `Incident ${number}` })
+  await panel.getByRole('button', { name: 'Correct the record' }).click()
+  const dlg = page.getByRole('dialog', { name: `Correct ${number}` })
+  await dlg.getByLabel('Disposition').selectOption('Transported')
+  await dlg.getByLabel('Why').fill('the crew transported after all')
+  await dlg.getByRole('button', { name: 'Correct', exact: true }).click()
+  await expect(panel.getByText(/record corrected: disposition Handled → Transported/)).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Correct the record' })).toBeVisible()
+  // And replays it from the ledger.
+  await panel.getByRole('button', { name: 'Replay' }).click()
+  const rp = page.getByRole('dialog', { name: `Replay ${number}` })
+  await expect(rp.getByRole('button', { name: /Play/ })).toBeVisible()
+  await rp.getByLabel('Speed').selectOption('120')
+  await rp.getByRole('button', { name: /Play/ }).click()
+  await expect(rp.getByRole('list', { name: 'Timeline so far' }).getByText(/record corrected/)).toBeVisible({ timeout: 15000 })
 })
 
 test('911 calls from the BitVoice simulator reach the queue', async ({ page, request }) => {

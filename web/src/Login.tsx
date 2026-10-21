@@ -41,8 +41,9 @@ export default function Login() {
   // The public demonstration account, when this server has one: one button signs a visitor in.
   const [demo, setDemo] = useState<{ name: string; role: string; duties?: Duty[] } | null>(null)
   const [demoDuty, setDemoDuty] = useState<Duty>((localStorage.getItem('bd.demo.duty') as Duty) || 'dispatcher')
+  const [notice, setNotice] = useState('')
   useEffect(() => {
-    api.get<{ demo?: { name: string; role: string; duties?: Duty[] } }>('/auth/me').then((r) => setDemo(r.demo ?? null), () => {})
+    api.get<{ demo?: { name: string; role: string; duties?: Duty[] }; notice?: string }>('/auth/me').then((r) => { setDemo(r.demo ?? null); setNotice(r.notice ?? '') }, () => {})
   }, [])
   useEffect(() => {
     if (need?.code || need?.enrol) codeRef.current?.focus()
@@ -112,6 +113,7 @@ export default function Login() {
             </button>
           </section>
         )}
+        {notice && <section aria-label="System use notice" className="w-full whitespace-pre-wrap rounded-lg border border-amber-600/60 bg-amber-950/40 p-3 text-xs leading-relaxed text-amber-100">{notice}</section>}
         <form onSubmit={submit} className="panel w-full space-y-4 rounded-xl p-6 shadow-2xl" aria-labelledby="login-h">
           <div className="flex items-center gap-2">
             <Logo size={28} />

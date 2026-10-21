@@ -424,8 +424,8 @@ func (s *Store) Session(id string) (*Session, bool) {
 	}
 	se.Last = now
 	// The inactivity lock: no input at the console for the policy's minutes. Field terminals in a moving
-	// vehicle and the training board are left alone.
-	if s.LockAfter > 0 && !se.Locked && se.Role != Field && !se.Active.IsZero() && now.Sub(se.Active) > s.LockAfter {
+	// vehicle, a read-only station screen in a firehouse and the training board are left alone.
+	if s.LockAfter > 0 && !se.Locked && se.Role != Field && !StationScreen(se) && !se.Active.IsZero() && now.Sub(se.Active) > s.LockAfter {
 		se.Locked, se.LockedAt = true, now
 		if s.OnLock != nil {
 			cp := *se
@@ -485,4 +485,10 @@ func (s *Store) Active() []Session {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Console < out[j].Console })
 	return out
+}
+
+// StationScreen reports whether a session is a station's alerting screen: a read-only (viewer) account
+// signed in at a position named STATION-<station>, a wall display nobody types at.
+func StationScreen(se *Session) bool {
+	return se.Role == Viewer && strings.HasPrefix(se.Console, "STATION-")
 }

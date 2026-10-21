@@ -75,8 +75,10 @@ type MDTView struct {
 		// MarkOuts are the mark-outs this unit may use.
 		MarkOuts []cad.MarkOutType `json:"markOuts"`
 	} `json:"settings"`
-	Health     HealthView `json:"health"`
-	PlaceViews bool       `json:"placeViews,omitempty"` // pictures of the place from the side can be looked up
+	Health     HealthView     `json:"health"`
+	PlaceViews bool           `json:"placeViews,omitempty"` // pictures of the place from the side can be looked up
+	Messages   []*cad.Message `json:"messages"`             // the last day's messages to and from this unit
+	SelfAttach bool           `json:"selfAttach,omitempty"` // the crew may attach itself to a waiting incident
 }
 
 func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -135,6 +137,8 @@ func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a
 				v.Pending = append(v.Pending, &ic)
 			}
 		}
+		v.Messages = copyMessages(st.MessagesFor(unit, time.Now().Add(-messageWindow)))
+		v.SelfAttach = st.Settings.Duties.SelfAttach
 		v.Settings.Agency, v.Settings.MapCenter, v.Settings.MapZoom, v.Settings.AVLStale = st.Settings.Agency, st.Settings.MapCenter, st.Settings.MapZoom, st.Settings.AVLStaleSeconds
 		v.Settings.MarkOuts = []cad.MarkOutType{}
 		d := st.Discipline(u)

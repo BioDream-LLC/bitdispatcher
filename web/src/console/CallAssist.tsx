@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Car, Copy, Languages, Layers, MapPin, Mic, Send, ShieldAlert, Sparkles, Volume2 } from 'lucide-react'
 import { api, errText } from '../api'
@@ -21,6 +21,7 @@ export default function CallAssist({ call, view }: { call: Call; view: View }) {
     <>
       <LocationLine call={call} />
       {call.crash && <CrashCard call={call} />}
+      {call.alert && <AlertCard call={call} />}
       {(call.details ?? []).length > 0 && <Details call={call} view={view} />}
       {(call.transcript ?? []).length > 0 && <Transcript call={call} />}
       {(call.transcript?.length || call.lang) && call.state !== 'ended' ? <Reply call={call} view={view} /> : null}
@@ -209,4 +210,27 @@ export function speak(text: string, lang: string) {
   u.lang = lang === 'es' ? 'es-US' : lang
   speechSynthesis.cancel()
   speechSynthesis.speak(u)
+}
+
+/** AlertCard: everything an outside alert gave, with the sender's own event ID for when the dispatcher calls them. */
+function AlertCard({ call }: { call: Call }) {
+  const a = call.alert!
+  const rows: [string, string | undefined][] = [
+    ['Sender', a.sender], ['Event ID', a.id], ['Event', a.event], ['Premise', a.premise], ['Zone', a.zone], ['Account', a.account], ['Permit', a.permit],
+    ['Keyholder', a.keyholder], ['Operator', a.operator], ['Call back', a.callback], ['Plate', [a.plate, a.state].filter(Boolean).join(' ') || undefined],
+    ['Vehicle', a.vehicle], ['Hotlist', a.hotlist], ['Camera', a.camera], ['Heading', a.heading], ['Rounds', a.rounds ? String(a.rounds) : undefined], ['Confidence', a.confidence], ['Detail', a.detail],
+  ]
+  return (
+    <section className={cx('rounded-md border p-2 text-xs', a.verified || a.kind === 'gunshot' ? 'border-rose-600 bg-rose-950/30' : 'border-orange-700/70 bg-orange-950/20')} aria-label="Alert">
+      <div className="mb-1 flex items-center gap-1.5 font-semibold text-slate-100">
+        {({ alarm: 'Alarm', lpr: 'Plate reader', gunshot: 'Gunshot detection', camera: 'Camera', cad: 'Incident', other: 'Alert' })[a.kind]} from {a.sender}
+        {a.verified && <span className="chip bg-rose-600 text-white">VERIFIED</span>}
+        {a.status === 'cancelled' && <span className="chip bg-emerald-600 text-white">CANCELLED</span>}
+      </div>
+      <dl className="grid grid-cols-[6rem_1fr] gap-x-2 gap-y-0.5">
+        {rows.filter(([, v]) => v).map(([k, v]) => <Fragment key={k}><dt className="text-slate-500">{k}</dt><dd className="text-slate-200">{v}</dd></Fragment>)}
+      </dl>
+      {a.image && <a className="mt-1 inline-block text-sky-300 underline" href={a.image} target="_blank" rel="noreferrer noopener">Open the sender's picture</a>}
+    </section>
+  )
 }

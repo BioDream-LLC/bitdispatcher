@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import IncidentFiles from '../Files'
+import ReplayDialog from './Replay'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle2, ChevronRight, Crosshair, FileText, Lock, MapPin, MessageSquareText, Phone, RefreshCw, Send, Star, Truck, Video, X, Eye, Image as ImageIcon, Unlock, Undo2,
+  Pencil, Play,
 } from 'lucide-react'
 import { AdvisoryCards, useAdvisory } from './Advisory'
 import PremiseBox from './PremiseBox'
@@ -15,7 +18,7 @@ import { api, errText } from '../api'
 import EntryFacts, { AckCell } from './Entry'
 import { dispatchUnits } from './ask'
 import { can, store, useStore } from '../store'
-import { Modal, Priority, StatusChip, Tip } from '../ui'
+import { Field, Modal, Priority, StatusChip, Tip } from '../ui'
 import { activity, checkDue, ago, clock, cx, hasPoint, hhmm, mi, locText, locationStale, mins, ms, overdue, phone, prio, statusMeta, typeName, uncertainty, useNow, avl } from '../util'
 import type { Call, Incident, Recommendation, View } from '../types'
 
@@ -195,7 +198,7 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
       )}
       {(call.notes ?? []).length > 0 && (
         <div className="text-[11px] text-slate-400">
-          {call.notes!.map((n, i) => <div key={i}>Call-taker note: <span className="text-slate-200">{n}</span></div>)}
+          {call.notes!.map((n, i) => <div key={i}>{call.alert ? `${call.alert.sender}: ` : "Call-taker note: "}<span className="text-slate-200">{n}</span></div>)}
         </div>
       )}
     </div>
@@ -387,7 +390,7 @@ function Timeline({ inc, now }: { inc: Incident; now: number }) {
   }
   const kindColor: Record<string, string> = {
     created: 'text-sky-300', dispatch: 'text-orange-300', status: 'text-slate-300', note: 'text-slate-100', 'priority-note': 'text-rose-200 font-semibold',
-    change: 'text-violet-300', call: 'text-sky-300', close: 'text-emerald-300', reopen: 'text-amber-300', emergency: 'text-rose-300 font-bold',
+    change: 'text-violet-300', call: 'text-sky-300', close: 'text-emerald-300', reopen: 'text-amber-300', 'auto-dispatch': 'text-amber-200', correction: 'text-violet-200', shared: 'text-sky-200', protocol: 'text-teal-200', file: 'text-slate-300', emergency: 'text-rose-300 font-bold',
     radio: 'text-teal-200 italic', drone: 'text-cyan-300',
   }
   return (
@@ -496,6 +499,12 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
             {firstDP ? <span>→ 1st dispatch <span className="text-slate-200">{clock(ms(inc.created), firstDP)}</span></span> : null}
             {firstOS ? <span>→ 1st on scene <span className="text-slate-200">{clock(ms(inc.created), firstOS)}</span></span> : null}
             {closed && <span className="text-emerald-300">closed {hhmm(inc.closed)} · {inc.disposition}</span>}
+            {inc.neris && <span className={inc.neris.ok ? 'text-sky-300' : 'text-rose-300'} title={inc.neris.error || `NERIS ${inc.neris.id ?? ''}`}>NERIS {inc.neris.ok ? 'sent' : 'refused'} {hhmm(inc.neris.at)}</span>}
+            {closed && can.supervise(me) && view.health.neris && (
+              <button className="underline hover:text-slate-200" onClick={async () => {
+                try { const r = await api.post<{ ok: boolean; error?: string }>(`/incidents/${inc.number}/neris`); r.ok ? toast.success('Sent to NERIS') : toast.error(r.error ?? 'NERIS refused it') } catch (e) { toast.error(errText(e)) }
+              }}>{inc.neris ? 'Send to NERIS again' : 'Send to NERIS'}</button>
+            )}
           </div>
         </div>
         <EntryFacts inc={inc} view={view} />
@@ -505,6 +514,8 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
         {calls.map((c) => <CallBox key={c.id} call={c} view={view} now={now} />)}
         {!closed && <RecommendBox inc={inc} rec={rec} reload={reloadRec} />}
         <UnitsOn inc={inc} view={view} now={now} />
+        <IncidentFiles inc={inc} />
+        {!closed && can.dispatch(me) && <ShareBox inc={inc} />}
         <Timeline inc={inc} now={now} />
       </div>
       {can.dispatch(me) && (
@@ -518,10 +529,14 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
               </button>
             </>
           ) : can.supervise(me) ? (
-            <form className="flex w-full gap-1" onSubmit={async (e) => { e.preventDefault(); try { await api.post(`/incidents/${inc.number}/reopen`, { reason: reopenWhy }); setReopenWhy('') } catch (err) { toast.error(errText(err)) } }}>
+            <div className="flex w-full gap-1">
+            <CorrectButton inc={inc} view={view} />
+            <ReplayButton number={inc.number} view={view} />
+            <form className="flex flex-1 gap-1" onSubmit={async (e) => { e.preventDefault(); try { await api.post(`/incidents/${inc.number}/reopen`, { reason: reopenWhy }); setReopenWhy('') } catch (err) { toast.error(errText(err)) } }}>
               <input className="input h-7 py-0 text-xs" placeholder="Why reopen?" value={reopenWhy} onChange={(e) => setReopenWhy(e.target.value)} aria-label="Reason to reopen" />
               <button className="btn h-7" disabled={!reopenWhy.trim()}><Unlock size={12} aria-hidden /> Reopen</button>
             </form>
+            </div>
           ) : (
             <span className="text-[11px] text-slate-500">Closed. A supervisor can reopen it.</span>
           )}
@@ -640,5 +655,117 @@ function ReportButton({ inc }: { inc: Incident }) {
         toast.error(errText(e))
       }
     }}><FileText size={12} aria-hidden /> {n ? n : 'Report'}</button>
+  )
+}
+
+/** ShareBox sends the incident to a neighbouring agency's CAD (mutual aid, a call on the line, a pursuit
+ * crossing over), with why; it arrives there as a call for their dispatcher. Shown when there are neighbours. */
+function ShareBox({ inc }: { inc: Incident }) {
+  const [partners, setPartners] = useState<{ id: string; name: string }[]>([])
+  const [to, setTo] = useState('')
+  const [why, setWhy] = useState('')
+  const [open, setOpen] = useState(false)
+  useEffect(() => { api.get<{ id: string; name: string }[]>('/partners').then((p) => { setPartners(p); setTo(p[0]?.id ?? '') }).catch(() => {}) }, [])
+  if (!partners.length) return null
+  return (
+    <section className="rounded-md border border-slate-800 p-2 text-xs" aria-label="Send to a neighbouring agency">
+      {!open ? (
+        <button className="btn h-6 px-2 text-[11px]" onClick={() => setOpen(true)}>Send to a neighbouring agency…</button>
+      ) : (
+        <form className="flex flex-wrap items-center gap-1" onSubmit={async (e) => {
+          e.preventDefault()
+          try { await api.post(`/incidents/${inc.number}/share`, { partner: to, reason: why }); toast.success(`Sent to ${partners.find((p) => p.id === to)?.name}`); setOpen(false); setWhy('') } catch (er) { toast.error(errText(er)) }
+        }}>
+          <select className="input h-7 w-auto text-xs" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Agency">{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+          <input className="input h-7 min-w-40 flex-1 text-xs" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why: mutual aid, need a ladder; on your side of the line…" aria-label="Why" required />
+          <button className="btn h-7 text-xs">Send</button>
+          <button type="button" className="btn btn-ghost h-7 text-xs" onClick={() => setOpen(false)}>Cancel</button>
+        </form>
+      )}
+    </section>
+  )
+}
+
+const UNIT_TIMES: [string, string][] = [['dispatched', 'Sent'], ['enroute', 'En route'], ['onScene', 'On scene'], ['transport', 'Transport'], ['atDest', 'At hospital'], ['cleared', 'Cleared']]
+// A datetime-local input works in local time without seconds' zone; the API wants RFC3339.
+const toLocal = (iso?: string) => { if (!iso || iso.startsWith('0001')) return ''; const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19) }
+
+/** CorrectButton puts a closed incident's record right without reopening it: the call type, priority,
+ * disposition, address, and units' times. Only what changes is sent, with why; it is on the timeline. */
+function CorrectButton({ inc, view }: { inc: Incident; view: View }) {
+  const [open, setOpen] = useState(false)
+  const [d, setD] = useState({ type: '', priority: 0, disposition: '', address: '', reason: '' })
+  const [times, setTimes] = useState<Record<string, Record<string, string>>>({})
+  const start = () => {
+    setD({ type: inc.type, priority: inc.priority, disposition: inc.disposition ?? '', address: inc.location?.address ?? '', reason: '' })
+    setTimes(Object.fromEntries(inc.units.map((u) => [u.unit, Object.fromEntries(UNIT_TIMES.map(([k]) => [k, toLocal((u as unknown as Record<string, string>)[k])]))])))
+    setOpen(true)
+  }
+  const save = async () => {
+    const body: Record<string, unknown> = { reason: d.reason }
+    if (d.type !== inc.type) body.type = d.type
+    if (d.priority !== inc.priority) body.priority = d.priority
+    if (d.disposition !== (inc.disposition ?? '')) body.disposition = d.disposition
+    if (d.address.trim() !== (inc.location?.address ?? '')) body.address = d.address
+    const ut: Record<string, Record<string, string>> = {}
+    for (const u of inc.units) {
+      for (const [k] of UNIT_TIMES) {
+        const was = toLocal((u as unknown as Record<string, string>)[k])
+        const now = times[u.unit]?.[k] ?? ''
+        if (now !== was) (ut[u.unit] ??= {})[k] = now ? new Date(now).toISOString() : '0001-01-01T00:00:00Z'
+      }
+    }
+    if (Object.keys(ut).length) body.unitTimes = ut
+    try {
+      const r = await api.post<{ changes: unknown[] }>(`/incidents/${inc.number}/correct`, body)
+      toast.success(`Corrected: ${r.changes.length} change${r.changes.length === 1 ? '' : 's'}`)
+      setOpen(false)
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  return (
+    <>
+      <button type="button" className="btn h-7 shrink-0" onClick={start}><Pencil size={12} aria-hidden /> Correct the record</button>
+      <Modal open={open} onClose={() => setOpen(false)} wide title={`Correct ${inc.number}`} icon={<Pencil size={16} aria-hidden />}
+        footer={<><button className="btn btn-ghost" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-go" disabled={!d.reason.trim()} onClick={save}>Correct</button></>}>
+        <div className="space-y-3 text-sm">
+          <p className="text-xs text-slate-400">The incident stays closed. What you change is on its timeline with what it was, who and why. Reports already sent (NERIS, NIBRS) are not changed: send them again.</p>
+          <div className="grid gap-2 md:grid-cols-3">
+            <Field label="Call type" htmlFor="cr-type"><select id="cr-type" className="input" value={d.type} onChange={(e) => setD({ ...d, type: e.target.value })}>{view.callTypes.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}</select></Field>
+            <Field label="Priority" htmlFor="cr-p"><select id="cr-p" className="input" value={d.priority} onChange={(e) => setD({ ...d, priority: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>P{n}</option>)}</select></Field>
+            <Field label="Disposition" htmlFor="cr-d"><select id="cr-d" className="input" value={d.disposition} onChange={(e) => setD({ ...d, disposition: e.target.value })}>{view.settings.dispositions.map((x) => <option key={x}>{x}</option>)}</select></Field>
+          </div>
+          <Field label="Address" htmlFor="cr-a"><input id="cr-a" className="input" value={d.address} onChange={(e) => setD({ ...d, address: e.target.value })} /></Field>
+          {inc.units.length > 0 && (
+            <table className="w-full text-xs">
+              <thead><tr className="text-slate-400"><th className="text-left">Unit</th>{UNIT_TIMES.map(([k, l]) => <th key={k} className="text-left font-normal">{l}</th>)}</tr></thead>
+              <tbody>
+                {inc.units.map((u) => (
+                  <tr key={u.unit}>
+                    <td className="pr-2 font-mono font-bold">{u.unit}</td>
+                    {UNIT_TIMES.map(([k, l]) => (
+                      <td key={k} className="pr-1"><input type="datetime-local" step={1} className="input h-7 px-1 text-[11px]" aria-label={`${u.unit} ${l}`} value={times[u.unit]?.[k] ?? ''}
+                        onChange={(e) => setTimes({ ...times, [u.unit]: { ...times[u.unit], [k]: e.target.value } })} /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <Field label="Why" htmlFor="cr-why"><input id="cr-why" className="input" value={d.reason} onChange={(e) => setD({ ...d, reason: e.target.value })} placeholder="E.g. M1 gave its on-scene time late by radio" required /></Field>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
+function ReplayButton({ number, view }: { number: string; view: View }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" className="btn h-7 shrink-0" onClick={() => setOpen(true)}><Play size={12} aria-hidden /> Replay</button>
+      {open && <ReplayDialog number={number} view={view} onClose={() => setOpen(false)} />}
+    </>
   )
 }

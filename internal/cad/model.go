@@ -159,6 +159,9 @@ type CallType struct {
 	Notify []string `json:"notify,omitempty"`
 	// Group is the agency's own heading for the type in long lists (Medical, Traffic, Property...).
 	Group string `json:"group,omitempty"`
+	// AutoDispatch sends the recommended units by itself when no dispatcher has within
+	// Settings.AutoDispatchSeconds: only for priority 3 to 5, and only a complete recommendation without warnings.
+	AutoDispatch bool `json:"autoDispatch,omitempty"`
 }
 
 // Caller is who reported an incident.
@@ -224,6 +227,9 @@ type Incident struct {
 	NewLocation *LocOffer       `json:"newLocation,omitempty"`
 	Guidance    []Shown         `json:"guidance,omitempty"` // approved guidance shown for it, by version
 	Changed     *LocChange      `json:"changed,omitempty"`  // the last accepted location change, for dispatchers
+	NERIS       *NERISRecord    `json:"neris,omitempty"`    // what NERIS last said about it (fire and EMS)
+	Protocol    *ProtocolRun    `json:"protocol,omitempty"` // the call-taking protocol worked on it
+	Files       []IncidentFile  `json:"files,omitempty"`    // attachments: pictures, documents
 }
 
 // TextLine is one line of a text conversation with a caller.
@@ -269,6 +275,7 @@ type CallData struct {
 	Translations []LineTranslation `json:"translations,omitempty"`
 	Line         string            `json:"line,omitempty"` // the line it came in on: 911, or a non-emergency number
 	Crash        *acn.Crash        `json:"crash,omitempty"`
+	Alert        *Alert            `json:"alert,omitempty"` // an alarm, plate-reader hit, gunshot or camera alert
 }
 
 // Call is a call from call handling, as bitdispatcher knows it from every source.
@@ -303,6 +310,7 @@ type Call struct {
 	Line       string           `json:"line,omitempty"`
 	Crash      *acn.Crash       `json:"crash,omitempty"`
 	CrashRisk  *acn.Assessment  `json:"crashRisk,omitempty"`
+	Alert      *Alert           `json:"alert,omitempty"`
 	Fixes      []Fix            `json:"fixes,omitempty"`
 	Screen     *Screen          `json:"screen,omitempty"`
 }
@@ -336,14 +344,19 @@ type Settings struct {
 	MapCenter       [2]float64     `json:"mapCenter"` // lat, lon
 	MapZoom         float64        `json:"mapZoom"`
 	// PhotosRecordedOnly stops the server fetching aerial photos it has not recorded when a console asks.
-	PhotosRecordedOnly bool          `json:"photosRecordedOnly,omitempty"`
-	Dispositions       []string      `json:"dispositions"`
-	Shifts             []string      `json:"shifts,omitempty"`   // shift change times, "07:00", for reports
-	ORI                string        `json:"ori,omitempty"`      // the agency's originating agency identifier, for NCIC
-	NCICMode           string        `json:"ncicMode,omitempty"` // off, sim (training simulator) or line (a switch adapter)
-	NCICAddr           string        `json:"ncicAddr,omitempty"` // host:port of the switch adapter
-	UnitTypes          []UnitType    `json:"unitTypes"`
-	MarkOuts           []MarkOutType `json:"markOuts"`
+	PhotosRecordedOnly bool     `json:"photosRecordedOnly,omitempty"`
+	Dispositions       []string `json:"dispositions"`
+	// SignInNotice is the system use notice on the sign-in page (CJIS AC-8): who may use the system, that
+	// use is monitored and recorded.
+	SignInNotice string `json:"signInNotice,omitempty"`
+	// AutoDispatchSeconds is how long an auto-dispatch call waits for a dispatcher (0: 60 seconds).
+	AutoDispatchSeconds int           `json:"autoDispatchSeconds,omitempty"`
+	Shifts              []string      `json:"shifts,omitempty"`   // shift change times, "07:00", for reports
+	ORI                 string        `json:"ori,omitempty"`      // the agency's originating agency identifier, for NCIC
+	NCICMode            string        `json:"ncicMode,omitempty"` // off, sim (training simulator) or line (a switch adapter)
+	NCICAddr            string        `json:"ncicAddr,omitempty"` // host:port of the switch adapter
+	UnitTypes           []UnitType    `json:"unitTypes"`
+	MarkOuts            []MarkOutType `json:"markOuts"`
 
 	// NonEmergencyLines are the numbers or line names of non-emergency lines; calls on them go to the
 	// non-emergency list. NonEmergencyWords are what callers say on calls that seldom are emergencies;

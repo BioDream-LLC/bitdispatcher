@@ -4,7 +4,7 @@ import { CheckCircle2, CircleDashed, Copy, Fingerprint, Images, KeyRound, PlugZa
 import { api, errText } from '../api'
 import { Field } from '../ui'
 import { ago, cx, useNow } from '../util'
-import type { View, ViewsConfig } from '../types'
+import type { NERISConfig, View, ViewsConfig } from '../types'
 import { Page } from './Admin'
 
 type IV = { bitvoiceUrl: string; bitvoiceFingerprint: string; bitvoiceTokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean; aliListen: string }
@@ -181,11 +181,15 @@ export default function Integrations({ view }: { view: View }) {
       )}
       <Connections view={view} />
       <ViewsSettings />
+      <NERISSettings />
+      <LISSettings />
+      <Partners />
+      <PublicFeedSettings view={view} />
     </Page>
   )
 }
 
-type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean; foiaModel?: boolean }
+type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean; foiaModel?: boolean; alertAnswerUrl?: string; alertAnswerTokenSet?: boolean; stationAlerts?: boolean; stationGatewayUrl?: string; stationGatewayTokenSet?: boolean }
 
 // Connections are the wishlist's: the hooks other systems send to (transcripts, crash data, drones, radio
 // words), the drone system, and the optional language model for translation.
@@ -200,6 +204,11 @@ function Connections({ view }: { view: View }) {
   const [modelName, setModelName] = useState('')
   const [modelOn, setModelOn] = useState(false)
   const [foiaModel, setFoiaModel] = useState(false)
+  const [answerUrl, setAnswerUrl] = useState('')
+  const [answerToken, setAnswerToken] = useState('')
+  const [stations, setStations] = useState(false)
+  const [gwUrl, setGwUrl] = useState('')
+  const [gwToken, setGwToken] = useState('')
   const fill = (v: XV) => {
     setX(v)
     setDroneUrl(v.droneUrl)
@@ -208,13 +217,18 @@ function Connections({ view }: { view: View }) {
     setModelName(v.modelName)
     setModelOn(v.modelOn)
     setFoiaModel(!!v.foiaModel)
+    setAnswerUrl(v.alertAnswerUrl ?? '')
+    setStations(!!v.stationAlerts)
+    setGwUrl(v.stationGatewayUrl ?? '')
   }
   useEffect(() => {
     api.get<XV>('/admin/connections').then(fill).catch((e) => toast.error(errText(e)))
   }, [])
   const save = async () => {
     try {
-      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn, foiaModel }))
+      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn, foiaModel, alertAnswerUrl: answerUrl, alertAnswerToken: answerToken, stationAlerts: stations, stationGatewayUrl: gwUrl, stationGatewayToken: gwToken }))
+      setAnswerToken('')
+      setGwToken('')
       setHook('')
       setDroneToken('')
       setModelKey('')
@@ -231,7 +245,7 @@ function Connections({ view }: { view: View }) {
         <h2 className="flex items-center gap-2 font-semibold text-slate-100"><KeyRound size={15} aria-hidden /> Hooks: transcripts, crash data, drones, radio words</h2>
         <p className="text-xs text-slate-400">Other systems post here with <span className="font-mono">Authorization: Bearer</span> and this token: a speech-to-text engine (call transcripts), a telematics provider (vehicle crash notifications), the drone system (status, position, live picture), a radio system's transcription. Without a token the hooks are off.</p>
         <ul className="space-y-1 text-xs">
-          {['transcript', 'acn', 'drone', 'radio-text'].map((h) => <li key={h}><Copyable text={`${base}/${h}`} /></li>)}
+          {['transcript', 'acn', 'drone', 'radio-text', 'location', 'alarm', 'lpr', 'gunshot', 'alert'].map((h) => <li key={h}><Copyable text={`${base}/${h}`} /></li>)}
         </ul>
         <Field label={`Hook token ${x.hookTokenSet ? '(set)' : '(not set: hooks off)'}`} htmlFor="ht" hint="Leave empty to keep it; - clears it">
           <div className="flex gap-1">
@@ -240,6 +254,21 @@ function Connections({ view }: { view: View }) {
           </div>
         </Field>
         {hook && hook !== '-' && <p className="text-xs text-amber-300">Copy it now and give it to the sending system: <Copyable text={hook} /></p>}
+      </section>
+      <section className="panel space-y-3 rounded-lg p-4">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} aria-hidden /> Alarms, plate readers, gunshot detection</h2>
+        <p className="text-xs text-slate-400">Alarm companies, plate readers and gunshot detection post to the alarm, lpr, gunshot and alert hooks above with the hook token (the contract is docs/ALERTS.md). Each arrives as a call in the queue, data only, for a dispatcher to make the incident from. Alarm companies are told what became of their alarms at this address: accepted, dispatched, on scene, closed.</p>
+        <Field label="Answers to the alarm company" htmlFor="aau" hint="https:// address; empty: no answers"><input id="aau" className="input font-mono" value={answerUrl} onChange={(e) => setAnswerUrl(e.target.value)} placeholder="https://alarm-company.example/cad/status" /></Field>
+        <Field label={`Token sent with them ${x.alertAnswerTokenSet ? '(set)' : ''}`} htmlFor="aat" hint="Leave empty to keep it; - clears it"><input id="aat" type="password" className="input font-mono" value={answerToken} onChange={(e) => setAnswerToken(e.target.value)} placeholder={x.alertAnswerTokenSet ? '••••••••' : ''} autoComplete="new-password" /></Field>
+        <p className="text-xs text-slate-500">ASAP over Nlets, the national standard for alarms, needs the standard's schema (sold by APCO) and the state's message switch; it is not connected yet.</p>
+      </section>
+      <section className="panel space-y-3 rounded-lg p-4">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} aria-hidden /> Station alerting</h2>
+        <p className="text-xs text-slate-400">When units are dispatched, their stations are toned out: the station's screen (open <span className="font-mono">#/station?st=ST1</span> on a read-only account in the firehouse) sounds the tones and reads the call aloud, and an alerting controller at the address below gets each alert (docs/STATION-ALERTING.md). TONE on the command line tones out again.</p>
+        <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={stations} onChange={(e) => setStations(e.target.checked)} /> Tone out stations when their units are dispatched</label>
+        <Field label="Alerting controller's address (optional)" htmlFor="gwu" hint="https:// or http://127.0.0.1 for a program on this server"><input id="gwu" className="input font-mono" value={gwUrl} onChange={(e) => setGwUrl(e.target.value)} placeholder="https://station-gateway.example/alert" /></Field>
+        <Field label={`Token sent with it ${x.stationGatewayTokenSet ? '(set)' : ''}`} htmlFor="gwt" hint="Leave empty to keep it; - clears it"><input id="gwt" type="password" className="input font-mono" value={gwToken} onChange={(e) => setGwToken(e.target.value)} placeholder={x.stationGatewayTokenSet ? '••••••••' : ''} autoComplete="new-password" /></Field>
+        <p className="text-xs text-slate-500">Vendors' station controllers (such as Phoenix G2 or Locution) use their own protocols; a small adapter from this alert to theirs is the connection, and none is included yet.</p>
       </section>
       <section className="panel space-y-3 rounded-lg p-4">
         <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} aria-hidden /> Drone as first responder</h2>
@@ -323,6 +352,190 @@ function ViewsSettings() {
         <button className="btn" onClick={async () => { try { setTest((await api.post<{ results: Record<string, string> }>('/admin/views/test', {})).results) } catch (e) { toast.error(errText(e)) } }}>Test at the map's centre</button>
         <button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save views</button>
       </div>
+    </section>
+  )
+}
+
+// NERISSettings: fire and EMS incidents to NERIS, the national reporting system, as CAD records.
+function NERISSettings() {
+  const [c, setC] = useState<NERISConfig | null>(null)
+  const [secret, setSecret] = useState('')
+  const [test, setTest] = useState<string>('')
+  useEffect(() => {
+    api.get<NERISConfig>('/admin/neris').then(setC).catch((e) => toast.error(errText(e)))
+  }, [])
+  if (!c) return null
+  const set = (p: Partial<NERISConfig>) => setC({ ...c, ...p })
+  const save = async () => {
+    try {
+      setC(await api.put<NERISConfig>('/admin/neris', { ...c, secret }))
+      setSecret('')
+      toast.success('NERIS saved')
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  return (
+    <section className="panel mt-4 space-y-3 rounded-lg p-4" aria-labelledby="neris-h">
+      <h2 id="neris-h" className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} className="text-orange-300" aria-hidden /> NERIS: fire and EMS reporting</h2>
+      <p className="text-xs text-slate-400">NERIS replaced NFIRS in 2026. bitdispatcher sends each fire or EMS incident as a <b>CAD record</b>: when the call came in and was answered, each unit's dispatch, en route, on scene and clear times, the place and how it ended. NERIS keeps it as pending until the fire department completes the rest (the incident type, actions, fire and medical detail) in NERIS or its records system. Police units are left out.</p>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Field label="Department's NERIS ID" htmlFor="nd" hint="FD and eight digits"><input id="nd" className="input font-mono uppercase" value={c.department} onChange={(e) => set({ department: e.target.value })} placeholder="FD51161234" /></Field>
+        <Field label="Client ID" htmlFor="nc" hint="a CAD integration from NERIS"><input id="nc" className="input font-mono" value={c.clientId} onChange={(e) => set({ clientId: e.target.value })} autoComplete="off" /></Field>
+        <Field label={`Client secret ${c.secretSet ? '(set)' : ''}`} htmlFor="ns" hint="Leave empty to keep it; - clears it"><input id="ns" type="password" className="input font-mono" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={c.secretSet ? '••••••••' : ''} autoComplete="new-password" /></Field>
+        <Field label="Dispatch centre" htmlFor="ncc" hint="sent as the centre's ID"><input id="ncc" className="input" value={c.center} onChange={(e) => set({ center: e.target.value })} placeholder="Roanoke ECC" /></Field>
+      </div>
+      <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.on} onChange={(e) => set({ on: e.target.checked })} /> On</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.auto} onChange={(e) => set({ auto: e.target.checked })} /> Send each fire or EMS incident when it closes</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.test} onChange={(e) => set({ test: e.target.checked })} /> NERIS's test environment</label>
+      </div>
+      {test && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-2 text-[11px] text-slate-300">{test}</pre>}
+      <div className="flex justify-end gap-2">
+        <button className="btn" onClick={async () => {
+          try { const r = await api.post<{ incident: string; ok: boolean; status: number; answer: string; error: string }>('/admin/neris/test', {}); setTest(`${r.incident}: ${r.ok ? 'NERIS accepts it' : r.error}\n${r.answer}`) } catch (e) { setTest(errText(e)) }
+        }}>Check the last closed incident</button>
+        <button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save NERIS</button>
+      </div>
+    </section>
+  )
+}
+
+type PV = { id: string; name: string; url: string; outTokenSet: boolean; inTokenSet: boolean; receive: string }
+
+// Partners: neighbouring agencies' CADs, for sending and receiving incidents (CAD-to-CAD, as EIDOs).
+function Partners() {
+  const [list, setList] = useState<PV[]>([])
+  const [d, setD] = useState({ id: '', name: '', url: '', outToken: '', inToken: '' })
+  const load = () => api.get<PV[]>('/admin/partners').then(setList).catch((e) => toast.error(errText(e)))
+  useEffect(() => { load() }, [])
+  const save = async () => {
+    try {
+      await api.put(`/admin/partners/${encodeURIComponent(d.id)}`, d)
+      toast.success('Saved')
+      setD({ id: '', name: '', url: '', outToken: '', inToken: '' })
+      load()
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  return (
+    <section className="panel mt-4 space-y-3 rounded-lg p-4" aria-labelledby="partners-h">
+      <h2 id="partners-h" className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} className="text-violet-300" aria-hidden /> Neighbouring agencies (CAD-to-CAD)</h2>
+      <p className="text-xs text-slate-400">Dispatchers send an incident to a neighbour's CAD (mutual aid, a call on their side of the line) as an EIDO, the NENA standard; what a neighbour sends arrives here as a call in the queue. Each neighbour has its own address and its own tokens (docs/CAD-TO-CAD.md).</p>
+      <ul className="space-y-1 text-sm">
+        {list.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center gap-2 rounded border border-slate-800 px-2 py-1">
+            <span className="font-mono font-bold text-slate-100">{p.id}</span><span className="text-slate-200">{p.name}</span>
+            <span className="truncate font-mono text-[11px] text-slate-500">{p.url || 'no address: receive only'}</span>
+            <span className="text-[11px] text-slate-400">they send to <Copyable text={location.origin + p.receive} /> {p.inTokenSet ? '' : '(no token yet: refused)'}</span>
+            <button className="btn btn-ghost ml-auto h-6 text-xs" onClick={() => setD({ id: p.id, name: p.name, url: p.url, outToken: '', inToken: '' })}>Change</button>
+            <button className="btn btn-ghost h-6 text-xs" onClick={async () => { if (confirm(`Remove ${p.name}?`)) { await api.del(`/admin/partners/${p.id}`).catch((e) => toast.error(errText(e))); load() } }}>Remove</button>
+          </li>
+        ))}
+        {!list.length && <li className="text-xs text-slate-500">No neighbouring agencies yet.</li>}
+      </ul>
+      <div className="grid gap-2 md:grid-cols-5">
+        <Field label="ID" htmlFor="pid"><input id="pid" className="input font-mono uppercase" value={d.id} onChange={(e) => setD({ ...d, id: e.target.value })} placeholder="FRANKLIN" /></Field>
+        <Field label="Name" htmlFor="pnm"><input id="pnm" className="input" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="Franklin County 911" /></Field>
+        <Field label="Their CAD's EIDO address" htmlFor="purl"><input id="purl" className="input font-mono" value={d.url} onChange={(e) => setD({ ...d, url: e.target.value })} placeholder="https://cad.franklin.example/…" /></Field>
+        <Field label="Token we send" htmlFor="pot" hint="empty keeps it; - clears"><input id="pot" type="password" className="input font-mono" value={d.outToken} onChange={(e) => setD({ ...d, outToken: e.target.value })} autoComplete="new-password" /></Field>
+        <Field label="Token they send" htmlFor="pit" hint="empty keeps it; - clears"><input id="pit" type="password" className="input font-mono" value={d.inToken} onChange={(e) => setD({ ...d, inToken: e.target.value })} autoComplete="new-password" /></Field>
+      </div>
+      <div className="flex justify-end"><button className="btn btn-go" disabled={!d.id || !d.name} onClick={save}><Save size={14} aria-hidden /> Save the agency</button></div>
+    </section>
+  )
+}
+
+type PFV = { on: boolean; tokenSet: boolean; police: boolean; leave: string[]; cprTypes: string[]; pushUrl: string; pushTokenSet: boolean }
+
+// PublicFeedSettings: the public incident feed, for the public and apps such as PulsePoint, without what
+// identifies anyone (hundred-block addresses, points to about 100 m, no callers or notes).
+function PublicFeedSettings({ view }: { view: View }) {
+  const [c, setC] = useState<PFV | null>(null)
+  const [tok, setTok] = useState('')
+  const [pushTok, setPushTok] = useState('')
+  const [preview, setPreview] = useState('')
+  useEffect(() => { api.get<PFV>('/admin/public-feed').then(setC).catch(() => {}) }, [])
+  if (!c) return null
+  const save = async () => {
+    try {
+      setC(await api.put<PFV>('/admin/public-feed', { ...c, token: tok, pushToken: pushTok }))
+      setTok('')
+      setPushTok('')
+      toast.success('Saved')
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  const pick = (k: 'leave' | 'cprTypes', code: string) => setC({ ...c, [k]: c[k].includes(code) ? c[k].filter((x) => x !== code) : [...c[k], code] })
+  return (
+    <section className="panel mt-4 space-y-3 rounded-lg p-4" aria-labelledby="pf-h">
+      <h2 id="pf-h" className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} className="text-emerald-300" aria-hidden /> Public incident feed (PulsePoint and others)</h2>
+      <p className="text-xs text-slate-400">Open incidents for the public, a website or an app: the type, the hundred block, a point to about 100 m, the units and their status. Never callers, callbacks, notes or house numbers. PulsePoint connects through its own partner interface; this is the documented feed a bridge reads (docs/PUBLIC-FEED.md).</p>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.on} onChange={(e) => setC({ ...c, on: e.target.checked })} /> Publish the feed at <Copyable text={location.origin + '/api/public/incidents'} /></label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.police} onChange={(e) => setC({ ...c, police: e.target.checked })} /> Include police incidents</label>
+      </div>
+      {c.on && !c.tokenSet && !tok && <p className="rounded bg-amber-500/15 px-2 py-1 text-xs text-amber-200">Without a token anyone on the internet can read the feed. Set one to give it only to a partner.</p>}
+      <fieldset>
+        <legend className="label">Never show these call types</legend>
+        <div className="flex flex-wrap gap-1">{view.callTypes.map((t) => <button key={t.code} type="button" aria-pressed={c.leave.includes(t.code)} className={cx('chip', c.leave.includes(t.code) ? 'bg-rose-700 text-white' : 'bg-slate-800 text-slate-300')} onClick={() => pick('leave', t.code)}>{t.code}</button>)}</div>
+      </fieldset>
+      <fieldset>
+        <legend className="label">Ask for CPR-trained bystanders on these</legend>
+        <div className="flex flex-wrap gap-1">{view.callTypes.filter((t) => t.discipline !== 'police').map((t) => <button key={t.code} type="button" aria-pressed={c.cprTypes.includes(t.code)} className={cx('chip', c.cprTypes.includes(t.code) ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300')} onClick={() => pick('cprTypes', t.code)}>{t.code}</button>)}</div>
+      </fieldset>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Field label="Readers' token" htmlFor="pf-tok" hint={c.tokenSet ? 'set: empty keeps it; - clears' : 'empty: anyone may read'}><input id="pf-tok" type="password" className="input font-mono" value={tok} onChange={(e) => setTok(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label="Push to (optional)" htmlFor="pf-push"><input id="pf-push" className="input font-mono" value={c.pushUrl} onChange={(e) => setC({ ...c, pushUrl: e.target.value })} placeholder="https://bridge.example/feed" /></Field>
+        <Field label="Push token" htmlFor="pf-pt" hint={c.pushTokenSet ? 'set: empty keeps it; - clears' : undefined}><input id="pf-pt" type="password" className="input font-mono" value={pushTok} onChange={(e) => setPushTok(e.target.value)} autoComplete="new-password" /></Field>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button className="btn" onClick={async () => setPreview(JSON.stringify(await api.get('/admin/public-feed/preview'), null, 2))}>See what it shows</button>
+        <button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save the feed</button>
+      </div>
+      {preview && <pre className="max-h-64 overflow-auto rounded bg-slate-950 p-2 text-[11px] text-slate-300">{preview}</pre>}
+    </section>
+  )
+}
+
+type LV = { on: boolean; name: string; url: string; tokenSet: boolean; user: string; passwordSet: boolean; auto: boolean }
+
+// LISSettings: a location server asked by HELD for the caller's phone (RapidSOS's clearinghouse or a
+// state NG9-1-1 LIS), with the credentials the provider gives the centre.
+function LISSettings() {
+  const [c, setC] = useState<LV | null>(null)
+  const [tok, setTok] = useState('')
+  const [pw, setPw] = useState('')
+  const [num, setNum] = useState('')
+  const [res, setRes] = useState('')
+  useEffect(() => { api.get<LV>('/admin/lis').then(setC).catch(() => {}) }, [])
+  if (!c) return null
+  const save = async () => {
+    try { setC(await api.put<LV>('/admin/lis', { ...c, token: tok, password: pw })); setTok(''); setPw(''); toast.success('Saved') } catch (e) { toast.error(errText(e)) }
+  }
+  return (
+    <section className="panel mt-4 space-y-3 rounded-lg p-4" aria-labelledby="lis-h">
+      <h2 id="lis-h" className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} className="text-sky-300" aria-hidden /> Supplemental location (RapidSOS, NG9-1-1 LIS)</h2>
+      <p className="text-xs text-slate-400">bitdispatcher asks a location server where the caller's phone is, by its number, using HELD (the NG9-1-1 standard). The provider gives your centre the address and credentials. The answer is offered to the call-taker like any newer location (docs/SUPPLEMENTAL-LOCATION.md). Not yet tested against RapidSOS itself.</p>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.on} onChange={(e) => setC({ ...c, on: e.target.checked })} /> On</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c.auto} onChange={(e) => setC({ ...c, auto: e.target.checked })} /> Ask for every new 911 call</label>
+      </div>
+      <div className="grid gap-2 md:grid-cols-5">
+        <Field label="Name" htmlFor="lis-n"><input id="lis-n" className="input" value={c.name} onChange={(e) => setC({ ...c, name: e.target.value })} placeholder="RapidSOS" /></Field>
+        <Field label="HELD address" htmlFor="lis-u"><input id="lis-u" className="input font-mono" value={c.url} onChange={(e) => setC({ ...c, url: e.target.value })} placeholder="https://…" /></Field>
+        <Field label="Token (Bearer)" htmlFor="lis-t" hint={c.tokenSet ? 'set: empty keeps it; - clears' : undefined}><input id="lis-t" type="password" className="input font-mono" value={tok} onChange={(e) => setTok(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label="Or user" htmlFor="lis-us"><input id="lis-us" className="input font-mono" value={c.user} onChange={(e) => setC({ ...c, user: e.target.value })} autoComplete="off" /></Field>
+        <Field label="Password" htmlFor="lis-p" hint={c.passwordSet ? 'set: empty keeps it; - clears' : undefined}><input id="lis-p" type="password" className="input font-mono" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
+      </div>
+      <div className="flex flex-wrap items-end justify-end gap-2">
+        <Field label="Try a number" htmlFor="lis-num"><input id="lis-num" className="input font-mono" value={num} onChange={(e) => setNum(e.target.value)} placeholder="+15405550100" /></Field>
+        <button className="btn" disabled={!num} onClick={async () => { const r = await api.post<{ ok: boolean; message?: string; location?: { lat?: number; lon?: number; radius?: number } }>('/admin/lis/test', { callback: num }); setRes(r.ok ? `Located: ${r.location?.lat}, ${r.location?.lon} ±${r.location?.radius ?? '?'} m` : `No: ${r.message}`) }}>Ask</button>
+        <button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save</button>
+      </div>
+      {res && <p className="text-xs text-slate-300">{res}</p>}
     </section>
   )
 }

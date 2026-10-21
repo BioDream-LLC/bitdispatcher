@@ -168,11 +168,17 @@ type State struct {
 	History      []History      `json:"-"` // incidents from an earlier system
 	rptCount     map[string]int // "site prefix|yy"
 	premCount    int
-	premGrid     grid
-	premIDs      []string
-	premIdx      map[string]int
-	histGrid     grid
-	yearCount    map[string]int // incidents per site and year, for numbering
+	Messages     []*Message `json:"messages"` // the most recent messages to and from units
+	msgCount     int
+	// StationAlerts are the most recent tone-outs.
+	StationAlerts []*StationAlert      `json:"stationAlerts"`
+	alertBase     int                  // tone-outs dropped from the front, for numbering
+	Protocols     map[string]*Protocol `json:"protocols"` // the agency's call-taking question sets
+	premGrid      grid
+	premIDs       []string
+	premIdx       map[string]int
+	histGrid      grid
+	yearCount     map[string]int // incidents per site and year, for numbering
 }
 
 func newState() *State {
@@ -200,6 +206,42 @@ func decode[T any](e ledger.Event) (T, error) {
 // an error, because the ledger was written by commands that validated it.
 func (s *State) apply(e ledger.Event) error {
 	s.Seq++ // events applied: the ledger's sequence on one site, the merged count on several
+	if ok, err := s.applyAuto(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
+	if ok, err := s.applyCorrection(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
+	if ok, err := s.applyFiles(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
+	if ok, err := s.applyProtocol(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
+	if ok, err := s.applyStation(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
+	if ok, err := s.applyMessages(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
 	if ok, err := s.applyEntry(e); ok {
 		if err == nil {
 			s.afterApply(e)

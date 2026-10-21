@@ -306,6 +306,13 @@ func (s *State) mergeDream(c *Call, d CallData, at time.Time) {
 			c.Callback = cr.Callback
 		}
 	}
+	if d.Alert != nil {
+		al := *d.Alert
+		if c.Alert != nil && al.Status == "" {
+			al.Status = c.Alert.Status
+		}
+		c.Alert = &al
+	}
 	if len(d.Transcript) > 0 || len(d.Translations) > 0 || d.Crash != nil {
 		c.Details = s.callDetails(c)
 	}

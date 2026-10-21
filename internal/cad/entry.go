@@ -84,6 +84,8 @@ type DutyRules struct {
 	CallTakersDispatch bool `json:"callTakersDispatch,omitempty"`
 	// CrossDiscipline lets a police, fire or EMS dispatcher send and change units of other disciplines.
 	CrossDiscipline bool `json:"crossDiscipline,omitempty"`
+	// SelfAttach lets a crew attach its own unit to a waiting incident from the mobile terminal.
+	SelfAttach bool `json:"selfAttach,omitempty"`
 }
 
 // Security is the sign-in policy.

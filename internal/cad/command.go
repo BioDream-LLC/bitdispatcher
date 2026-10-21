@@ -45,6 +45,8 @@ var Verbs = []Verb{
 	{[]string{"ACK"}, "ACK [units…]", "With units: they acknowledged their assignment; alone: acknowledge the oldest open emergency"},
 	{[]string{"TG"}, "TG <talkgroup>", "Set the selected incident's talkgroup"},
 	{[]string{"BOLO"}, "BOLO <text>", "Issue a BOLO for the selected incident (or none)"},
+	{[]string{"TONE", "ALERT"}, "TONE [units…] [#incident]", "Tone out the stations of the units on the selected incident again (or of the units named)"},
+	{[]string{"MSG", "SEND"}, "MSG <units…|ALL|ALL-FIRE|ALL-EMS|ALL-POLICE|#incident> / <text>", "Send a message to units' terminals (! first for urgent)"},
 	{[]string{"MU", "COVER"}, "MU <unit> <station>", "Move a unit up to cover another station"},
 	{[]string{"RET", "HOME"}, "RET <units…>", "Send covering units back to their own station"},
 	{[]string{"ATTACH"}, "ATTACH <call> [#incident]", "Attach a 911 call to the selected (or named) incident"},
@@ -418,6 +420,74 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 			return fail(err)
 		}
 		return CommandResult{OK: true, Message: selected + " on talkgroup " + strings.Join(args, " "), Incident: selected}
+	case "TONE", "ALERT":
+		inc := selected
+		var us []string
+		for _, w := range args {
+			if strings.HasPrefix(w, "#") {
+				inc = strings.TrimPrefix(w, "#")
+			} else {
+				us = append(us, strings.ToUpper(w))
+			}
+		}
+		if inc == "" {
+			return CommandResult{Message: "Select the incident, or give it: TONE #26-000123"}
+		}
+		if len(us) == 0 {
+			e.Read(func(st *State) {
+				if in := st.Incidents[inc]; in != nil {
+					for _, as := range in.Units {
+						if as.Cleared.IsZero() {
+							us = append(us, as.Unit)
+						}
+					}
+				}
+			})
+		}
+		ids, err := e.AlertStations(a, inc, us, true)
+		if err != nil {
+			return fail(err)
+		}
+		if len(ids) == 0 {
+			return CommandResult{Message: "No station to tone out: the units have no station"}
+		}
+		return CommandResult{OK: true, Message: fmt.Sprintf("%d station alert(s) sent", len(ids)), Incident: inc}
+	case "MSG", "SEND":
+		// MSG E1 M2 / text, MSG ALL text, MSG #26-000012 / text (the units on it); "!" first: urgent.
+		var to []string
+		inc := ""
+		var words []string
+		slash := slices.Index(args, "/")
+		head, tail := args, []string(nil)
+		if slash >= 0 {
+			head, tail = args[:slash], args[slash+1:]
+		}
+		for i, w := range head {
+			if strings.HasPrefix(w, "#") {
+				inc = strings.TrimPrefix(w, "#")
+				continue
+			}
+			uw := strings.ToUpper(w)
+			if slash < 0 && !e.isUnitOrGroup(uw) {
+				words = head[i:] // without a slash, the message starts at the first word that is not an address
+				break
+			}
+			to = append(to, uw)
+		}
+		if slash >= 0 {
+			words = tail
+		}
+		text := strings.Join(words, " ")
+		urgent := strings.HasPrefix(text, "!")
+		text = strings.TrimSpace(strings.TrimPrefix(text, "!"))
+		if inc == "" && len(to) == 0 && selected != "" {
+			inc = selected
+		}
+		id, err := e.SendMessage(a, "", to, inc, text, urgent)
+		if err != nil {
+			return fail(err)
+		}
+		return CommandResult{OK: true, Message: id + " sent", Incident: inc}
 	case "BOLO":
 		if len(args) == 0 {
 			return CommandResult{Message: "Say what to look out for: BOLO silver Honda Civic VA KTR-4471 northbound"}
@@ -457,4 +527,15 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 		return CommandResult{OK: true, Message: "Emergency acknowledged"}
 	}
 	return CommandResult{Message: "Unknown command " + verb + ": HELP lists them"}
+}
+
+// isUnitOrGroup reports whether a word is a unit ID or a message group (ALL, ALL-FIRE…).
+func (e *Engine) isUnitOrGroup(w string) bool {
+	switch w {
+	case ToAll, ToFire, ToEMS, ToPolice, ToDispatch:
+		return true
+	}
+	ok := false
+	e.Read(func(st *State) { _, ok = st.Units[w] })
+	return ok
 }

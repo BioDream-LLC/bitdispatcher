@@ -234,6 +234,12 @@ func (e *Engine) SaveSettings(a Actor, s Settings) error {
 			return problem("shifts", "shift changes are times like 07:00")
 		}
 	}
+	if len(s.SignInNotice) > 4000 {
+		return problem("signInNotice", "the sign-in notice is up to 4000 characters")
+	}
+	if s.AutoDispatchSeconds < 0 || s.AutoDispatchSeconds > 3600 {
+		return problem("autoDispatchSeconds", "auto-dispatch waits 0 to 3600 seconds")
+	}
 	if len(s.Dispositions) == 0 {
 		return problem("dispositions", "keep at least one disposition")
 	}
@@ -354,6 +360,9 @@ func (e *Engine) SaveCallType(a Actor, c CallType) error {
 	if c.Priority < 1 || c.Priority > 5 {
 		return problem("priority", "priority is 1 (highest) to 5")
 	}
+	if c.AutoDispatch && c.Priority < 3 {
+		return problem("autoDispatch", "only priority 3 to 5 call types are sent automatically")
+	}
 	for i, r := range c.RunCard {
 		if r.Capability == "" || r.Count < 1 || r.Count > 20 {
 			return problem(fmt.Sprintf("runCard[%d]", i), "each run card line needs a capability and 1 to 20 units")
@@ -471,7 +480,7 @@ func changes(c *Call, d CallData) bool {
 	if d.Problems != nil && !slices.Equal(d.Problems, c.Problems) {
 		return true
 	}
-	if len(d.Transcript) > 0 || len(d.Translations) > 0 || d.Crash != nil || d.Line != "" && d.Line != c.Line {
+	if len(d.Transcript) > 0 || len(d.Translations) > 0 || d.Crash != nil || d.Alert != nil || d.Line != "" && d.Line != c.Line {
 		return true
 	}
 	if d.Location != nil && d.Location.Altitude != nil && (c.Location == nil || c.Location.Altitude == nil || *c.Location.Altitude != *d.Location.Altitude) {

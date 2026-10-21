@@ -51,6 +51,11 @@ Where something has been tested only against simulators or sample data rather th
 - A call-taker's workspace with nine tabs (Call Entry, Persons, Vehicles, Previous, Hazards, CAD Search, Comments, History, Resources) and the call and narrative always beside them; F4 submits and keeps the incident open for more, F2 clears for the next call.
 - Call types by code or word with CSV import, modifiers that raise the priority or add who to notify, the caller's own location when they are not at the incident, duplicates offered before a second incident is made, and newer caller locations offered to accept or keep.
 - Resources: passages from the agency's approved policies and guides, quoted word for word with their version, and recorded on the incident when shown.
+- Call-taking protocols the agency writes (questions to a determinant that sets the priority and gives the caller's instructions, answered on number keys), and a hook for licensed protocol software such as ProQA to report its determinant.
+- Supplemental caller location by HELD from RapidSOS's clearinghouse or a state NG9-1-1 location server, automatically or with one press, offered like any newer location.
+- Messages between dispatch and crews (to units, groups, everyone on an incident), urgent ones holding the top of the terminal until acknowledged; crews may take a waiting incident if the agency allows it.
+- Alarm companies, plate readers, gunshot detection and cameras arrive as data calls in the queue, with the alarm company told when units are sent, arrive and clear; the alarm company's cancel goes on the incident.
+- Automatic dispatch for the low-priority call types an agency chooses: the recommended units are sent when no dispatcher has within the wait, only when the recommendation is complete and has no warnings, and it is logged.
 - For the dispatcher: the reason asked when units other than the recommended ones are sent, a confirmation for an unverified location, response plans with a due order, units flashed NO ACK when they do not acknowledge, talkgroups, a notification checklist, BOLOs, hospital diversion and a shift passdown log; a supervisor's exceptions panel.
 
 **Screens for several monitors**
@@ -59,6 +64,7 @@ Where something has been tested only against simulators or sample data rather th
 - Monitors found with the browser's Window Management API, told apart by position, so two identical monitors are never confused.
 
 **Fire, EMS and police**
+- **Station alerting:** a dispatch tones out each station of the units sent, on a station screen (rising tones, the call read aloud twice, acknowledge) and to a station alerting controller.
 - **Fire houses:** every station as a card with its bays, what is in quarters, covering units and gaps, with a one-click move-up by road time.
 - **Police mark-outs:** meal, fuel, report writing, follow-up, traffic stop, business check, court, jail and more (the agency's own list), each with where the officer is and its own status-check timer; overdue checks flash; `SC` clears them in one keystroke; interruptible mark-outs are offered when no car is free.
 - **Supervisor board:** what is free, what is waiting, status checks due, empty stations, and where the work is piling up, shaded by county zone or station area.
@@ -73,7 +79,10 @@ Where something has been tested only against simulators or sample data rather th
 - A mobile data terminal for crews: assignment, route, premises, notes, one-tap statuses on F-keys, mark-outs, GPS, and the emergency button.
 
 **Records and reporting**
-- Incident reports with the NIBRS data elements checked and supervisor approval; Virginia's incident-based reporting file for the month in one click.
+- Incident reports with the NIBRS data elements checked and supervisor approval; Virginia's incident-based reporting file for the month in one click; a first narrative drafted from the incident's record (or the agency's language model, from the same facts) for the writer to correct and finish.
+- Fire and EMS incidents sent to NERIS, the national fire reporting system, on close or by a press.
+- Files and photos on an incident (from the console or a crew's camera), each with its SHA-256 in the ledger; a supervisor hides one with why, never deletes it.
+- A closed incident's record corrected without reopening it (type, priority, disposition, address, unit times), with what each was and why; any incident replayed on the map from the ledger.
 - NCIC inquiries through the state's switch or a training simulator, logged with purpose and reason.
 - The Daily Operations Report and shift debrief, built from the ledger, with drill-down and supervisor certification.
 
@@ -95,6 +104,10 @@ Where something has been tested only against simulators or sample data rather th
 - Breaks and workload on the supervisor board, with who is free to relieve; a quality review of every incident against the centre's standards and the questions heard on the transcript.
 - A training environment with scripted scenarios on the agency's own map and units, scored, never touching the live board; shared exercises where everyone who joins works one board while an instructor injects callers, location changes and radio traffic; configuration changes tried on a training board and published to the live one with a reason.
 - Working through an outage from the last board with an offline log sent when the server is back, and a warning of telephony denial-of-service floods.
+
+**Working with others**
+- Incidents sent to and received from neighbouring agencies' CADs as NENA EIDOs, each agency with its own address and tokens; what arrives is a call in the queue.
+- A public incident feed for a website or apps such as PulsePoint: hundred-block addresses, points to about 100 m, never callers or notes; off until turned on.
 
 **Built to keep running**
 - An append-only, SHA-256 hash-chained event ledger, verified and searched from the browser.
@@ -171,7 +184,7 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 
 - `make check`: gofmt, `go vet` and the Go unit suites (the ledger, the state rebuilt from the ledger equals the live state, recommendations, mark-outs, the map importer and router, NIBRS and the Virginia file, scripts, sites).
 - `make web-test`: the web unit tests, including the manual checked against the screens.
-- `make e2e`: Playwright against a real bitdispatcher with demo data and the BitVoice simulator: sign-in, call to incident to dispatch, emergencies both ways, call entry by a call-taker, the console lock, review views and a records request, the mobile terminal, mark-outs and status checks, and **three emulated monitors**, each screen landing on its own, the selection shared across windows.
+- `make e2e`: Playwright against a real bitdispatcher with demo data and the BitVoice simulator: sign-in, call to incident to dispatch, emergencies both ways, call entry by a call-taker, the console lock, review views and a records request, the mobile terminal with messages and photos, call-taking protocols, a correction and a replay of a closed incident, mark-outs and status checks, and **three emulated monitors**, each screen landing on its own, the selection shared across windows.
 - Golden files for i3 and EIDO generated by BitVoice's own encoder.
 
 ## Status
@@ -182,8 +195,9 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 - **Tested against simulators and samples:** NCIC (training simulator), BitVoice (its simulator and its encoder's output, not yet a live BitVoice), ALI (sample spills).
 - **Multiple monitors** tested with Chrome's emulated monitors, not yet on a real console's monitors.
 - **Transcripts, crash data and drones** tested with the simulator's callers, crash notifications and drone system, not yet a live speech-to-text engine, telematics provider or drone system. The phrasebook translates the language of emergencies, not everything; the injury-risk rating and the quality review are aids, not judgements.
-- **Sign-in and records.** The one-time codes, console lock and audit records have not been reviewed against the CJIS Security Policy. The location hook for providers such as RapidSOS is a documented contract ([docs/LOCATION-HOOK.md](docs/LOCATION-HOOK.md)), not yet connected to any provider. The sample redaction rules and example guidance are placeholders, not legal advice or approved text; the optional language model for redactions is off by default and, when on, sends the record's text to that model. The training board is not a backup.
+- **Sign-in and records.** The one-time codes, console lock, sign-in notice and audit records have not been reviewed against the CJIS Security Policy; there is no FBI certification for software, and no FIPS 140-validated crypto module is used yet. What it does towards each control, and the gaps, are in [docs/COMPLIANCE.md](docs/COMPLIANCE.md). Supplemental location by HELD (RapidSOS's clearinghouse or a state LIS) and the location hook are tested against stand-ins, not RapidSOS itself ([docs/SUPPLEMENTAL-LOCATION.md](docs/SUPPLEMENTAL-LOCATION.md)). The sample redaction rules and example guidance are placeholders, not legal advice or approved text; the optional language model for redactions is off by default and, when on, sends the record's text to that model. The training board is not a backup.
 - **Views.** EagleView is built to its published Imagery API and tested against a stand-in, not yet against EagleView itself (that needs an agency's licence or EagleView's sandbox credentials). Panoramax is tested live; Mapillary against a stand-in. Looking a place up tells the provider where the incident is, so each provider is off until an administrator turns it on.
+- **New integrations, tested against stand-ins only:** NERIS (its test environment needs an agency's credentials), neighbouring agencies' CADs (bitdispatcher to bitdispatcher, not another vendor's CAD), station alerting controllers, alarm companies (a JSON contract; the APCO/CSAA ASAP standard is not implemented because its schema is not public), plate readers and gunshot detection (a JSON contract, not Flock's or SoundThinking's own APIs), ProQA (a determinant hook, not a certified ProQA interface), PulsePoint (a documented feed, not PulsePoint's partner interface). Auto-dispatch is off for every call type until an administrator turns it on. See [docs/ALERTS.md](docs/ALERTS.md), [docs/CAD-TO-CAD.md](docs/CAD-TO-CAD.md), [docs/STATION-ALERTING.md](docs/STATION-ALERTING.md), [docs/PROTOCOLS.md](docs/PROTOCOLS.md), [docs/PUBLIC-FEED.md](docs/PUBLIC-FEED.md).
 - **Open decisions:** when an ALI-only call (no hang-up signal) should end; whether agency scripts may reach outside the sandbox; VGIN's terms for its data outside Virginia.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design, the rules and the phases, and [docs/OPERATIONS.md](docs/OPERATIONS.md) for the ledger and how reports count.
@@ -196,6 +210,8 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the design, the rules and the phases, a
 | [**Design**](docs/DESIGN.md) | What bitdispatcher is, its rules, its scope and the phases |
 | [**Operations**](docs/OPERATIONS.md) | The event ledger, the reports and their counting rules |
 | [**BitVoice**](docs/BITVOICE.md) | Every BitVoice hook and how bitdispatcher uses it |
+| [**Compliance**](docs/COMPLIANCE.md) | What can be certified, the CJIS control areas, what bitdispatcher does and the gaps |
+| [**Integrations**](docs/) | Alerts, CAD-to-CAD, station alerting, protocols, the public feed, supplemental location, NERIS, views |
 
 ## FAQ
 

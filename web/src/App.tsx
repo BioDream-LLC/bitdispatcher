@@ -15,6 +15,7 @@ const Board = lazy(() => import('./console/Board'))
 const Review = lazy(() => import('./records/Review'))
 const Records = lazy(() => import('./records/Records'))
 const Taker = lazy(() => import('./taker/Taker'))
+const Station = lazy(() => import('./Station'))
 
 const wait = (what: string) => <div className="grid h-full place-items-center text-sm text-slate-500">Loading {what}…</div>
 
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="/records" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />
           <Route path="/records/:id" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />
           <Route path="/admin/*" element={<Admin />} />
+          <Route path="/station" element={<Suspense fallback={wait('the station screen')}><Station /></Suspense>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       ) : (

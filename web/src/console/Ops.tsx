@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ClipboardCheck, Hospital, Plus, Siren, X } from 'lucide-react'
+import { ClipboardCheck, Hospital, MessageSquare, Plus, Send, Siren, X } from 'lucide-react'
 import { api, errText } from '../api'
 import { can, useStore } from '../store'
 import { ago, cx, hhmm, useNow } from '../util'
-import type { Facility, View } from '../types'
+import type { Facility, UnitMessage, View } from '../types'
 
 /** The passdown log: what this shift needs to know from the last, and what the next needs from this one. */
 export function Passdown({ view }: { view: View }) {
@@ -112,6 +112,79 @@ export function Facilities({ view }: { view: View }) {
             )}
           </li>
         ))}
+      </ul>
+    </section>
+  )
+}
+
+const GROUPS = ['ALL', 'ALL-FIRE', 'ALL-EMS', 'ALL-POLICE']
+
+/** Messages to and from the crews' terminals. What units send to dispatch stays bold until a dispatcher
+ * reads it; urgent ones are red. Write to a unit, several, a discipline or everyone (or MSG on the command line). */
+export function Messages({ view }: { view: View }) {
+  const me = useStore((s) => s.me)
+  const selected = useStore((s) => s.selected)
+  const now = useNow()
+  const [to, setTo] = useState('')
+  const [text, setText] = useState('')
+  const [urgent, setUrgent] = useState(false)
+  const [all, setAll] = useState(false)
+  const list = (view.messages ?? []).slice().reverse()
+  const unread = list.filter((m) => m.fromUnit && m.to.includes('DISPATCH') && !m.read?.DISPATCH)
+  const shown = all ? list : list.slice(0, 6)
+  const send = async () => {
+    const dest = to.split(/[\s,]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)
+    try {
+      await api.post('/messages', { to: dest, incident: dest.length ? '' : selected ?? '', text, urgent })
+      setText('')
+      setUrgent(false)
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  const read = (m: UnitMessage) => api.post(`/messages/${m.id}/read`).catch(() => {})
+  // A new message from a crew is announced once.
+  const seen = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (seen.current === null) { seen.current = new Set(unread.map((m) => m.id)); return }
+    for (const m of unread) {
+      if (seen.current.has(m.id)) continue
+      seen.current.add(m.id)
+      ;(m.urgent ? toast.error : toast.info)(`${m.from}: ${m.text}`, { description: m.incident ? `on ${m.incident}` : 'message from a unit' })
+    }
+  }, [unread])
+  if (!can.dispatch(me)) return null
+  return (
+    <section aria-label="Messages">
+      <h3 className="mb-1 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <MessageSquare size={12} aria-hidden /> Messages
+        {unread.length > 0 ? <span className="chip bg-sky-500 font-mono text-white">{unread.length} new</span> : <span className="font-mono text-slate-300">{list.length}</span>}
+        {list.length > 6 && <button className="btn btn-ghost ml-auto h-5 px-1 text-[10px] normal-case tracking-normal" onClick={() => setAll(!all)}>{all ? 'Fewer' : 'All today'}</button>}
+      </h3>
+      <form className="mb-1 grid grid-cols-[6.5rem_1fr_auto_auto] gap-1" onSubmit={(e) => { e.preventDefault(); if (text.trim()) send() }}>
+        <input className="input h-7 font-mono text-xs uppercase" list="msg-to" value={to} onChange={(e) => setTo(e.target.value)} placeholder={selected ? `on ${selected.slice(-6)}` : 'E1 M2, ALL'} aria-label="To (units, ALL, ALL-FIRE…)" title="Units, ALL, ALL-FIRE, ALL-EMS or ALL-POLICE; empty: the units on the selected incident" />
+        <datalist id="msg-to">{[...GROUPS, ...view.units.map((u) => u.id)].map((x) => <option key={x} value={x} />)}</datalist>
+        <input className="input h-7 text-xs" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Message to the terminals" aria-label="Message" />
+        <label className={cx('btn h-7 px-1.5 text-[10px]', urgent && 'bg-rose-600 text-white')} title="Urgent: the terminal shows it full width and sounds"><input type="checkbox" className="sr-only" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} />!</label>
+        <button className="btn h-7 px-2 text-xs" disabled={!text.trim() || (!to.trim() && !selected)} aria-label="Send"><Send size={12} aria-hidden /></button>
+      </form>
+      <ul className="space-y-0.5 text-xs">
+        {shown.map((m) => {
+          const isNew = m.fromUnit && m.to.includes('DISPATCH') && !m.read?.DISPATCH
+          const readBy = Object.keys(m.read ?? {}).filter((k) => k !== 'DISPATCH')
+          return (
+            <li key={m.id}>
+              <button type="button" className={cx('block w-full rounded px-1 text-left hover:bg-slate-800/60', isNew && 'bg-sky-950/60 font-semibold', m.urgent && 'text-rose-200')} onClick={() => isNew && read(m)} title={isNew ? 'Mark read' : undefined}>
+                <span className="font-mono text-[10px] text-slate-500">{hhmm(m.at)}</span>{' '}
+                <span className="font-mono text-slate-300">{m.from} → {m.to.join(', ')}</span>{m.incident && <span className="font-mono text-[10px] text-slate-500"> {m.incident}</span>}{' '}
+                <span className={m.urgent ? 'text-rose-200' : 'text-slate-100'}>{m.urgent && '! '}{m.text}</span>
+                {!m.fromUnit && readBy.length > 0 && <span className="ml-1 text-[10px] text-emerald-400">read by {readBy.join(', ')}</span>}
+                {!m.fromUnit && readBy.length === 0 && now - new Date(m.at).getTime() > 120000 && <span className="ml-1 text-[10px] text-amber-400">not read yet</span>}
+              </button>
+            </li>
+          )
+        })}
+        {!list.length && <li className="text-[11px] text-slate-500">No messages today. Write one here or with MSG E1 / text.</li>}
       </ul>
     </section>
   )

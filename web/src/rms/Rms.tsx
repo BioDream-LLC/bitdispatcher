@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BadgeCheck, CheckCircle2, CircleAlert, FilePlus2, Plus, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, CheckCircle2, CircleAlert, FilePlus2, Plus, Send, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
 import type { Session } from '../types'
@@ -339,6 +339,7 @@ function Editor({ number, meta, me, onSaved }: { number: string; meta: Meta; me:
           ))}
         </Box>
         <Box title="Narrative">
+          {!dis && r.incident && <DraftButton incident={r.incident} has={!!r.narrative?.trim()} onDraft={(t) => up({ narrative: t })} />}
           <textarea className="input min-h-64 font-[inherit] text-sm leading-relaxed" disabled={dis} value={r.narrative ?? ''} onChange={(e) => up({ narrative: e.target.value })} aria-label="Narrative" placeholder="What happened, in your words." />
         </Box>
       </div>
@@ -414,5 +415,30 @@ function Box({ title, add, children }: { title: string; add?: () => void; childr
         {add && <button className="btn ml-auto h-6 px-1.5 py-0 text-[11px] normal-case tracking-normal" onClick={add}><Plus size={11} aria-hidden /> Add</button>}</h2>
       {children}
     </section>
+  )
+}
+
+/** DraftButton fills the narrative with a first draft from the incident's record (or the language model,
+ * when the agency turned it on, from the same facts). It is a proposal: read it, correct it, finish it. */
+function DraftButton({ incident, has, onDraft }: { incident: string; has: boolean; onDraft: (t: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [by, setBy] = useState('')
+  return (
+    <div className="mb-1.5 flex items-center gap-2 text-xs">
+      <button className="btn h-7 text-xs" disabled={busy} onClick={async () => {
+        if (has && !confirm('Replace the narrative with a draft from the incident?')) return
+        setBusy(true)
+        try {
+          const d = await api.post<{ text: string; by: string }>(`/incidents/${encodeURIComponent(incident)}/draft-narrative`)
+          onDraft(d.text)
+          setBy(d.by)
+        } catch (e) {
+          toast.error(errText(e))
+        } finally {
+          setBusy(false)
+        }
+      }}><Sparkles size={12} aria-hidden /> {busy ? 'Drafting…' : 'Draft from the incident'}</button>
+      {by && <span className="rounded bg-amber-500/15 px-2 py-0.5 text-amber-200">A draft {by === 'model' ? 'written by the language model' : 'from the record'}: check every line and finish it in your words.</span>}
+    </div>
   )
 }

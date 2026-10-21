@@ -6,7 +6,7 @@ import { Field, Modal, Priority } from '../ui'
 import type { Requirement, View } from '../types'
 import { Page, Table } from './Admin'
 
-type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; notify?: string[]; group?: string; isNew: boolean }
+type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string; isNew: boolean }
 
 // importCSV reads call types from a spreadsheet: code, name, priority, discipline, group, run card
 // ("2 engine; 1 ladder"), notify ("Fire marshal; Animal control"). A header row is skipped.
@@ -32,7 +32,7 @@ export default function CallTypes({ view }: { view: View }) {
   const save = async () => {
     if (!d) return
     try {
-      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, notify: d.notify, group: d.group })
+      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, autoDispatch: !!d.autoDispatch && d.priority >= 3, notify: d.notify, group: d.group })
       toast.success(`Call type ${d.code.toUpperCase()} saved`)
       setD(null)
     } catch (e) {
@@ -65,7 +65,7 @@ export default function CallTypes({ view }: { view: View }) {
         {view.callTypes.map((c) => (
           <tr key={c.code} className="cursor-pointer hover:bg-slate-800/50" onClick={() => open(c.code)}>
             <td className="px-3 py-1.5 font-mono font-bold text-slate-100">{c.code}</td>
-            <td className="px-3 text-slate-200">{c.name}{c.critical && <span className="chip ml-1 bg-teal-500/20 text-teal-200">critical</span>}{c.drone && <span className="chip ml-1 bg-cyan-500/20 text-cyan-200">drone</span>}</td>
+            <td className="px-3 text-slate-200">{c.name}{c.critical && <span className="chip ml-1 bg-teal-500/20 text-teal-200">critical</span>}{c.drone && <span className="chip ml-1 bg-cyan-500/20 text-cyan-200">drone</span>}{c.autoDispatch && <span className="chip ml-1 bg-amber-500/20 text-amber-200">auto-dispatch</span>}</td>
             <td className="px-3"><Priority p={c.priority} /></td>
             <td className="px-3 text-slate-400">{c.discipline}</td>
             <td className="px-3 font-mono text-xs text-slate-300">{(c.runCard ?? []).map((r) => `${r.count}×${r.capability}`).join('  ') || <span className="text-slate-500">none: chosen by hand</span>}</td>
@@ -114,6 +114,10 @@ export default function CallTypes({ view }: { view: View }) {
             <label className="flex items-start gap-2 text-sm text-slate-300 sm:col-span-2">
               <input type="checkbox" className="mt-1" checked={!!d.drone} onChange={(e) => setD({ ...d, drone: e.target.checked })} />
               <span>Send a drone<span className="block text-xs text-slate-500">With the drone launch rule on (Integrations), these ask for one by themselves</span></span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-slate-300 sm:col-span-2">
+              <input type="checkbox" className="mt-1" disabled={d.priority < 3} checked={!!d.autoDispatch && d.priority >= 3} onChange={(e) => setD({ ...d, autoDispatch: e.target.checked })} />
+              <span>Auto-dispatch<span className="block text-xs text-slate-500">{d.priority < 3 ? 'Only priority 3 to 5 types' : 'When no dispatcher has sent units in time (Settings), the recommended units go by themselves; only a complete recommendation without warnings'}</span></span>
             </label>
             <div className="sm:col-span-4">
               <span className="label">Run card</span>

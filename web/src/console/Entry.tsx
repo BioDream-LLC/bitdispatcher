@@ -23,11 +23,18 @@ export default function EntryFacts({ inc, view }: { inc: Incident; view: View })
   const decide = (accept: boolean) => api.post(`/incidents/${inc.number}/location`, { accept, why: accept ? 'newer caller location (dispatcher)' : 'kept (dispatcher)' }).catch((e) => toast.error(errText(e)))
   const done = (id: string) => api.put(`/incidents/${inc.number}/contacts/${id}`, { status: 'done' }).catch((e) => toast.error(errText(e)))
   const setTG = (tg: string) => api.put(`/incidents/${inc.number}/talkgroup`, { talkgroup: tg }).catch((e) => toast.error(errText(e)))
-  const any = mods.length || changedRecently || inc.newLocation || inc.callerAt || persons.length || vehicles.length || pending.length || bolo.length || tgs.length
+  const det = inc.protocol?.determinant
+  const any = det || mods.length || changedRecently || inc.newLocation || inc.callerAt || persons.length || vehicles.length || pending.length || bolo.length || tgs.length
   return (
     <>
       {any ? (
         <section aria-label="Call entry" className="space-y-1 text-xs">
+          {det && (
+            <div className="flex flex-wrap items-center gap-1.5" title={(det.instructions ?? []).join(' · ')}>
+              <span className="chip bg-sky-600 font-mono text-white">{det.code}</span><span className="text-slate-100">{det.text}</span>
+              <span className="text-slate-500">{inc.protocol?.system ? `from ${inc.protocol.system}` : 'protocol'}</span>
+            </div>
+          )}
           {mods.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {mods.map((m) => <span key={m.code} className={cx('chip', 'safety' in m && m.safety ? 'bg-rose-500 text-white' : 'bg-sky-500/20 text-sky-200')}>{'safety' in m && m.safety && <ShieldAlert size={10} aria-hidden />}{m.name}</span>)}

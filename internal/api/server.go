@@ -28,21 +28,27 @@ import (
 	"github.com/biodream-llc/bitdispatcher/internal/imagery"
 	"github.com/biodream-llc/bitdispatcher/internal/ledger"
 	"github.com/biodream-llc/bitdispatcher/internal/mapdata"
+	"github.com/biodream-llc/bitdispatcher/internal/neris"
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
 	"github.com/biodream-llc/bitdispatcher/internal/views"
 )
 
 // Integrations is the integration configuration kept in the data directory (with its secrets, mode 0600).
 type Integrations struct {
-	BitVoice  bitvoice.Config `json:"bitvoice"`
-	ALIListen string          `json:"aliListen"` // host:port to accept ALI spills on; empty: off
-	Extra     Extra           `json:"extra"`     // hooks, the drone system, the language model
-	Views     views.Config    `json:"views"`     // pictures of a place from the side
+	BitVoice   bitvoice.Config `json:"bitvoice"`
+	ALIListen  string          `json:"aliListen"`  // host:port to accept ALI spills on; empty: off
+	Extra      Extra           `json:"extra"`      // hooks, the drone system, the language model
+	Views      views.Config    `json:"views"`      // pictures of a place from the side
+	NERIS      neris.Config    `json:"neris"`      // fire and EMS incidents to the national reporting system
+	Partners   []Partner       `json:"partners"`   // neighbouring agencies' CADs (CAD-to-CAD)
+	PublicFeed PublicFeed      `json:"publicFeed"` // what is happening, for the public and apps like PulsePoint
+	LIS        LIS             `json:"lis"`        // a location server asked by HELD (supplemental location)
 }
 
 // Server is the API.
 type Server struct {
 	enrol          enrolCodes // one-time workstation enrolment codes
+	neris          *neris.Client
 	Eng            *cad.Engine
 	Auth           *auth.Store
 	BV             *bitvoice.Bridge
@@ -324,6 +330,17 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/auth/login", s.signIn)
 	s.entryRoutes()
 	s.viewRoutes()
+	s.messageRoutes()
+	s.alertRoutes()
+	s.nerisRoutes()
+	s.stationRoutes()
+	s.partnerRoutes()
+	s.protocolRoutes()
+	s.fileRoutes()
+	s.publicFeedRoutes()
+	s.draftRoutes()
+	s.replayRoutes()
+	s.lisRoutes()
 	s.recordsRoutes()
 	s.lockRoutes()
 	s.workstationRoutes()
@@ -348,6 +365,18 @@ func (s *Server) routes() {
 	s.handle("POST /api/incidents/{n}/dispatch", auth.Dispatcher, s.dispatch)
 	s.handle("POST /api/incidents/{n}/close", auth.Dispatcher, s.closeIncident)
 	s.handle("POST /api/incidents/{n}/reopen", auth.Supervisor, s.reopen)
+	s.handle("POST /api/incidents/{n}/correct", auth.Supervisor, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+		var c cad.Correction
+		if !readJSON(w, r, &c) {
+			return
+		}
+		ch, err := s.Eng.CorrectIncident(a, r.PathValue("n"), c)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"changes": ch})
+	})
 	s.handle("POST /api/units/{id}/status", auth.Dispatcher, s.unitStatus)
 	s.handle("POST /api/units/{id}/position", auth.Dispatcher, s.unitPosition)
 	s.handle("POST /api/command", auth.Dispatcher, s.command)
@@ -495,6 +524,12 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	if d, ok := s.Auth.Demo(); ok {
 		out["demo"] = map[string]any{"name": d.Name, "role": d.Role, "duties": d.Duties}
 	}
+	// The agency's system use notice, shown before anyone signs in.
+	s.Eng.Read(func(st *cad.State) {
+		if b := strings.TrimSpace(st.Settings.SignInNotice); b != "" {
+			out["notice"] = b
+		}
+	})
 	writeJSON(w, 200, out)
 }
 
@@ -508,19 +543,21 @@ type UnitView struct {
 
 // View is everything the dispatcher screen shows, in one document.
 type View struct {
-	ServerTime  time.Time        `json:"serverTime"`
-	Seq         uint64           `json:"seq"`
-	Settings    cad.Settings     `json:"settings"`
-	Stations    []*cad.Station   `json:"stations"`
-	Units       []UnitView       `json:"units"`
-	CallTypes   []*cad.CallType  `json:"callTypes"`
-	Incidents   []*cad.Incident  `json:"incidents"`
-	Calls       []*cad.Call      `json:"calls"`
-	Emergencies []*cad.Emergency `json:"emergencies"`
-	Health      HealthView       `json:"health"`
-	PlaceViews  bool             `json:"placeViews,omitempty"` // a provider of pictures from the side is on
-	Verbs       []cad.Verb       `json:"verbs"`
-	Statuses    []string         `json:"statuses"`
+	ServerTime    time.Time           `json:"serverTime"`
+	Seq           uint64              `json:"seq"`
+	Settings      cad.Settings        `json:"settings"`
+	Stations      []*cad.Station      `json:"stations"`
+	Units         []UnitView          `json:"units"`
+	CallTypes     []*cad.CallType     `json:"callTypes"`
+	Incidents     []*cad.Incident     `json:"incidents"`
+	Calls         []*cad.Call         `json:"calls"`
+	Emergencies   []*cad.Emergency    `json:"emergencies"`
+	Health        HealthView          `json:"health"`
+	PlaceViews    bool                `json:"placeViews,omitempty"` // a provider of pictures from the side is on
+	Messages      []*cad.Message      `json:"messages"`             // the last day's messages to and from units
+	StationAlerts []*cad.StationAlert `json:"stationAlerts"`        // the last day's tone-outs
+	Verbs         []cad.Verb          `json:"verbs"`
+	Statuses      []string            `json:"statuses"`
 	// What is known about each incident's place: premises (hazards first) and the earlier system's
 	// incidents there.
 	Premises map[string][]*cad.Premise `json:"premises"`
@@ -548,9 +585,11 @@ type HealthView struct {
 	Site     string           `json:"site,omitempty"`
 	Sites    []PeerHealth     `json:"sites,omitempty"`
 	Advisory *advisory.Status `json:"advisory,omitempty"`
-	Drone    bool             `json:"drone"` // a drone system is configured
-	Hooks    bool             `json:"hooks"` // the inbound hooks are on
-	Model    bool             `json:"model"` // a language model translates
+	Drone    bool             `json:"drone"`         // a drone system is configured
+	Hooks    bool             `json:"hooks"`         // the inbound hooks are on
+	Model    bool             `json:"model"`         // a language model translates
+	NERIS    bool             `json:"neris"`         // fire and EMS incidents go to NERIS
+	LIS      string           `json:"lis,omitempty"` // the location server's name, when one is on
 }
 
 // ALIHealth is the ALI listener's health.
@@ -576,7 +615,7 @@ func (s *Server) health() HealthView {
 	s.Eng.Read(func(st *cad.State) { seq = st.Seq })
 	x := s.extra()
 	return HealthView{BitVoice: s.BV.Health(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth(),
-		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != ""}
+		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig())}
 }
 
 func (s *Server) view() ([]byte, error) {
@@ -588,6 +627,8 @@ func (s *Server) view() ([]byte, error) {
 	s.Eng.Read(func(st *cad.State) {
 		v := View{ServerTime: now.UTC(), Seq: st.Seq, Settings: st.Settings, Health: h, PlaceViews: vc.Any() || vc.GoogleLink, Verbs: cad.Verbs, Statuses: cad.Statuses,
 			Stations: []*cad.Station{}, Units: []UnitView{}, CallTypes: []*cad.CallType{}, Incidents: []*cad.Incident{}, Calls: []*cad.Call{}, Emergencies: []*cad.Emergency{}}
+		v.Messages = floorMessages(st, now)
+		v.StationAlerts = stationAlertsView(st, now)
 		for _, x := range st.Stations {
 			v.Stations = append(v.Stations, x)
 		}
@@ -1530,6 +1571,12 @@ func (s *Server) Run(ctx context.Context) {
 	go s.runSites(ctx)
 	go s.droneRule(ctx)
 	go s.endDataCalls(ctx)
+	go s.alarmAnswers(ctx)
+	go s.nerisAuto(ctx)
+	go s.stationAlerter(ctx)
+	go s.publicFeedPusher(ctx)
+	go s.autoDispatcher(ctx)
+	go s.lisAuto(ctx)
 	go s.policyWatch(ctx)
 	go s.translator(ctx)
 	if s.Advisory != nil {

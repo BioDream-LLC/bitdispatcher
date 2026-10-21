@@ -8,13 +8,13 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'signin', 'taker', 'resources', 'console', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'command', 'keys'] },
+    ids: ['start', 'signin', 'taker', 'resources', 'console', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'messages', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
     ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
-    ids: ['admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'help'] },
+    ids: ['admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
 
 export const manual: Article[] = [
@@ -143,12 +143,16 @@ Choose the disciplines across the top, or open it from Screens with them. **Full
 - Its [transcript](#transcript) and what was heard, [translation](#translation), the [device location and floor](#caller-location), [crash data](#crash), callers [grouped](#grouping) and [non-emergency](#nonemergency) calls are described in their own chapters.`,
   },
   {
-    id: 'incidents', title: 'Incidents', keys: 'incident create new close reopen priority note narrative timeline disposition',
+    id: 'incidents', title: 'Incidents', keys: 'incident create new close reopen replay playback correct correction amend edit closed priority note narrative timeline disposition',
     body: `**New incident**: \`F2\`, the New button, + Incident on a call, right-click on the map (the address is filled in), a search result's New incident, or \`NEW SF 2001 Crystal Spring Ave\` on the command line. An address the recorded map knows exactly is placed on the map at once, so units are ranked by road straight away; anything else stays text to be placed.
 
 The incident panel shows the recommendation, the units on it with their times, the caller and the timeline. Notes (\`N text\`) and priority notes (\`PN text\`) go on the timeline; priority notes are shown to every dispatcher and unit.
 
-**Close** with a disposition (\`CL Handled\`); units still on it become available. Supervisors can reopen (\`RO #26-000123 reason\`).`,
+**Close** with a disposition (\`CL Handled\`); units still on it become available. Supervisors can reopen (\`RO #26-000123 reason\`).
+
+**Correct the record** (supervisors, on a closed incident) changes the call type, priority, disposition, address or a unit's times without reopening it: say why, and the timeline keeps what each was. Reports already sent (NERIS, NIBRS) are sent again by hand.
+
+**Replay** (supervisors, on a closed incident) plays it back from the ledger: the units move on the map along their recorded positions (about every 30 seconds) while the timeline fills in, at 10× to 120×, with a slider to any moment.`,
   },
   {
     id: 'recommend', title: 'Unit recommendations', keys: 'recommend run card closest unit drive time routing eta',
@@ -265,6 +269,58 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 | \`F1\`–\`F6\` (mobile terminal) | En route, on scene, transporting, at hospital, available, out of service |`,
   },
   {
+    id: 'files', title: 'Files and photos on an incident', keys: 'file attachment photo picture upload document pdf video audio evidence camera scene',
+    body: `An incident keeps files: a crew's photos of the scene, a PDF, an audio or video clip.
+
+- **Add**: on the incident panel, **Add** (with a caption if you like); on the mobile terminal, **Photo or file** opens the camera. Crews add to incidents they are on. Up to 25 MB each: pictures, PDF, plain text, MP3, WAV, MP4, WebM. The server goes by what the file is, not its name.
+- Pictures show as thumbnails (click for full size); others open or download. Each file is on the timeline with who added it.
+- Each file's SHA-256 is in the ledger: a file changed on disk is refused, not shown.
+- A supervisor removes a file with why. It stays in the record, hidden from everyone below supervisor.`,
+  },
+  {
+    id: 'cad-to-cad', title: 'Incidents with neighbouring agencies', keys: 'cad to cad cad-to-cad neighbouring agency mutual aid eido interoperability county line send share',
+    body: `Incidents go to and come from neighbouring agencies' CADs as EIDOs, the NENA standard (Admin › Integrations › Neighbouring agencies; docs/CAD-TO-CAD.md).
+
+- **Send**: on an open incident, **Send to a neighbouring agency…**, choose the agency and say why (*mutual aid, need a ladder*; *on your side of the line*). It goes with the location, the callback, our units on it and the notes; the timeline says it was sent.
+- **Receive**: what a neighbour sends arrives in the 911 calls list as a call from that agency, data only, with their incident number, type and notes. Make the incident from it or attach it as from any call.
+- Each send is a press: closing and unit status do not flow back on their own yet.`,
+  },
+  {
+    id: 'station', title: 'The station screen and toning out', route: '/station', keys: 'station alerting tone out tones firehouse quarters voice alert speaker phoenix locution acknowledge',
+    body: `When units are dispatched, their stations are toned out (where an administrator turned it on in Integrations). In the firehouse, a screen on a read-only account at **#/station** (choose the station once; it is remembered) shows the station's units and their statuses, and on an alert:
+
+- rising **tones**, twice as many for a priority 1, then the call **read aloud** twice: the units, the call type and the street;
+- the call in large type: priority, type, address, the units, the latest priority notes;
+- **Acknowledge** stops it and puts *ST1 acknowledged the alert* on the incident; **Read it again** repeats it.
+
+Press **Press to turn the sound on** once after the screen opens (browsers play sound only after a press). The inactivity lock leaves a station screen on a read-only account alone.
+
+- \`TONE\` on the command line tones out the stations of the units on the selected incident again (\`TONE E1\`, \`TONE #26-000123\`); each tone-out is on the incident's timeline.
+- An alerting controller from a vendor gets the same alert at its address (docs/STATION-ALERTING.md).`,
+  },
+  {
+    id: 'alerts', title: 'Alarms, plate readers and gunshot detection', keys: 'alarm alarms asap alarm company central station plate reader lpr flock hotlist gunshot shotspotter soundthinking camera alert',
+    body: `Alarm companies, plate readers and gunshot detection send their alerts to bitdispatcher (Admin › Integrations; the contract is docs/ALERTS.md). Each arrives in the 911 calls list as a call, **data only**, with what it is at a glance: the alarm type and zone, VERIFIED when the alarm company verified it, the plate and its hotlist, the number of rounds.
+
+- Select it: the incident panel shows everything the sender gave (premise, account, permit, keyholder, the operator's call-back line, the camera and heading, a link to the reader's picture).
+- Make the incident from it, or attach it to one, as from any call; the agency's own alarm and shots-fired types are suggested when they exist.
+- An update from the sender changes the same call; a **cancel** from an alarm company goes on the incident as a priority note.
+- Alarm companies are told what became of their alarm: accepted, dispatched, on scene, closed.
+- An alert nobody acts on leaves the queue after 30 minutes; it stays in the ledger.
+
+> ASAP over Nlets, the national standard for alarms, is not connected yet: it needs the standard's schema and the state's message switch.`,
+  },
+  {
+    id: 'messages', title: 'Messages to and from the crews', keys: 'message messages msg text chat silent dispatch terminal mdt unit to unit urgent read receipt self attach take it',
+    body: `Messages go from the floor to the crews' terminals, and from crews to dispatch or to another unit, without the radio.
+
+- **Write** in Messages (Situation panel): to one unit or several (\`E1 M2\`), a discipline (\`ALL-FIRE\`, \`ALL-EMS\`, \`ALL-POLICE\`) or everyone (\`ALL\`). Leave To empty to write to the units on the selected incident. **!** makes it urgent.
+- **Command line**: \`MSG E1 M2 / Stage at the north lot\`, \`MSG ALL-EMS ! Carilion on diversion\`, \`MSG #26-000123 / Caller says the back door is open\`.
+- **From the crews**: messages to dispatch are bold until a dispatcher clicks them, and announced as they arrive. A message on an incident is also written on its timeline.
+- **Read**: the terminal marks a message read when it is shown (an urgent one when the crew presses Got it); the floor sees *read by E1*, or *not read yet* after two minutes.
+- Every message and every read is a ledger event. Crews write to dispatch or to units, never to everyone.`,
+  },
+  {
     id: 'mdt', title: 'Mobile data terminal', route: '/mdt', keys: 'mdt mobile terminal field crew vehicle laptop tablet gps',
     body: `A crew signs in on the vehicle's laptop or tablet with a **field** account (Admin › Users) and the unit's call sign as the position (\`E1\`). The terminal opens at once.
 
@@ -274,11 +330,13 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 - **GPS**: the device's position goes to bitdispatcher as AVL every few seconds (allow location when the browser asks).
 - **Emergency**: hold the button for two seconds. Dispatch sees the emergency banner and acknowledges it.
 - **Photos** on the map, as on the console.
+- **Messages**: what dispatch (or another unit) writes to this unit, with a reply line and quick replies (Copy, Delayed, Need PD…). An urgent message fills the top of the screen and sounds until the crew presses Got it; see [Messages](#messages).
+- **Take it**: where the agency allows crews to attach themselves (Settings › Roles), an available unit takes a waiting incident from the list in one press; it is recorded as a dispatch by the crew, self-attached.
 
 A crew acts only as its own unit. Dispatchers can open the terminal at #/mdt to see what a unit sees (the position names the unit).`,
   },
   {
-    id: 'rms', title: 'Incident reports (RMS)', route: '/rms', keys: 'rms report records nibrs offense victim suspect property narrative approve',
+    id: 'rms', title: 'Incident reports (RMS)', route: '/rms', keys: 'rms report records nibrs offense victim suspect property narrative approve draft ai model',
     body: `Officers and dispatchers write incident reports at #/rms, or with **Report** on an incident (the incident's location and time are filled in). A crew on a mobile terminal writes its own from the car.
 
 - **Sections**: when and where (location type, whether it was cleared), offences, people, property, vehicles and the narrative. Codes are shown in words and picked in one click; the screen asks only for what the offence needs (a weapon for an assault, the method of entry for a burglary, the drug for a seizure, the injury and the relationship to each suspect for a crime against a person).
@@ -290,7 +348,9 @@ A crew acts only as its own unit. Dispatchers can open the terminal at #/mdt to 
 
 Supervisors see **State IBR file** under the list. Choose the month and press **File**: bitdispatcher writes the month's approved reports in Virginia's incident-based reporting format (the FBI's position-based flat file with Virginia's additions, 2025.2 specification): Group A incidents with their offence, property, victim, offender and arrestee segments, Group B arrests, or a zero report when there is nothing. Upload it to the Virginia Crime Repository by the 15th of the next month. Reports that fail the checks are left out and listed. Making the file is a ledger event, with its SHA-256.
 
-> The settings need the agency's nine-character ORI (Admin › Settings). Before the first production upload, the Virginia State Police ask for a test file by email (dart@vsp.virginia.gov).`,
+> The settings need the agency's nine-character ORI (Admin › Settings). Before the first production upload, the Virginia State Police ask for a test file by email (dart@vsp.virginia.gov).
+
+**Draft from the incident** (on a report written from an incident) fills the narrative with a first draft: the type, place, times, units, people, vehicles and notes from the record. With the language model on (Admin › Integrations) the model writes it from the same facts and is told to add nothing, writing *[to be completed]* where something is missing. Either way it is a proposal: check every line and finish it in your words.`,
   },
   {
     id: 'ncic', title: 'NCIC inquiries', keys: 'ncic vcin query wanted person vehicle plate gun article cjis hit confirmation',
@@ -358,7 +418,9 @@ An incident script sees the number, type and its name, priority, status, address
     id: 'admin-calltypes', title: 'Call types and run cards', route: '/admin/calltypes', keys: 'call types run cards priority capability requirement',
     body: `A call type is a kind of incident (\`SF\` structure fire, \`CHEST\` chest pain) with a default priority, a discipline and a run card: how many units of each capability it needs (\"3 × engine, 1 × ladder, 1 × als\"). Recommendations fill the run card. Capabilities come from unit types (Admin › Settings) and units.
 
-**Critical call** puts the people who work one on the supervisor's [care list](#care); **Send a drone** has the drone launch rule ask for a [drone](#drones).`,
+**Critical call** puts the people who work one on the supervisor's [care list](#care); **Send a drone** has the drone launch rule ask for a [drone](#drones).
+
+**Auto-dispatch** (priority 3 to 5 types only): when no dispatcher has sent units within the wait in Settings (60 seconds unless changed), the recommended units go by themselves, logged as *auto-dispatch*. Only a complete recommendation without warnings is sent (a verified location, every line filled); otherwise the timeline says why and a dispatcher sends it. It tries once per incident.`,
   },
   {
     id: 'admin-map', title: 'Recording the map', route: '/admin/map', keys: 'map record openstreetmap geofabrik radius centre photos imagery offline',
@@ -395,7 +457,7 @@ Below the map, **Aerial photos** records photos around the same centre: full det
 Search results from county data are marked as such. ArcGIS layers are read with https only, in batches, so services that cap a query still give everything.`,
   },
   {
-    id: 'admin-settings', title: 'Settings', route: '/admin/settings', keys: 'settings agency timers stale road factor speed tiles shifts unit types mark-outs markout',
+    id: 'admin-settings', title: 'Settings', route: '/admin/settings', keys: 'settings agency timers stale road factor speed tiles shifts unit types mark-outs markout sign-in notice banner cjis auto-dispatch',
     body: `- **Agency** name and incident number prefix.
 - **Status timers**: minutes in each status before the dispatcher is prompted for a status check.
 - **Mark-outs**: the kinds a unit can be marked out for (code, name, status-check minutes, which units, whether it can be pulled for a call). See Police status and mark-outs.
@@ -407,13 +469,18 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 - **Quality review** standards and the questions to listen for ([Quality review](#quality)); **crash data** thresholds ([Vehicle crash data](#crash)); the [line-attack](#tdos) warning level.
 - **Map beyond the recorded area**: the online tile source (fetched and cached by the server, never by browsers), and the map's starting centre and zoom.
 - **Unit types**: code, name, discipline, capabilities, and whether stations keep them covered (move-up suggestions).
-- **Dispositions** an incident can be closed with.`,
+- **Dispositions** an incident can be closed with.
+
+**Sign-in notice** is the system use notice shown on the sign-in page before anyone signs in: authorised use only, use is monitored and recorded (the CJIS Security Policy asks for one). **Auto-dispatch waits** is how long a call of an auto-dispatch type waits for a dispatcher (see Call types).`,
   },
   {
-    id: 'admin-integrations', title: 'Integrations', route: '/admin/integrations', keys: 'integrations bitvoice ali eido radio webhook token certificate views eagleview panoramax mapillary',
+    id: 'admin-integrations', title: 'Integrations', route: '/admin/integrations', keys: 'integrations bitvoice ali eido radio webhook token certificate views eagleview panoramax mapillary neris nfirs fire reporting public feed pulsepoint cpr neighbouring rapidsos held lis supplemental location',
     body: `How bitdispatcher connects to call handling and radio. Each integration shows its live state and a checklist of the hooks in use.
 
 - **BitVoice**: its address and API token, and its certificate pinned with Read it. See [BitVoice](#bitvoice).
+- **Neighbouring agencies**: their CADs, for sending and receiving incidents. See [Incidents with neighbouring agencies](#cad-to-cad).
+- **Supplemental location (RapidSOS, NG9-1-1 LIS)**: a location server asked by HELD for where the caller's phone is: its address and the credentials the provider gives you, **Ask for every new 911 call**, and **Try a number**. The call-taker can press **Ask <name>** on the ANI / ALI panel. Not yet tested against RapidSOS itself (docs/SUPPLEMENTAL-LOCATION.md).
+- **Public incident feed**: open incidents for the public or apps like PulsePoint: hundred-block addresses, points to about 100 m, no callers or notes; optional token and push address; **See what it shows** before turning it on.
 - **EIDO**: the token a call-handling system uses to push EIDO to \`/api/ng911/eido\`.
 - **Radio**: the secret for radio webhooks to \`/api/radio/events\`.
 - **ALI spill**: the TCP address bitdispatcher listens on, and Test.
@@ -425,7 +492,9 @@ Search results from county data are marked as such. ArcGIS layers are read with 
 - **Panoramax**: no key; empty uses the catalogue of every instance, or give the agency's own instance.
 - **Mapillary**: a client token from Mapillary's developer dashboard.
 - **Google Street View link**: a link only.
-- **Test at the map's centre** looks the centre up with each provider that is on and says what came back. Save first.`,
+- **Test at the map's centre** looks the centre up with each provider that is on and says what came back. Save first.
+
+**NERIS** (fire and EMS reporting): the department's NERIS ID (FD and eight digits), a CAD integration's client ID and secret from NERIS, and the dispatch centre's name. With *Send each fire or EMS incident when it closes*, every closed incident with a fire or EMS call type or unit goes to NERIS as a CAD record (call, unit and clear times, the place, the disposition, the notes; police units left out); NERIS keeps it pending until the fire department completes it. **Check the last closed incident** asks NERIS to validate one without keeping it. Supervisors see *NERIS sent* (or why it was refused) on a closed incident, with **Send to NERIS** to send it again; a second send updates the same record. Use NERIS's test environment until NERIS has checked the integration.`,
   },
   {
     id: 'bitvoice', title: 'BitVoice', keys: 'bitvoice call handling integration hooks sse eido radio rebid text video',
@@ -533,6 +602,17 @@ The **due order** is the unit ids in the order they are wanted; add from the lis
 - **Status** is a coloured chip: open (taking patients), on diversion, or closed. A quick button changes it in one click, and the change is an attributed ledger event.
 
 Nothing here decides a destination; it tells the people who do what is open.`,
+  },
+  {
+    id: 'admin-protocols', title: 'Call-taking protocols', route: '/admin/protocols', keys: 'protocol question determinant proqa emd medical priority dispatch call taking script card interview',
+    body: `Your agency's question sets, worked on the call-taker's Entry tab once the call is submitted (docs/PROTOCOLS.md).
+
+- **New protocol** or **Start from the example** (marked *not for use*). Give it an ID, a name and a version, and choose the call types it is offered for.
+- **Questions**: each answer leads to the next question or ends at a **determinant**. **Make first** chooses where it starts.
+- **Determinants**: a code, what it means, the priority and call type it sets (or keeps), and the instructions for the caller, one per line.
+- Tick **Approved for calls** when your medical director or chief has approved it; drafts are not offered. Saving checks that every answer goes somewhere and nothing loops.
+- On a call: one question at a time, answers on buttons or keys 1–9; every answer is on the timeline, and the determinant shows on the dispatcher's incident.
+- Protocol software you license (ProQA and others) can post its determinant to the hook instead; it shows the same way, marked with the system.`,
   },
   {
     id: 'admin-guidance', title: 'Approved guidance', route: '/admin/guidance', keys: 'guidance policy guide prompt checklist passage citation approved resources call taker effective expires supersedes markdown',

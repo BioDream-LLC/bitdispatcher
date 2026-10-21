@@ -7,7 +7,7 @@ import { can, store, useStore } from '../store'
 import { StatusChip } from '../ui'
 import { activity as doing, ago, clock, cx, ms, overdue, statusMeta, typeName, useNow } from '../util'
 import type { Call, Coverage, View } from '../types'
-import { Passdown, BOLOs, Facilities } from './Ops'
+import { Passdown, BOLOs, Facilities, Messages } from './Ops'
 import { CallBox, UnitDetail } from './IncidentPanel'
 
 const LABEL: Record<string, string> = {
@@ -55,6 +55,7 @@ export default function Situation({ view, onCreateFromCall }: { view: View; onCr
           </div>
         )}
         {selUnit && <UnitDetail view={view} id={selUnit} />}
+        <Messages view={view} />
         <Passdown view={view} />
         <BOLOs view={view} />
         <Facilities view={view} />

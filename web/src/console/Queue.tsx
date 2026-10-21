@@ -1,12 +1,12 @@
 import { useDroppable } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { MapPin, MessageSquareText, Phone, PhoneIncoming, Plus, Video, Link2, AlertTriangle, Image as ImageIcon, Car, Languages, Layers, Repeat, PhoneOff, ShieldAlert, Siren } from 'lucide-react'
+import { MapPin, MessageSquareText, Phone, PhoneIncoming, Plus, Video, Link2, AlertTriangle, Image as ImageIcon, Car, Languages, Layers, Repeat, PhoneOff, ShieldAlert, Siren, BellRing } from 'lucide-react'
 import { clusters, floorText, langName, methodText, repeats, type Cluster } from '../dream'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
 import { Priority, StatusChip, Tip } from '../ui'
 import { ago, clock, cx, hasPoint, locText, locationStale, ms, phone, prio, typeName, uncertainty, useNow, overdue } from '../util'
-import type { Call, Incident, Recommendation, View } from '../types'
+import type { Alert, Call, Incident, Recommendation, View } from '../types'
 import { dispatchUnits } from './ask'
 
 function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: View; now: number; onCreate: (c: Call) => void; rep?: number; grouped?: boolean }) {
@@ -33,9 +33,9 @@ function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: Vie
       >
         <div className="flex items-center gap-1.5">
           {ringing ? <PhoneIncoming size={13} className="text-rose-300 live-dot" aria-hidden /> : <Phone size={13} className="text-sky-300" aria-hidden />}
-          <span className="font-mono text-[13px] font-bold text-slate-50">{phone(c.callback) || 'No callback'}</span>
+          <span className="font-mono text-[13px] font-bold text-slate-50">{phone(c.callback) || (c.alert ? c.alert.premise || c.alert.sender : 'No callback')}</span>
           {c.class && <span className="chip bg-slate-800 font-mono text-slate-300">{c.class}</span>}
-          <span className={cx('chip uppercase', ringing ? 'bg-rose-500 text-white' : c.state === 'data' ? 'bg-amber-500/25 text-amber-200' : c.state === 'ended' ? 'bg-slate-700 text-slate-300' : 'bg-sky-500/20 text-sky-300')} title={c.state === 'data' ? 'Data only (no voice): a vehicle crash notification. Attaching it to an incident ends it.' : undefined}>{c.state === 'data' ? 'crash data only' : c.state}</span>
+          <span className={cx('chip uppercase', ringing ? 'bg-rose-500 text-white' : c.state === 'data' ? 'bg-amber-500/25 text-amber-200' : c.state === 'ended' ? 'bg-slate-700 text-slate-300' : 'bg-sky-500/20 text-sky-300')} title={c.state === 'data' ? `Data only (no voice): ${c.alert ? alertName(c.alert) : 'a vehicle crash notification'}. Attaching it to an incident ends it.` : undefined}>{c.state === 'data' ? (c.alert ? `${alertName(c.alert)} · data only` : 'crash data only') : c.state}</span>
           <span className="ml-auto font-mono font-semibold text-slate-300 tnum">{clock(c.start, now)}</span>
         </div>
         <div className="mt-0.5 flex items-start gap-1">
@@ -51,6 +51,7 @@ function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: Vie
           {c.callerName && <span className="truncate text-slate-300">{c.callerName}</span>}
           {c.lang && c.lang !== 'en' && <span className="chip bg-fuchsia-500/20 text-fuchsia-200"><Languages size={10} aria-hidden /> {langName[c.lang] ?? c.lang.toUpperCase()}</span>}
           {c.crashRisk && <span className={cx('chip', c.crashRisk.risk === 'high' ? 'bg-rose-500 text-white' : c.crashRisk.risk === 'medium' ? 'bg-amber-500/25 text-amber-200' : 'bg-slate-800 text-slate-300')}><Car size={10} aria-hidden /> CRASH DATA · {c.crashRisk.risk.toUpperCase()}</span>}
+          {c.alert && <AlertChips a={c.alert} />}
           {(c.details ?? []).filter((d) => d.urgent).slice(0, 3).map((d) => <span key={d.kind + d.text} className="chip bg-rose-500/20 text-rose-200"><ShieldAlert size={10} aria-hidden /> {d.text}</span>)}
           {rep && rep >= 3 ? <span className="chip bg-orange-500/25 text-orange-200" title="Calls from this number in the last ten minutes"><Repeat size={10} aria-hidden /> ×{rep}</span> : null}
           {c.text?.length ? <span className="chip bg-violet-500/20 text-violet-300"><MessageSquareText size={10} aria-hidden /> {c.text.length}</span> : null}
@@ -286,5 +287,23 @@ export default function Queue({ view, onCreateFromCall, onNew, callsOnly }: { vi
       </ul>
       </>}
     </aside>
+  )
+}
+
+export const alertName = (a: Alert) => ({ alarm: 'alarm', lpr: 'plate reader', gunshot: 'gunshot detection', camera: 'camera', cad: 'neighbouring agency', other: 'alert' })[a.kind] ?? 'alert'
+
+/** AlertChips: what an outside alert says, at a glance: the event, verified or cancelled, the plate and its hotlist, the rounds. */
+export function AlertChips({ a }: { a: Alert }) {
+  return (
+    <>
+      <span className={cx('chip', a.kind === 'gunshot' || a.verified ? 'bg-rose-500 text-white' : 'bg-orange-500/25 text-orange-200')}>
+        <BellRing size={10} aria-hidden /> {a.kind === 'lpr' ? `${a.plate ?? ''} ${a.state ?? ''}`.trim() || 'PLATE' : a.kind === 'gunshot' ? `SHOTS${a.rounds ? ` ×${a.rounds}` : ''}` : (a.event || a.kind).toUpperCase()}
+      </span>
+      {a.verified && <span className="chip bg-rose-500/20 text-rose-200">VERIFIED</span>}
+      {a.status === 'cancelled' && <span className="chip bg-emerald-500/20 text-emerald-200">CANCELLED by sender</span>}
+      {a.hotlist && <span className="chip bg-rose-500/20 text-rose-200">{a.hotlist}</span>}
+      {a.zone && <span className="chip bg-slate-800 text-slate-300">zone {a.zone}</span>}
+      <span className="truncate text-slate-500">{a.sender}</span>
+    </>
   )
 }

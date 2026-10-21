@@ -44,6 +44,15 @@ type Extra struct {
 	// FOIAModel lets records requests ask the same model for passages that may be exempt (proposals only,
 	// for a person to decide). Off unless an administrator sets it: the record is sent to the model.
 	FOIAModel bool `json:"foiaModel"`
+	// AlertAnswerURL receives what became of an alarm company's alarms (accepted, dispatched, on scene,
+	// closed), with AlertAnswerToken as Bearer; see docs/ALERTS.md. Empty: no answers are sent.
+	AlertAnswerURL   string `json:"alertAnswerUrl"`
+	AlertAnswerToken string `json:"alertAnswerToken"`
+	// StationAlerts tones out the stations of dispatched units; StationGatewayURL (with its token as
+	// Bearer) receives each alert for a station alerting controller (docs/STATION-ALERTING.md).
+	StationAlerts       bool   `json:"stationAlerts"`
+	StationGatewayURL   string `json:"stationGatewayUrl"`
+	StationGatewayToken string `json:"stationGatewayToken"`
 	// Location providers (a supplemental location service like RapidSOS) post newer caller locations to
 	// /api/hooks/location with the hook token; see docs/LOCATION-HOOK.md. Nothing here is a vendor's API.
 }
@@ -59,6 +68,11 @@ type ExtraView struct {
 	ModelName  string `json:"modelName"`
 	ModelOn    bool   `json:"modelOn"`
 	FOIAModel  bool   `json:"foiaModel"`
+	AlertURL   string `json:"alertAnswerUrl"`
+	AlertToken bool   `json:"alertAnswerTokenSet"`
+	Stations   bool   `json:"stationAlerts"`
+	GatewayURL string `json:"stationGatewayUrl"`
+	GatewayTok bool   `json:"stationGatewayTokenSet"`
 }
 
 var hookActor = cad.Actor{User: "hook"}
@@ -881,7 +895,9 @@ func (s *Server) quality(w http.ResponseWriter, r *http.Request, se *auth.Sessio
 func (s *Server) extraView() ExtraView {
 	x := s.extra()
 	return ExtraView{HookToken: x.HookToken != "", DroneURL: x.DroneURL, DroneToken: x.DroneToken != "", DroneAuto: x.DroneAuto,
-		ModelURL: x.ModelURL, ModelKey: x.ModelKey != "", ModelName: x.ModelName, ModelOn: x.ModelOn, FOIAModel: x.FOIAModel}
+		ModelURL: x.ModelURL, ModelKey: x.ModelKey != "", ModelName: x.ModelName, ModelOn: x.ModelOn, FOIAModel: x.FOIAModel,
+		AlertURL: x.AlertAnswerURL, AlertToken: x.AlertAnswerToken != "",
+		Stations: x.StationAlerts, GatewayURL: x.StationGatewayURL, GatewayTok: x.StationGatewayToken != ""}
 }
 
 func (s *Server) getExtra(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -900,11 +916,16 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 		ModelName  string `json:"modelName"`
 		ModelOn    bool   `json:"modelOn"`
 		FOIAModel  bool   `json:"foiaModel"`
+		AlertURL   string `json:"alertAnswerUrl"`
+		AlertToken string `json:"alertAnswerToken"`
+		Stations   bool   `json:"stationAlerts"`
+		GatewayURL string `json:"stationGatewayUrl"`
+		GatewayTok string `json:"stationGatewayToken"`
 	}
 	if !readJSON(w, r, &b) {
 		return
 	}
-	for _, u := range []string{b.DroneURL, b.ModelURL} {
+	for _, u := range []string{b.DroneURL, b.ModelURL, b.AlertURL, b.GatewayURL} {
 		if u = strings.TrimSpace(u); u != "" && !strings.HasPrefix(u, "https://") && !strings.HasPrefix(u, "http://127.0.0.1") && !strings.HasPrefix(u, "http://localhost") {
 			fail(w, 422, "addresses start with https:// (or http://127.0.0.1 for a program on this server)")
 			return
@@ -928,6 +949,10 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 	keep(&n.Extra.HookToken, b.HookToken)
 	keep(&n.Extra.DroneToken, b.DroneToken)
 	keep(&n.Extra.ModelKey, b.ModelKey)
+	keep(&n.Extra.AlertAnswerToken, b.AlertToken)
+	n.Extra.AlertAnswerURL = strings.TrimSpace(b.AlertURL)
+	keep(&n.Extra.StationGatewayToken, b.GatewayTok)
+	n.Extra.StationAlerts, n.Extra.StationGatewayURL = b.Stations, strings.TrimSpace(b.GatewayURL)
 	n.Extra.DroneURL, n.Extra.DroneAuto = strings.TrimSpace(b.DroneURL), b.DroneAuto
 	n.Extra.ModelURL, n.Extra.ModelName, n.Extra.ModelOn = strings.TrimRight(strings.TrimSpace(b.ModelURL), "/"), strings.TrimSpace(b.ModelName), b.ModelOn
 	n.Extra.FOIAModel = b.FOIAModel

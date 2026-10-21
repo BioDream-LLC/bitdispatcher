@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -22,6 +22,7 @@ import Workstations from './Workstations'
 import Plans from './Plans'
 import Facilities from './Facilities'
 import GuidanceAdmin from './GuidanceAdmin'
+import Protocols from './Protocols'
 import Disclosure from './Disclosure'
 
 // Charts are large; they load when the report is opened.
@@ -45,6 +46,7 @@ const PAGES = [
   { to: 'migrate', label: 'Migration', icon: FileInput, admin: true },
   { to: 'advisory', label: 'Advisory panel', icon: Lightbulb, admin: false },
   { to: 'guidance', label: 'Approved guidance', icon: BookOpen, admin: true },
+  { to: 'protocols', label: 'Call-taking protocols', icon: ListChecks, admin: true },
   { to: 'reports', label: 'Operations report', icon: BarChart3, admin: false },
   { to: 'quality', label: 'Quality review', icon: Award, admin: false },
   { to: 'ledger', label: 'Ledger & audit', icon: Database, admin: false },
@@ -96,6 +98,7 @@ export default function Admin() {
             <Route path="disclosure" element={<Disclosure view={view} />} />
             <Route path="advisory" element={<AdvisoryAdmin />} />
             <Route path="guidance" element={<GuidanceAdmin view={view} />} />
+            <Route path="protocols" element={<Protocols view={view} />} />
             <Route path="gis" element={<GisAdmin />} />
             <Route path="sites" element={<Sites />} />
             <Route path="premises" element={<Premises />} />

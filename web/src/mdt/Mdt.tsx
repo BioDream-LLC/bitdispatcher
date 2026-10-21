@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import IncidentFiles from '../Files'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as maplibregl from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
@@ -12,8 +13,9 @@ import { signOut, useStore } from '../store'
 import { Logo, StatusChip } from '../ui'
 import PremiseBox from '../console/PremiseBox'
 import { ViewsButton } from '../views/PlaceViews'
+import MdtMessages from './Messages'
 import { clock, cx, mi, prio, statusMeta, useNow } from '../util'
-import type { BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, View } from '../types'
+import type { BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, UnitMessage, View } from '../types'
 import { dispatchStyle } from '../console/mapStyle'
 
 maplibregl.setWorkerUrl(workerUrl)
@@ -22,7 +24,7 @@ type MDTView = {
   serverTime: string; unit: Unit; station?: Station; incident?: Incident; typeName?: string; summary?: string; partners: Unit[]; premises?: Premise[]
   emergency?: { key: string; raised: string; ackedBy?: string }; pending: Incident[]; statuses: string[]; bolos?: BOLO[]
   settings: { agency: string; mapCenter: [number, number]; mapZoom: number; avlStaleSeconds: number; markOuts?: MarkOutType[] }
-  health: View['health']; placeViews?: boolean
+  health: View['health']; placeViews?: boolean; messages?: UnitMessage[]; selfAttach?: boolean
 }
 
 // The next status a crew normally gives, so it is the big button.
@@ -194,6 +196,7 @@ export default function Mdt() {
                 )}
                 {m.summary && <p className="mt-2 rounded border border-sky-900/60 bg-sky-950/30 p-2 text-sm leading-snug text-slate-100" aria-label="Summary">{m.summary}</p>}
                 <MdtEntry inc={inc} unit={m.unit.id} />
+                <div className="mt-2"><IncidentFiles inc={inc} big /></div>
                 {(m.premises?.length ?? 0) > 0 && <div className="mt-2"><PremiseBox premises={m.premises} compact /></div>}
                 {inc.location?.lat != null && inc.location.lon != null && (m.placeViews || (m.premises ?? []).length > 0) && (
                   <div className="mt-2"><ViewsButton lat={inc.location.lat} lon={inc.location.lon} premises={m.premises} label="Views of the place · pre-plan photos" className="h-10 w-full justify-center text-base" /></div>
@@ -237,12 +240,21 @@ export default function Mdt() {
                 <div className="mt-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-amber-300">Waiting for a unit ({m.pending.length})</div>
                   <ul className="mt-1 space-y-1 text-sm">
-                    {m.pending.slice(0, 8).map((p) => <li key={p.number} className="flex gap-2"><span className="font-mono font-bold">P{p.priority}</span><span>{p.type}</span><span className="truncate text-slate-400">{p.location?.address}</span></li>)}
+                    {m.pending.slice(0, 8).map((p) => (
+                      <li key={p.number} className="flex items-center gap-2"><span className="font-mono font-bold">P{p.priority}</span><span>{p.type}</span><span className="truncate text-slate-400">{p.location?.address}</span>
+                        {m.selfAttach && u!.status === 'available' && (
+                          <button className="btn ml-auto h-9 shrink-0 px-3 text-sm" onClick={async () => {
+                            try { await api.post('/mdt/attach' + unitParam, { incident: p.number }); load() } catch (e) { setErr(errText(e)) }
+                          }}>Take it</button>
+                        )}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
             </div>
           )}
+          <MdtMessages unit={u!.id} messages={m.messages ?? []} unitParam={unitParam} />
           {moOpen && (
             <div className="mt-auto space-y-2 rounded-lg border border-teal-700 bg-teal-950/30 p-2" aria-label="Mark out">
               <div className="flex items-center gap-2">

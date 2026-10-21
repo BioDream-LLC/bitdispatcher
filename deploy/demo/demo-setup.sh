@@ -22,7 +22,7 @@ echo "simulated BitVoice pinned at $FP"
 # Views of a place from the side: open street photos (Panoramax) and the Street View link. EagleView needs an
 # agency's own licence, so the demo has none.
 api PUT /admin/views '{"panoramaxOn":true,"googleLink":true}' >/dev/null
-api PUT /admin/connections '{"hookToken":"bd_hook_demo","droneUrl":"http://127.0.0.1:9445/launch","droneToken":"bd_drone_demo","droneAuto":true}' >/dev/null
+api PUT /admin/connections '{"hookToken":"bd_hook_demo","droneUrl":"http://127.0.0.1:9445/launch","droneToken":"bd_drone_demo","droneAuto":true,"stationAlerts":true}' >/dev/null
 S=$(api GET /state | jq -c '.settings | .nonEmergencyLines = ["+15408532121"] | .supportLine = "Employee assistance: 540-555-0199 (demo number)"
   | .talkgroups = ["FIRE-DISP","FIRE-OPS2","EMS-1","PD-MAIN","PD-TAC3"]')
 api PUT /admin/settings "$S" >/dev/null
