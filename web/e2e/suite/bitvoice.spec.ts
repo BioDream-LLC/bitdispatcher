@@ -24,16 +24,25 @@ test('a BitVoice call shows its caller-ID check, and a caller photo stays hidden
   const sent = await request.post(`${SIM}/sim/photo?call=${encodeURIComponent(id)}`)
   expect(sent.ok(), await sent.text()).toBeTruthy()
   const { sha256 } = (await sent.json()) as { sha256: string }
+  // bitdispatcher reads the photo's facts from BitVoice when told a photo came.
+  await expect(async () => {
+    const st = (await api.get('/state')) as { calls: (C & { handling?: { evidence?: { items: { sha256: string }[] } } })[] }
+    expect(st.calls.find((c) => c.id === id)?.handling?.evidence?.items.map((i) => i.sha256)).toContain(sha256)
+  }).toPass({ timeout: 15_000, intervals: [500] })
 
   const inc = await api.post('/incidents', { type: 'SICK', call: id, location: { lat: 37.2712, lon: -79.9418, address: '215 Church Ave SW' } })
   expect(inc.ok(), await inc.text()).toBeTruthy()
   const { number } = (await inc.json()) as { number: string }
 
   await signIn(page)
-  await page.getByText(number).first().click()
-  await expect(page.getByText(/number (verified|NOT verified)/).first()).toBeVisible()
+  const panel = page.getByRole('complementary', { name: `Incident ${number}` })
+  await expect(async () => {
+    await page.getByRole('main').or(page.locator('body')).getByText(number, { exact: true }).first().click()
+    await expect(panel).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(panel.getByText(/number (verified|NOT verified)/).first()).toBeVisible()
 
-  const photos = page.getByRole('region', { name: 'Caller photos and clips' })
+  const photos = panel.getByRole('region', { name: 'Caller photos and clips' })
   await expect(photos).toBeVisible({ timeout: 15_000 })
   await expect(photos.getByText(`SHA-256 ${sha256}`)).toBeVisible()
   await expect(photos.getByText(/GPS 3\d\.\d{5}/)).toBeVisible()
