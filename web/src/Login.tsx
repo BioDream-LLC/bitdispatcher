@@ -42,8 +42,19 @@ export default function Login() {
   const [demo, setDemo] = useState<{ name: string; role: string; duties?: Duty[] } | null>(null)
   const [demoDuty, setDemoDuty] = useState<Duty>((localStorage.getItem('bd.demo.duty') as Duty) || 'dispatcher')
   const [notice, setNotice] = useState('')
+  // Ask until the server answers: a page opened while it was restarting (or kept by the offline cache)
+  // would otherwise never offer the demo account or show the notice.
   useEffect(() => {
-    api.get<{ demo?: { name: string; role: string; duties?: Duty[] }; notice?: string }>('/auth/me').then((r) => { setDemo(r.demo ?? null); setNotice(r.notice ?? '') }, () => {})
+    let stop = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const ask = (wait: number) => {
+      api.get<{ demo?: { name: string; role: string; duties?: Duty[] }; notice?: string }>('/auth/me').then(
+        (r) => { if (!stop) { setDemo(r.demo ?? null); setNotice(r.notice ?? '') } },
+        () => { if (!stop) timer = setTimeout(() => ask(Math.min(wait * 2, 30_000)), wait) },
+      )
+    }
+    ask(2000)
+    return () => { stop = true; clearTimeout(timer) }
   }, [])
   useEffect(() => {
     if (need?.code || need?.enrol) codeRef.current?.focus()

@@ -99,7 +99,12 @@ test('a public demonstration account: one button on the sign-in page', async ({ 
   const page = await ctx.newPage()
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
+  // The server does not answer the page's first question (as while it restarts): the button still comes.
+  let refused = 0
+  await page.route('**/api/auth/me', (route) => (refused++ < 2 ? route.abort('connectionrefused') : route.continue()))
   await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Sign in as the demo user' })).toBeVisible({ timeout: 15_000 })
+  expect(refused).toBeGreaterThan(2)
   await page.getByRole('button', { name: 'Sign in as the demo user' }).click()
   await expect(page.getByText('911 CALLS')).toBeVisible()
   await expect(page.getByText(/Demo dispatcher · WEB-/)).toBeVisible()
