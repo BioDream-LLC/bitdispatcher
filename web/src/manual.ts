@@ -172,7 +172,9 @@ The recommended units are picked; **Dispatch** (\`Ctrl Enter\`, or \`REC\`) send
 - **Why**: open a suggestion to see the evidence it relied on (with its source: unit, caller, dispatcher, machine), what it assumed absent, and the rule in plain words.
 - **Cannot determine** is an answer: when sources of equal weight disagree (\"smoke\" and \"no smoke\" from two callers), it says so and you decide.
 - **Accept** runs the suggested command as you (change the type, attach the call, dispatch the recommendation), or just notes it. **Reject** with a one-click reason; it is not shown again. Both are recorded.
-- It advises only. It never merges, retypes, reprioritises or dispatches by itself, and core dispatch works the same when it is off or down.`,
+- It advises only. It never merges, retypes, reprioritises or dispatches by itself, and core dispatch works the same when it is off or down.
+
+When an upgrade supplies a new rule (such as *Silent or abandoned 911 call*), Admin › Advisory panel offers it above the rules: **Add it**, then **Save version**. A saved codebook never changes by itself.`,
   },
   {
     id: 'moveup', title: 'Move-up and cover', keys: 'move up cover coverage station empty relocate post return',
@@ -522,6 +524,8 @@ Delivery failures BitVoice reports show on the Situation panel.
 - Caller video opens blurred and muted; **Reveal** is recorded in BitVoice's exposure record.
 - A text-to-911 call waiting for a call-taker: **Take this text**, then reply in the box.
 - After the call: the recording's name and its summary, marked as written by a language model.
+
+If BitVoice ends a call because **the caller's audio stopped** (the line went silent and no hang-up came), the call says so and the advisory panel raises it as a silent 911 call: call back.
 
 Reports › Operations report shows BitVoice's answer times (the NENA standard: 90% within 15 seconds), who looked at callers' photos and video, and the i3 log events received. The BitVoice light in the status bar turns amber when a PSAP the ESInet routes to is full, down or unstaffed.`,
   },

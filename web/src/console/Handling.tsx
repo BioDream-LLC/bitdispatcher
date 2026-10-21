@@ -71,6 +71,13 @@ export default function HandlingBox({ call }: { call: Call }) {
           <div className="text-[10px] text-slate-500">Written by a language model from the recording: check it against what was said.</div>
         </div>
       )}
+      {h.endCause && (
+        <div className={/audio stopped/i.test(h.endCause) ? 'text-amber-300' : 'text-slate-400'}>
+          Ended: {h.endCause}
+          {h.endedBy && h.endedBy !== 'system' ? ` (by ${h.endedBy})` : ''}
+          {/audio stopped/i.test(h.endCause) ? ': the line went silent without a hang-up. Call back.' : ''}
+        </div>
+      )}
       {h.recording && <div className="text-slate-500">Recorded in BitVoice: <span className="font-mono">{h.recording}</span></div>}
       {h.evidence && h.evidence.items.length > 0 && <EvidenceList call={call} />}
     </div>

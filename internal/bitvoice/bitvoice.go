@@ -195,6 +195,21 @@ func (b *Bridge) setErr(err error) {
 
 // ---- REST ----
 
+type onBehalfKey struct{}
+
+// OnBehalf names the person a request to BitVoice is made for, sent as X-BitVoice-On-Behalf-Of so
+// BitVoice's own records (the 911 exposure log, text calls taken, its audit log) name the dispatcher.
+// BitVoice honours it only from a token made to name the person it acts for, and ignores it otherwise.
+func OnBehalf(ctx context.Context, person string) context.Context {
+	return context.WithValue(ctx, onBehalfKey{}, person)
+}
+
+func setOnBehalf(req *http.Request) {
+	if p, _ := req.Context().Value(onBehalfKey{}).(string); p != "" {
+		req.Header.Set("X-BitVoice-On-Behalf-Of", p)
+	}
+}
+
 func (b *Bridge) do(ctx context.Context, method, path string, body, out any) error {
 	b.mu.Lock()
 	cfg, client := b.cfg, b.client
@@ -217,6 +232,7 @@ func (b *Bridge) do(ctx context.Context, method, path string, body, out any) err
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	setOnBehalf(req)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -478,6 +494,10 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 	case "call.ended":
 		var c CallInfo
 		if json.Unmarshal(env.Data, &c) == nil && c.ID != "" {
+			if c.Cause != "" || c.EndedBy != "" {
+				// Why it ended, kept on the call (BitVoice ends a call whose caller's audio stopped).
+				b.upsertKnown(c.ID, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{EndCause: c.Cause, EndedBy: c.EndedBy}})
+			}
 			b.eng.EndCall(cad.BitVoiceActor, c.ID)
 		}
 	case "emergency.answered":
@@ -604,12 +624,37 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 		b.Radio(env.Type, env.Data, false)
 	case "call.transcript":
 		// Live lines of what is said on a call, when the call-handling system transcribes as it goes.
+		// BitVoice: {call, lines[{speaker ("Caller" or the call-taker's name), side (caller, taker), text, second}]}.
 		var t struct {
-			Call  string               `json:"call"`
-			Lines []cad.TranscriptLine `json:"lines"`
+			Call  string `json:"call"`
+			Lines []struct {
+				Speaker string `json:"speaker"`
+				Side    string `json:"side"`
+				Text    string `json:"text"`
+			} `json:"lines"`
 		}
-		if json.Unmarshal(env.Data, &t) == nil && t.Call != "" && len(t.Lines) > 0 {
-			b.eng.UpsertCall(cad.BitVoiceActor, t.Call, cad.CallData{Source: "bitvoice", Transcript: t.Lines})
+		if json.Unmarshal(env.Data, &t) == nil && t.Call != "" {
+			var lines []cad.TranscriptLine
+			for _, l := range t.Lines {
+				if strings.TrimSpace(l.Text) == "" {
+					continue
+				}
+				sp := l.Side
+				if sp == "" {
+					sp = strings.ToLower(l.Speaker)
+				}
+				if sp != "caller" && sp != "taker" {
+					sp = "other"
+				}
+				at := env.At
+				if at.IsZero() {
+					at = time.Now().UTC()
+				}
+				lines = append(lines, cad.TranscriptLine{At: at, Speaker: sp, Text: strings.TrimSpace(l.Text)})
+			}
+			if len(lines) > 0 {
+				b.upsertKnown(t.Call, cad.CallData{Source: "bitvoice", Transcript: lines})
+			}
 		}
 	case "call.summarized":
 		// BitVoice's transcript of a recorded call, after it ends: kept on the call when CAD knows it.
@@ -734,6 +779,8 @@ type CallInfo struct {
 	To        string    `json:"to"`
 	Start     time.Time `json:"start"`
 	Answer    time.Time `json:"answer"`
+	Cause     string    `json:"cause,omitempty"`   // on call.ended: why it ended
+	EndedBy   string    `json:"endedBy,omitempty"` // on call.ended: caller, callee, system, or a person
 	Screen    *struct {
 		Attest   string `json:"attest"`
 		Verified string `json:"verified"`
@@ -1211,6 +1258,7 @@ func (b *Bridge) Evidence(ctx context.Context, call string, n int) (*http.Respon
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	setOnBehalf(req)
 	return client.Do(req)
 }
 

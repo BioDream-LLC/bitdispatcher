@@ -66,8 +66,16 @@ func main() {
 	consoleUnit := flag.Int("console-unit", 9999, "with -radio: the console's unit ID")
 	radioUnit := flag.Int("unit", 101, "with -radio: the radio's unit ID")
 	emergency := flag.Bool("emergency", true, "with -radio: the radio's call is an emergency")
+	esinetAt := flag.String("esinet", "", "instead of calling: stand in for the ESInet at a trunk's address (host:port), answering the call-handling system's OPTIONS keepalives")
 	after := flag.Duration("after", 5*time.Second, "with -radio: when the radio calls")
 	flag.Parse()
+	if *esinetAt != "" {
+		if err := runESInet(*esinetAt); err != nil {
+			fmt.Fprintln(os.Stderr, "i3caller:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *radioAt != "" {
 		if err := runRadio(*radioAt, *issi, *wacn, *sysID, *consoleUnit, *radioUnit, *emergency, *after); err != nil {
 			fmt.Fprintln(os.Stderr, "i3caller:", err)

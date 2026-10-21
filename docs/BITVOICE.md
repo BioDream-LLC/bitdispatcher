@@ -22,9 +22,14 @@ event through the pull path (section 2), which BitVoice cannot fail to deliver w
 ## 2. What bitdispatcher pulls from BitVoice
 
 bitdispatcher signs in to BitVoice with an API token (`Authorization: Bearer bv_...`, viewer role is
-enough to read; acknowledging radio emergencies needs admin).
+enough to read; acknowledging radio emergencies needs admin). Each request a person causes carries
+`X-BitVoice-On-Behalf-Of: Name (username)`; BitVoice honours it from a token made with "Names the person
+it acts for", so its exposure log, text calls taken and audit log name the dispatcher.
 
 - **Event stream** `GET /api/events` (server-sent events). bitdispatcher uses:
+  - `call.transcript`: live lines while a 911 call is answered (BitVoice Settings › AI, live transcripts).
+  - `call.ended` carries `cause` and `endedBy` (BitVoice ends a call whose caller's audio stopped);
+    bitdispatcher shows the cause on the call and its silent-line advice says the line went silent.
   - `call.started`, `call.updated`, `call.ended`: the full call snapshot, including `emergency` (location,
     Additional Data, text, video, ALI class) for 911 calls. Ringing 911 calls appear in the dispatcher's
     queue before a call-taker answers.
@@ -110,3 +115,13 @@ everything; BitVoice did not push (it needs to reach and trust bitdispatcher: se
 | Silent-line and machine-against-caller advice | bitdispatcher's own advisory panel (unit tested), advice only |
 | Real-time text, TTY, SIP MESSAGE, CAMA, ALI lookup by callback, ESRP routing and PSAP states, recordings, transcripts and AI summaries | Built to BitVoice's payloads and unit tested; not exercised live (needs a TTY, a CAMA trunk, an ALI link, an ESRP policy, or BitVoice's AI configured) |
 | BitVoice pushing EIDO, ALI spill and radio events to bitdispatcher | Not tested: bitdispatcher ran where BitVoice could not reach it |
+
+Retested against BitVoice a83099c (its fixes for what this testing found):
+
+| What | Result |
+|---|---|
+| A 911 route set to hang up: Health warns, the call rings every call-taker and is answered, the routing trail says why | Works |
+| A caller who vanishes without a hang-up: BitVoice ends the call after 60 s of silence, bitdispatcher shows "the caller's audio stopped" and raises the silent-line advice | Works |
+| The dispatcher named in BitVoice's exposure log, text calls taken and audit log (token that names the person) | Works |
+| The video link says why it was not texted | Works |
+| Live transcripts (`call.transcript`) | Unit tested with BitVoice's shape; not live (BitVoice's AI is not set up in the lab) |

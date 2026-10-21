@@ -127,6 +127,21 @@ export default function AdvisoryAdmin() {
               <span className="ml-auto text-xs text-slate-500">version {v.version || 'default'} · {v.status.current} current{v.status.degraded && <b className="ml-1 text-amber-300">degraded</b>}</span>
             </div>
             {admin && dirty && <input className="input mt-2 text-xs" placeholder="What changed and why (kept with the version)" value={note} onChange={(e) => setNote(e.target.value)} />}
+            {admin && (() => {
+              // Rules supplied since this codebook was saved: offered, never added without a person.
+              const fresh = v.default.rules.filter((d) => !cb.rules.some((r) => r.id === d.id))
+              if (fresh.length === 0) return null
+              return (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1.5 text-xs text-sky-100" role="status">
+                  <Lightbulb size={12} aria-hidden />
+                  <span>New {fresh.length === 1 ? 'rule' : 'rules'} supplied since this version: {fresh.map((r) => r.name).join(', ')}.</span>
+                  <button className="btn h-6 px-2 py-0 text-[11px]" onClick={() => { setCb({ ...cb, rules: [...cb.rules, ...fresh] }); setNote(`added the supplied ${fresh.map((r) => r.name).join(', ')}`) }}>
+                    <Plus size={12} aria-hidden /> Add {fresh.length === 1 ? 'it' : 'them'}
+                  </button>
+                  <span className="text-sky-200/70">then Save version</span>
+                </div>
+              )
+            })()}
           </section>
 
           <section className="panel rounded-lg p-3">

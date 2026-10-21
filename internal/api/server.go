@@ -315,8 +315,16 @@ func (s *Server) handle(pattern, role string, h handler) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			s.Auth.Touch(c.Value) // a change is input at the console
 		}
-		h(w, r, se, actorOf(se))
+		h(w, r.WithContext(bitvoice.OnBehalf(r.Context(), personOf(se))), se, actorOf(se))
 	})
+}
+
+// personOf names a signed-in person for another system's records: their name and username.
+func personOf(se *auth.Session) string {
+	if se.Name != "" && se.Name != se.Username {
+		return se.Name + " (" + se.Username + ")"
+	}
+	return se.Username
 }
 
 func (s *Server) routes() {
@@ -1137,6 +1145,9 @@ func (s *Server) videoLink(w http.ResponseWriter, r *http.Request, se *auth.Sess
 		}
 		if v.Problem == "" {
 			return "BitVoice has no texting number for video links (its 911 settings): read the link to the caller", nil
+		}
+		if strings.Contains(strings.ToLower(v.Problem), "read the link") {
+			return "link not texted: " + v.Problem, nil
 		}
 		return "link not texted (" + v.Problem + "): read it to the caller", nil
 	}()

@@ -655,6 +655,8 @@ func silent(r Rule, s *cad.State, now time.Time) []Suggestion {
 		switch {
 		case c.State == "ended" && c.Answer.IsZero():
 			what = "hung up before it was answered"
+		case c.State == "ended" && c.Handling != nil && strings.Contains(c.Handling.EndCause, "audio stopped"):
+			what = "went silent: the caller's audio stopped and no hang-up came"
 		case c.State == "ended":
 			what = "ended with nothing from the caller"
 		case c.State == "ringing":

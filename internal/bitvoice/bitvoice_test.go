@@ -31,6 +31,7 @@ type fakeBitVoice struct {
 	texts   []string
 	eido    []byte
 	authBad int
+	behalf  []string
 }
 
 func (f *fakeBitVoice) handler(t *testing.T) http.Handler {
@@ -99,6 +100,12 @@ func (f *fakeBitVoice) handler(t *testing.T) http.Handler {
 	}))
 	mux.HandleFunc("POST /api/core/validate", auth(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"invalid":["RD"],"matched":"","position":{"checked":false,"within":false,"why":"no point"},"suggestions":[{"civic":{"HNO":"215","RD":"Church","STS":"Ave","POD":"SW","A3":"Roanoke","A1":"VA"},"why":"a street of a similar name"}]}`))
+	}))
+	mux.HandleFunc("POST /api/calls/{id}/take", auth(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		f.behalf = append(f.behalf, r.Header.Get("X-BitVoice-On-Behalf-Of"))
+		f.mu.Unlock()
+		w.Write([]byte(`{}`))
 	}))
 	mux.HandleFunc("GET /api/core/states", auth(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"items":[{"uri":"sip:sos@east","name":"East","queue":"Full","length":8,"max":8,"service":"Normal"}]}`))
@@ -333,4 +340,31 @@ func TestHandlingFromBitVoice(t *testing.T) {
 		return h.Summary == "A caller reports a fall." && h.Recording != "" && len(h.Routes) == 1 && lines == 1
 	})
 	waitFor(t, "the PSAP states", func() bool { p := b.Health().PSAPs; return len(p) == 1 && p[0].Queue == "Full" })
+
+	// A live transcript line: BitVoice's speaker is "Caller" or the taker's name, its side caller or taker.
+	f.events <- sse("call.transcript", map[string]any{"call": "c9", "lines": []any{map[string]any{"speaker": "Call taker 1", "side": "taker", "text": "where are you", "second": 4.5}}})
+	waitFor(t, "the live line", func() bool {
+		var l []cad.TranscriptLine
+		eng.Read(func(s *cad.State) { l = s.Calls["c9"].Transcript })
+		return len(l) == 2 && l[1].Speaker == "taker" && l[1].Text == "where are you" && !l[1].At.IsZero()
+	})
+	// The dispatcher is named to BitVoice.
+	if err := b.TakeText(OnBehalf(ctx, "Pat Doe (pdoe)"), "c9"); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.TakeText(ctx, "c9"); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	if len(f.behalf) != 2 || f.behalf[0] != "Pat Doe (pdoe)" || f.behalf[1] != "" {
+		t.Fatalf("on behalf of: %q", f.behalf)
+	}
+	f.mu.Unlock()
+	// Why the call ended.
+	f.events <- sse("call.ended", map[string]any{"id": "c9", "state": "ended", "cause": "the caller's audio stopped", "endedBy": "system"})
+	waitFor(t, "the end and its cause", func() bool {
+		var st, cause string
+		eng.Read(func(s *cad.State) { c := s.Calls["c9"]; st, cause = c.State, c.Handling.EndCause })
+		return st == "ended" && cause == "the caller's audio stopped"
+	})
 }
