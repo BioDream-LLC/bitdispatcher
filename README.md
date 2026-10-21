@@ -13,11 +13,17 @@
 [![Works with](https://img.shields.io/badge/works%20with-BitVoice-3b82f6.svg)](https://github.com/biodream-llc/bitvoice)
 [![CI](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml)
 
-**[[Try bitdispatcher now: the live demonstration, no install]](https://demo.bitdispatcher.com)** · **[bitdispatcher.com](https://bitdispatcher.com)**: the website, the manual and this page
+<p align="center">
+<a href="https://demo.bitdispatcher.com"><img src="docs/assets/buttons/try.svg" alt="Try bitdispatcher now: the live demonstration, no install" width="300"></a>
+</p>
 
-**Press Sign in as the demo user**, or sign in as `demo` with password `try-bitdispatcher-demo` · choose any duty (call-taker, police, fire or EMS dispatcher, supervisor, records) on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night
+<p align="center"><sub><b>Press Sign in as the demo user</b>, or sign in as <code>demo</code> with password <code>try-bitdispatcher-demo</code> · choose any duty (call-taker, police, fire or EMS dispatcher, supervisor, records) on invented data around Roanoke, Virginia · simulated 911 calls arrive every 35 seconds · reset every night</sub></p>
 
-**[Build bitdispatcher from source](#build-and-run)** · No release yet. Launch state: **Virginia**.
+<p align="center">
+<a href="#build-and-run"><img src="docs/assets/buttons/build.svg" alt="Build bitdispatcher from source" width="240"></a>&nbsp;<a href="https://bitdispatcher.com/manual/"><img src="docs/assets/buttons/manual.svg" alt="Read the bitdispatcher manual" width="240"></a>&nbsp;<a href="https://bitdispatcher.com"><img src="docs/assets/buttons/website.svg" alt="Visit bitdispatcher.com" width="240"></a>
+</p>
+
+<p align="center"><sub>No release yet: build it from source with one <code>make</code>. Launch state: <b>Virginia</b>.</sub></p>
 
 [**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq) · [**bitdispatcher.com**](https://bitdispatcher.com)
 
