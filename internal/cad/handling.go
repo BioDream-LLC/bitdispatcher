@@ -25,10 +25,12 @@ type Handling struct {
 	Recording string         `json:"recording,omitempty"` // the recording's name in the call-handling system
 	Summary   string         `json:"summary,omitempty"`   // its summary (AI), labelled as such on screen
 	SummaryBy string         `json:"summaryBy,omitempty"`
-	Taker     string         `json:"taker,omitempty"`    // who answered, in the call-handling system
-	LVF       *LVFCheck      `json:"lvf,omitempty"`      // the address checked against the authoritative address data
-	EndCause  string         `json:"endCause,omitempty"` // why the call ended ("the caller's audio stopped")
-	EndedBy   string         `json:"endedBy,omitempty"`  // caller, callee, system, or a person
+	Briefing  string         `json:"briefing,omitempty"`  // the briefing (AI) made when the call was passed on, for whoever took it
+	BriefedBy string         `json:"briefedBy,omitempty"` // who passed it on
+	Taker     string         `json:"taker,omitempty"`     // who answered, in the call-handling system
+	LVF       *LVFCheck      `json:"lvf,omitempty"`       // the address checked against the authoritative address data
+	EndCause  string         `json:"endCause,omitempty"`  // why the call ended ("the caller's audio stopped")
+	EndedBy   string         `json:"endedBy,omitempty"`   // caller, callee, system, or a person
 }
 
 // LVFCheck is the location validation function's answer (NENA i3 LVF) for the caller's civic address,
@@ -117,7 +119,8 @@ func mergeHandling(c *Call, h *Handling) {
 		dst *string
 		v   string
 	}{{&o.Service, h.Service}, {&o.CAMA, h.CAMA}, {&o.ALILookup, h.ALILookup},
-		{&o.Recording, h.Recording}, {&o.Summary, h.Summary}, {&o.SummaryBy, h.SummaryBy}, {&o.Taker, h.Taker},
+		{&o.Recording, h.Recording}, {&o.Summary, h.Summary}, {&o.SummaryBy, h.SummaryBy},
+		{&o.Briefing, h.Briefing}, {&o.BriefedBy, h.BriefedBy}, {&o.Taker, h.Taker},
 		{&o.EndCause, h.EndCause}, {&o.EndedBy, h.EndedBy}} {
 		if p.v != "" {
 			*p.dst = p.v

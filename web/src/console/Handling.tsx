@@ -71,6 +71,12 @@ export default function HandlingBox({ call }: { call: Call }) {
           <div className="text-[10px] text-slate-500">Written by a language model from the recording: check it against what was said.</div>
         </div>
       )}
+      {h.briefing && (
+        <div className="rounded border border-slate-700 bg-slate-900/60 px-1.5 py-1 text-slate-200">
+          <Sparkles size={10} className="inline text-violet-300" aria-hidden /> <span className="text-slate-400">Briefing on transfer{h.briefedBy ? ` from ${h.briefedBy}` : ''} (AI):</span> {h.briefing}
+          <div className="text-[10px] text-slate-500">Written by a language model from the call so far: check it against what was said.</div>
+        </div>
+      )}
       {h.endCause && (
         <div className={/audio stopped/i.test(h.endCause) ? 'text-amber-300' : 'text-slate-400'}>
           Ended: {h.endCause}

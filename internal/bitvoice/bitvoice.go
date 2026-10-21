@@ -567,7 +567,7 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 			By      string `json:"by"`
 		}
 		if json.Unmarshal(env.Data, &br) == nil && br.CallID != "" && br.Summary != "" {
-			b.upsertKnown(br.CallID, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Summary: br.Summary, SummaryBy: "BitVoice briefing (AI)"}})
+			b.upsertKnown(br.CallID, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Briefing: strings.TrimSpace(br.Summary), BriefedBy: br.By}})
 		}
 	case "call.recorded":
 		var r struct {

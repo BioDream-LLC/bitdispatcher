@@ -262,7 +262,7 @@ export type Handling = {
   callerId?: { verified?: string; attest?: string; why?: string }; esinet?: boolean; service?: string; cama?: string; aliLookup?: string
   locCheck?: { show: string; text: string; reasons?: string[]; previous?: Location }; textVia?: string[]
   routes?: { service?: string; psap?: string; why: string; at: string }[]; evidence?: { held: boolean; items: EvidenceItem[] }
-  recording?: string; summary?: string; summaryBy?: string; taker?: string
+  recording?: string; summary?: string; summaryBy?: string; briefing?: string; briefedBy?: string; taker?: string
   endCause?: string; endedBy?: string
   lvf?: { address: string; valid: boolean; matched?: string; invalid?: string[]; position?: string; within?: boolean; suggestions?: { address: string; why: string }[]; at: string }
 }

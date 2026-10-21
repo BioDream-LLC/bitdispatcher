@@ -329,6 +329,12 @@ func TestHandlingFromBitVoice(t *testing.T) {
 	if h := get(); !h.ESInet || h.TextVia[0] != "msrp" || h.Taker != "Call taker 1" || !h.Evidence.Items[0].HasGPS {
 		t.Fatalf("%+v", h)
 	}
+	// A briefing when the call is passed on, then the summary after it: both stay.
+	f.events <- sse("call.briefing", map[string]any{"callId": "c9", "target": "101", "by": "100 Call taker 1", "summary": " A woman fell at home. "})
+	waitFor(t, "the briefing", func() bool {
+		h := get()
+		return h.Briefing == "A woman fell at home." && h.BriefedBy == "100 Call taker 1"
+	})
 	f.events <- sse("transcript.done", map[string]any{"callId": "c9", "recording": "2026-10/c9.wav", "status": "done", "summary": "A caller reports a fall.",
 		"lines": []any{map[string]any{"second": 1.2, "side": "caller", "text": "my mother fell"}}})
 	f.events <- sse("esrp.route", map[string]any{"call": "c9", "service": "urn:service:sos", "psap": "sip:sos@east", "why": "the caller's location is in East", "at": time.Now()})
@@ -337,7 +343,7 @@ func TestHandlingFromBitVoice(t *testing.T) {
 		h := get()
 		var lines int
 		eng.Read(func(s *cad.State) { lines = len(s.Calls["c9"].Transcript) })
-		return h.Summary == "A caller reports a fall." && h.Recording != "" && len(h.Routes) == 1 && lines == 1
+		return h.Summary == "A caller reports a fall." && h.Briefing == "A woman fell at home." && h.Recording != "" && len(h.Routes) == 1 && lines == 1
 	})
 	waitFor(t, "the PSAP states", func() bool { p := b.Health().PSAPs; return len(p) == 1 && p[0].Queue == "Full" })
 

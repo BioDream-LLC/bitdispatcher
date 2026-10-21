@@ -523,7 +523,8 @@ Delivery failures BitVoice reports show on the Situation panel.
 - **Caller photos and clips**: each with its SHA-256, the camera's time and GPS, shown as facts until you press **Reveal (recorded)**; every reveal is in the ledger with who looked. **Hold as evidence** keeps them past BitVoice's retention.
 - Caller video opens blurred and muted; **Reveal** is recorded in BitVoice's exposure record.
 - A text-to-911 call waiting for a call-taker: **Take this text**, then reply in the box.
-- After the call: the recording's name and its summary, marked as written by a language model.
+- When a call-taker passes the call on: BitVoice's briefing for whoever takes it, and who passed it on.
+- After the call: the recording's name and its summary. The briefing and the summary are both kept, each marked as written by a language model.
 
 If BitVoice ends a call because **the caller's audio stopped** (the line went silent and no hang-up came), the call says so and the advisory panel raises it as a silent 911 call: call back.
 
