@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	mrand "math/rand/v2"
 	"net"
 	"net/http"
 	"os"
@@ -35,6 +36,7 @@ type opts struct {
 	lat, lon, radius, alt                                                         float64
 	hold                                                                          time.Duration
 	byRef                                                                         bool
+	speech                                                                        []int16 // -wav: what the caller says, 8 kHz
 }
 
 func main() {
@@ -54,6 +56,7 @@ func main() {
 	flag.StringVar(&o.text, "text", "", "text to 911 over MSRP instead of voice: the caller's first message (more lines: type them while it runs)")
 	flag.StringVar(&o.provider, "provider", "Lab Wireless Co", "the service provider (Additional Data ProviderInfo)")
 	flag.StringVar(&o.device, "device", "Lab handset", "the device (Additional Data DeviceInfo)")
+	wavFile := flag.String("wav", "", "voice calls: say this recording (a WAV, 16-bit mono 8 kHz, such as macOS: say -o f.wav --data-format=LEI16@8000 \"...\") after the answer, instead of the tone")
 	flag.DurationVar(&o.hold, "hold", 2*time.Minute, "how long to stay on the call before hanging up")
 	flag.BoolVar(&o.byRef, "by-ref", true, "also give the location by reference (a HELD server here), so a rebid gets a newer one: the caller moves about 40 m north-east each time")
 	phoneExt := flag.String("phone", "", "instead of calling: register as this extension (a call-taker's phone) and answer every call")
@@ -69,6 +72,14 @@ func main() {
 	esinetAt := flag.String("esinet", "", "instead of calling: stand in for the ESInet at a trunk's address (host:port), answering the call-handling system's OPTIONS keepalives")
 	after := flag.Duration("after", 5*time.Second, "with -radio: when the radio calls")
 	flag.Parse()
+	if *wavFile != "" {
+		pcm, err := readWAV(*wavFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "i3caller:", err)
+			os.Exit(2)
+		}
+		o.speech = pcm
+	}
 	if *esinetAt != "" {
 		if err := runESInet(*esinetAt); err != nil {
 			fmt.Fprintln(os.Stderr, "i3caller:", err)
@@ -469,11 +480,19 @@ func (c *caller) voice(rtp *net.UDPConn, answer string, quit chan struct{}) {
 		binary.BigEndian.PutUint32(pkt[8:], 0x1e3ca11e)
 		tone := time.Since(start) < 2*time.Second
 		for j := 0; j < 160; j++ {
-			v := 0.0
-			if tone {
-				v = 0.2 * math.Sin(2*math.Pi*440*float64(int(ts)+j)/8000)
+			var s int16
+			switch {
+			case c.o.speech != nil:
+				// the recording, a second after the answer, then quiet (a little noise, so the line is not dead)
+				if k := int(ts) + j - 8000; k >= 0 && k < len(c.o.speech) {
+					s = c.o.speech[k]
+				} else {
+					s = int16(mrand.IntN(61) - 30)
+				}
+			case tone:
+				s = int16(0.2 * math.Sin(2*math.Pi*440*float64(int(ts)+j)/8000) * 32767)
 			}
-			pkt[12+j] = linearToMuLaw(int16(v * 32767))
+			pkt[12+j] = linearToMuLaw(s)
 		}
 		rtp.WriteToUDP(pkt, dst)
 		seq++
@@ -567,4 +586,39 @@ func (c *caller) textChat(ln net.Listener, answer string, quit chan struct{}) {
 			}
 		}
 	}
+}
+
+// readWAV reads a 16-bit mono 8 kHz PCM WAV file's samples.
+func readWAV(name string) ([]int16, error) {
+	b, err := os.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) < 12 || string(b[0:4]) != "RIFF" || string(b[8:12]) != "WAVE" {
+		return nil, fmt.Errorf("%s is not a WAV file", name)
+	}
+	var fmtOK bool
+	for i := 12; i+8 <= len(b); {
+		id, n := string(b[i:i+4]), int(binary.LittleEndian.Uint32(b[i+4:]))
+		body := b[i+8 : min(len(b), i+8+n)]
+		switch id {
+		case "fmt ":
+			if len(body) < 16 || binary.LittleEndian.Uint16(body[0:]) != 1 || binary.LittleEndian.Uint16(body[2:]) != 1 ||
+				binary.LittleEndian.Uint32(body[4:]) != 8000 || binary.LittleEndian.Uint16(body[14:]) != 16 {
+				return nil, fmt.Errorf("%s: want 16-bit PCM, mono, 8000 Hz", name)
+			}
+			fmtOK = true
+		case "data":
+			if !fmtOK {
+				return nil, fmt.Errorf("%s: no format before the data", name)
+			}
+			out := make([]int16, len(body)/2)
+			for k := range out {
+				out[k] = int16(binary.LittleEndian.Uint16(body[2*k:]))
+			}
+			return out, nil
+		}
+		i += 8 + n + n%2
+	}
+	return nil, fmt.Errorf("%s: no audio data", name)
 }

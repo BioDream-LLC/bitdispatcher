@@ -129,4 +129,9 @@ Retested against BitVoice a83099c (its fixes for what this testing found):
 | The dispatcher named in BitVoice's exposure log, text calls taken and audit log (token that names the person) | Works |
 | The video link says why it was not texted | Works |
 | BitVoice pushing to bitdispatcher on the same computer (`-hooks-addr`): the EIDO and the ALI spill at answer, a P25 radio emergency by webhook | Works: the call came by all three paths (event stream, ALI, EIDO), the emergency as M1 "Medic 1" |
-| Live transcripts (`call.transcript`) | Unit tested with BitVoice's shape; not live (BitVoice's AI is not set up in the lab) |
+| Live transcripts (`call.transcript`): a caller speaking (a recorded sentence, `i3caller -wav`), written out by BitVoice's local speech-to-text and shown on the call as the caller's words | Works: the sentence arrived word for word while the call was in progress |
+
+Retested against BitVoice 29f2ae7 (its rule against plain http off this computer): the EIDO, ALI spill and
+radio pushes to `http://127.0.0.1:9450` still arrive; saving an `http://` EIDO or radio address to another
+computer is refused (422 naming `system.psap.eidoUrl` or `system.radio.cadUrl`); an ALI spill address on
+another computer saves with a Health warning that it crosses the network unencrypted.
