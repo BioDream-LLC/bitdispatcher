@@ -239,3 +239,20 @@ func TestCommandLineErrors(t *testing.T) {
 		t.Fatalf("D by short number: %+v", r)
 	}
 }
+
+// A TTY or real-time text line grows a character at a time: each growth reaches the call.
+func TestCallTextLineGrows(t *testing.T) {
+	e, _, _ := testEngine(t)
+	at := time.Date(2026, 10, 21, 19, 33, 50, 0, time.UTC)
+	for _, s := range []string{"f", "fi", "fire in the kitchen"} {
+		if err := e.UpsertCall(BitVoiceActor, "rtt1", CallData{Source: "bitvoice", State: "answered", Callback: "+15405550304",
+			Text: []TextLine{{At: at, From: "caller", Via: "rtt", Text: s}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var got string
+	e.Read(func(s *State) { got = s.Calls["rtt1"].Text[0].Text })
+	if got != "fire in the kitchen" {
+		t.Fatalf("the line is %q", got)
+	}
+}

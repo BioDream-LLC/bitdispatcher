@@ -35,8 +35,10 @@ type opts struct {
 	psap, bind, from, name, verstat, class, method, civic, text, provider, device string
 	lat, lon, radius, alt                                                         float64
 	hold                                                                          time.Duration
-	byRef                                                                         bool
+	byRef, noLoc                                                                  bool
+	rttText, sipText                                                              string  // voice calls: type this as real-time text, send it as a SIP MESSAGE
 	speech                                                                        []int16 // -wav: what the caller says, 8 kHz
+	ttyListen                                                                     bool    // -tty: read the call-taker's TTY reply
 }
 
 func main() {
@@ -56,6 +58,10 @@ func main() {
 	flag.StringVar(&o.text, "text", "", "text to 911 over MSRP instead of voice: the caller's first message (more lines: type them while it runs)")
 	flag.StringVar(&o.provider, "provider", "Lab Wireless Co", "the service provider (Additional Data ProviderInfo)")
 	flag.StringVar(&o.device, "device", "Lab handset", "the device (Additional Data DeviceInfo)")
+	ttyText := flag.String("tty", "", "voice calls: be a TTY (text telephone) typing this on the voice line after the answer, end with GA (go ahead)")
+	flag.StringVar(&o.rttText, "rtt", "", "voice calls: offer real-time text (RFC 4103) and type this, a character at a time, after the answer")
+	flag.StringVar(&o.sipText, "sipmsg", "", "voice calls: send this as a SIP MESSAGE inside the call after the answer")
+	flag.BoolVar(&o.noLoc, "noloc", false, "send no location: a call that brings only its number, as a legacy wireline call (the PSAP asks its ALI database)")
 	wavFile := flag.String("wav", "", "voice calls: say this recording (a WAV, 16-bit mono 8 kHz, such as macOS: say -o f.wav --data-format=LEI16@8000 \"...\") after the answer, instead of the tone")
 	flag.DurationVar(&o.hold, "hold", 2*time.Minute, "how long to stay on the call before hanging up")
 	flag.BoolVar(&o.byRef, "by-ref", true, "also give the location by reference (a HELD server here), so a rebid gets a newer one: the caller moves about 40 m north-east each time")
@@ -64,6 +70,11 @@ func main() {
 	ring := flag.Duration("ring", 4*time.Second, "with -phone: how long a call rings before it is answered")
 	xferTo := flag.String("transfer", "", "with -phone: pass each answered call to this number (a blind transfer), as a call-taker would")
 	xferAfter := flag.Duration("transfer-after", 20*time.Second, "with -phone -transfer: how long after the answer")
+	siteAt := flag.String("site", "", "instead of calling: be a lab PSAP on the ESInet at this address (host:port): answer the calls routed to it, tell subscribers its NENA states")
+	siteName := flag.String("site-name", "Lab PSAP", "with -site: the PSAP's name")
+	queueState := flag.String("queue", "Active", "with -site: its queue state (Active, Full, Disabled, Inactive)")
+	serviceState := flag.String("service", "Normal", "with -site: its service state (Normal, Unstaffed, Overloaded, Down)")
+	aliDB := flag.String("alidb", "", "instead of calling: be a lab ALI database answering ALI queries on this address (host:port)")
 	radioAt := flag.String("radio", "", "instead of calling: be a P25 radio system's home RFSS at this address (host:port), and have a radio call the console")
 	issi := flag.String("issi", "127.0.0.1:5062", "with -radio: the console's ISSI SIP address")
 	wacn := flag.String("wacn", "BEE00", "with -radio: the WACN (5 hex digits)")
@@ -74,6 +85,13 @@ func main() {
 	esinetAt := flag.String("esinet", "", "instead of calling: stand in for the ESInet at a trunk's address (host:port), answering the call-handling system's OPTIONS keepalives")
 	after := flag.Duration("after", 5*time.Second, "with -radio: when the radio calls")
 	flag.Parse()
+	if *ttyText != "" && *wavFile != "" {
+		fmt.Fprintln(os.Stderr, "i3caller: -tty and -wav both use the voice: choose one")
+		os.Exit(2)
+	}
+	if *ttyText != "" {
+		o.speech, o.ttyListen = ttyTones(*ttyText), true
+	}
 	if *wavFile != "" {
 		pcm, err := readWAV(*wavFile)
 		if err != nil {
@@ -84,6 +102,20 @@ func main() {
 	}
 	if *esinetAt != "" {
 		if err := runESInet(*esinetAt); err != nil {
+			fmt.Fprintln(os.Stderr, "i3caller:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *siteAt != "" {
+		if err := runSite(*siteAt, *siteName, *queueState, *serviceState, *ring); err != nil {
+			fmt.Fprintln(os.Stderr, "i3caller:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *aliDB != "" {
+		if err := runALIDB(*aliDB); err != nil {
 			fmt.Fprintln(os.Stderr, "i3caller:", err)
 			os.Exit(1)
 		}
@@ -171,6 +203,7 @@ type caller struct {
 	inviteVia          string
 	answered           chan string // the answer's SDP
 	ended              chan string
+	heard              []int16 // the PSAP's audio, for a TTY reply
 }
 
 func run(o opts) error {
@@ -188,7 +221,7 @@ func run(o opts) error {
 	go c.read()
 
 	// Media: an RTP port for voice, or an MSRP listener for text.
-	var rtp *net.UDPConn
+	var rtp, rttConn *net.UDPConn
 	var msrpLn net.Listener
 	var sdpBody string
 	host := o.bind
@@ -202,6 +235,13 @@ func run(o opts) error {
 		port := rtp.LocalAddr().(*net.UDPAddr).Port
 		sdpBody = "v=0\r\no=i3caller " + sess + " " + sess + " IN IP4 " + host + "\r\ns=-\r\nc=IN IP4 " + host + "\r\nt=0 0\r\nm=audio " + strconv.Itoa(port) +
 			" RTP/AVP 0 101\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:101 telephone-event/8000\r\na=sendrecv\r\n"
+		if o.rttText != "" {
+			if rttConn, err = net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(o.bind)}); err != nil {
+				return err
+			}
+			defer rttConn.Close()
+			sdpBody += rttOffer(rttConn.LocalAddr().(*net.UDPAddr).Port)
+		}
 	} else {
 		msrpLn, err = net.Listen("tcp", net.JoinHostPort(o.bind, "0"))
 		if err != nil {
@@ -255,7 +295,9 @@ func run(o opts) error {
 	}
 	part("application/sdp", "", sdpBody)
 	locCID := "loc-" + c.tag + "@i3caller"
-	part("application/pidf+xml", locCID, pidf(o, "pres:"+strings.TrimPrefix(o.from, "+")+"@i3caller"))
+	if !o.noLoc {
+		part("application/pidf+xml", locCID, pidf(o, "pres:"+strings.TrimPrefix(o.from, "+")+"@i3caller"))
+	}
 	var callInfo []string
 	for k, v := range additional(o) {
 		cid := strings.ToLower(k) + "-" + c.tag + "@i3caller"
@@ -271,10 +313,11 @@ func run(o opts) error {
 		"From":                c.fromHdr(),
 		"To":                  "<urn:service:sos>",
 		"P-Asserted-Identity": "<sip:" + user + "@esinet.lab;user=phone>",
-		"Geolocation":         geoHeader("<cid:"+locCID+">", locRef),
-		"Geolocation-Routing": "yes",
 		"Call-Info":           strings.Join(callInfo, ", "),
 		"Content-Type":        "multipart/mixed;boundary=" + boundary,
+	}
+	if !o.noLoc {
+		hdr["Geolocation"], hdr["Geolocation-Routing"] = geoHeader("<cid:"+locCID+">", locRef), "yes"
 	}
 	fmt.Printf("i3caller: calling %s from %s at %.5f, %.5f (%s)\n", o.psap, o.from, o.lat, o.lon, map[bool]string{true: "text", false: "voice"}[o.text != ""])
 	c.send("INVITE", "urn:service:sos", 1, hdr, body.String())
@@ -300,6 +343,18 @@ func run(o opts) error {
 	quit := make(chan struct{})
 	if rtp != nil {
 		go c.voice(rtp, answer, quit)
+		if rttConn != nil {
+			go c.rtt(rttConn, answer, o.rttText, quit)
+		}
+		if o.sipText != "" {
+			go func() {
+				select {
+				case <-quit:
+				case <-time.After(2 * time.Second):
+					c.sipMessage(o.sipText)
+				}
+			}()
+		}
 	} else {
 		go c.textChat(msrpLn, answer, quit)
 	}
@@ -307,6 +362,7 @@ func run(o opts) error {
 	case why := <-c.ended:
 		close(quit)
 		fmt.Println("i3caller: the PSAP hung up:", why)
+		c.ttyReply()
 		return nil
 	case <-deadline:
 	case <-stop:
@@ -314,6 +370,7 @@ func run(o opts) error {
 	close(quit)
 	c.bye()
 	fmt.Println("i3caller: hung up")
+	c.ttyReply()
 	time.Sleep(300 * time.Millisecond)
 	return nil
 }
@@ -420,6 +477,9 @@ func (c *caller) read() {
 				// a re-INVITE (hold, transfer): keep the same media
 				c.conn.WriteToUDP([]byte(resp+"Contact: <sip:i3caller@"+c.local+">\r\nContent-Length: 0\r\n\r\n"), from)
 			case "ACK":
+			case "MESSAGE":
+				c.conn.WriteToUDP([]byte(resp+"Content-Length: 0\r\n\r\n"), from)
+				fmt.Println("i3caller: the call-taker sent (SIP MESSAGE):", strings.TrimSpace(sdpPart))
 			default:
 				c.conn.WriteToUDP([]byte(resp+"Content-Length: 0\r\n\r\n"), from)
 			}
@@ -457,11 +517,19 @@ func (c *caller) voice(rtp *net.UDPConn, answer string, quit chan struct{}) {
 	}
 	p, _ := strconv.Atoi(port[1])
 	dst := &net.UDPAddr{IP: net.ParseIP(ip[1]), Port: p}
-	go func() { // read and drop what the PSAP sends
+	go func() { // read what the PSAP sends: kept only when a TTY listens for the call-taker's reply
 		b := make([]byte, 2048)
 		for {
-			if _, _, err := rtp.ReadFromUDP(b); err != nil {
+			n, _, err := rtp.ReadFromUDP(b)
+			if err != nil {
 				return
+			}
+			if c.o.ttyListen && n > 12 && b[1]&0x7f == 0 {
+				c.mu.Lock()
+				for _, u := range b[12:n] {
+					c.heard = append(c.heard, muLawToLinear(u))
+				}
+				c.mu.Unlock()
 			}
 		}
 	}()
@@ -623,4 +691,30 @@ func readWAV(name string) ([]int16, error) {
 		i += 8 + n + n%2
 	}
 	return nil, fmt.Errorf("%s: no audio data", name)
+}
+
+// ttyReply prints what the call-taker sent back by TTY, read from the PSAP's audio.
+func (c *caller) ttyReply() {
+	c.mu.Lock()
+	pcm := c.heard
+	c.mu.Unlock()
+	if !c.o.ttyListen {
+		return
+	}
+	if got := strings.TrimSpace(readTTY(pcm)); got != "" {
+		fmt.Println("i3caller: the call-taker typed (TTY):", got)
+	} else {
+		fmt.Println("i3caller: no TTY reply heard")
+	}
+}
+
+// muLawToLinear decodes one G.711 mu-law sample.
+func muLawToLinear(u byte) int16 {
+	u = ^u
+	t := (int(u&0x0f) << 3) + 0x84
+	t <<= (u & 0x70) >> 4
+	if u&0x80 != 0 {
+		return int16(0x84 - t)
+	}
+	return int16(t - 0x84)
 }

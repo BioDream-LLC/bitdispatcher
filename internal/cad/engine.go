@@ -471,7 +471,8 @@ func changes(c *Call, d CallData) bool {
 	if d.Location != nil && (d.Location.HasPoint() || d.Location.Civic != nil) && (c.Location == nil || !sameLocation(c.Location, d.Location) || (!d.Location.At.IsZero() && !d.Location.At.Equal(c.Location.At))) {
 		return true
 	}
-	if len(d.Media) != len(c.Media) && len(d.Media) > 0 || len(d.Text) != len(c.Text) && len(d.Text) > 0 || len(d.Notes) > len(c.Notes) {
+	// Text compared line by line: a TTY or real-time text line grows a character at a time.
+	if len(d.Media) != len(c.Media) && len(d.Media) > 0 || len(d.Text) > 0 && !sameText(d.Text, c.Text) || len(d.Notes) > len(c.Notes) {
 		return true
 	}
 	if d.Video != nil && (c.Video == nil || *d.Video != *c.Video) {
@@ -490,6 +491,12 @@ func changes(c *Call, d CallData) bool {
 		return true
 	}
 	return false
+}
+
+func sameText(a, b []TextLine) bool {
+	return slices.EqualFunc(a, b, func(x, y TextLine) bool {
+		return x.Text == y.Text && x.From == y.From && x.Via == y.Via && x.Name == y.Name && x.At.Equal(y.At)
+	})
 }
 
 // EndCall records a call's end.

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/biodream-llc/bitdispatcher/internal/cad"
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
@@ -90,7 +91,12 @@ type Bridge struct {
 	cancel context.CancelFunc
 	wake   chan struct{}
 	lvf    map[string]bool // call|address|position already checked with the LVF
+	// early holds routing decisions for calls not yet seen: the ESRP routes a call before BitVoice
+	// announces it. They join the call when it comes, or are dropped after earlyFor.
+	early map[string][]cad.Route
 }
+
+const earlyFor = 2 * time.Minute
 
 // New makes a bridge. Call Configure, then Run.
 func New(eng *cad.Engine, log *slog.Logger) *Bridge {
@@ -211,6 +217,11 @@ func setOnBehalf(req *http.Request) {
 }
 
 func (b *Bridge) do(ctx context.Context, method, path string, body, out any) error {
+	return b.doWait(ctx, 8*time.Second, method, path, body, out)
+}
+
+// doWait is do, waiting up to wait for BitVoice's answer.
+func (b *Bridge) doWait(ctx context.Context, wait time.Duration, method, path string, body, out any) error {
 	b.mu.Lock()
 	cfg, client := b.cfg, b.client
 	b.mu.Unlock()
@@ -225,7 +236,7 @@ func (b *Bridge) do(ctx context.Context, method, path string, body, out any) err
 		}
 		rd = bytes.NewReader(buf)
 	}
-	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, cfg.URL+path, rd)
 	if err != nil {
@@ -586,7 +597,13 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 			if r.At.IsZero() {
 				r.At = time.Now()
 			}
-			b.upsertKnown(raw.Call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Routes: []cad.Route{r}}})
+			known := false
+			b.eng.Read(func(s *cad.State) { _, known = s.Calls[raw.Call] })
+			if known {
+				b.eng.UpsertCall(cad.BitVoiceActor, raw.Call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Routes: []cad.Route{r}}})
+			} else {
+				b.holdRoute(raw.Call, r)
+			}
 		}
 	case "core.states":
 		go b.pullStates(ctx)
@@ -854,8 +871,37 @@ func (b *Bridge) call(c CallInfo) {
 		b.mu.Unlock()
 		d.Video = &cad.Video{Live: v.Live, Source: v.Source, ViewURL: base + "/whep/" + v.ViewToken}
 	}
+	if rs := b.takeRoutes(c.ID); len(rs) > 0 {
+		h.Routes = rs
+	}
 	b.eng.UpsertCall(cad.BitVoiceActor, c.ID, d)
 	b.checkAddress(c.ID, d.Location)
+}
+
+// holdRoute keeps a routing decision for a call not yet seen.
+func (b *Bridge) holdRoute(call string, r cad.Route) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.early == nil {
+		b.early = map[string][]cad.Route{}
+	}
+	for id, rs := range b.early {
+		if time.Since(rs[len(rs)-1].At) > earlyFor {
+			delete(b.early, id)
+		}
+	}
+	if len(b.early) < 1000 {
+		b.early[call] = append(b.early[call], r)
+	}
+}
+
+// takeRoutes gives a call the routing decisions held for it.
+func (b *Bridge) takeRoutes(call string) []cad.Route {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	rs := b.early[call]
+	delete(b.early, call)
+	return rs
 }
 
 // checkAddress validates a caller's civic address and position with BitVoice's LVF, once per change.
@@ -1123,7 +1169,13 @@ func (b *Bridge) Rebid(ctx context.Context, call string) (*ng911.Location, error
 
 // Text sends text to the caller (TTY, RTT, MSRP or SIP; empty lets BitVoice choose).
 func (b *Bridge) Text(ctx context.Context, call, via, text string) error {
-	return b.do(ctx, http.MethodPost, "/api/calls/"+url.PathEscape(call)+"/text", map[string]string{"via": via, "text": text}, nil)
+	// BitVoice answers once the text is sent, and a TTY sends about six characters a second.
+	return b.doWait(ctx, TextWait(text), http.MethodPost, "/api/calls/"+url.PathEscape(call)+"/text", map[string]string{"via": via, "text": text}, nil)
+}
+
+// TextWait is how long sending text to a caller may take: the time a TTY needs to send it, and more.
+func TextWait(text string) time.Duration {
+	return 8*time.Second + time.Duration(utf8.RuneCountInString(text))*200*time.Millisecond
 }
 
 // VideoLink is BitVoice's answer to a video-link request.

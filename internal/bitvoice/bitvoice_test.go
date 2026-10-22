@@ -339,6 +339,20 @@ func TestHandlingFromBitVoice(t *testing.T) {
 		"lines": []any{map[string]any{"second": 1.2, "side": "caller", "text": "my mother fell"}}})
 	f.events <- sse("esrp.route", map[string]any{"call": "c9", "service": "urn:service:sos", "psap": "sip:sos@east", "why": "the caller's location is in East", "at": time.Now()})
 	f.events <- sse("core.states", nil)
+	// The ESRP routes a call before BitVoice announces it: the decision waits for the call.
+	f.events <- sse("esrp.route", map[string]any{"call": "c10", "service": "urn:service:sos", "psap": "sip:sos@psap-b",
+		"why": "default: the call brought no location; passed over PSAP A (its queue says Full)", "at": time.Now()})
+	f.events <- sse("call.started", map[string]any{"id": "c10", "state": "ringing", "from": "+15405550351", "start": time.Now(),
+		"emergency": map[string]any{"esinet": true, "additional": map[string]any{}}})
+	waitFor(t, "the early route", func() bool {
+		var rs []cad.Route
+		eng.Read(func(s *cad.State) {
+			if c := s.Calls["c10"]; c != nil && c.Handling != nil {
+				rs = c.Handling.Routes
+			}
+		})
+		return len(rs) == 1 && rs[0].PSAP == "sip:sos@psap-b"
+	})
 	waitFor(t, "the transcript, summary and route", func() bool {
 		h := get()
 		var lines int
