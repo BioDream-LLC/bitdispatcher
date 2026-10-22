@@ -445,7 +445,9 @@ func (b *Bridge) resync(ctx context.Context) {
 		sys := b.System()
 		b.eng.Read(func(s *cad.State) {
 			for id, c := range s.Calls {
-				if c.State != "ended" && !live[id] && containsStr(c.Sources, "bitvoice") && c.System == sys {
+				// The main system's calls also come from other EIDO and ALI senders, so only those
+				// BitVoice itself reported; another system's calls are all its own (pushed or read).
+				if c.State != "ended" && !live[id] && c.System == sys && (containsStr(c.Sources, "bitvoice") || sys != "") {
 					stale = append(stale, id)
 				}
 			}

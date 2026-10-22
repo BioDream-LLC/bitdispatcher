@@ -409,3 +409,27 @@ func TestResyncLeavesOtherSystemsCalls(t *testing.T) {
 		t.Fatalf("the other system's call: %s on %q", st, sys)
 	}
 }
+
+// A system besides the main one also ends its calls known only from its EIDO pushes (sent while
+// the link was down); the main one leaves those, which other EIDO senders may have sent.
+func TestResyncEndsOwnPushedCalls(t *testing.T) {
+	eng, b, f, srv := setup(t)
+	sum := sha256.Sum256(srv.Certificate().Raw)
+	b.Configure(Config{ID: "bv2", Name: "Neighbour", URL: srv.URL, Token: "bv_test", Fingerprint: hex.EncodeToString(sum[:])})
+	eng.UpsertCall(cad.BitVoiceActor, "pushed", cad.CallData{Source: "eido", State: "answered", System: "bv2"})
+	eng.UpsertCall(cad.BitVoiceActor, "elsewhere", cad.CallData{Source: "eido", State: "answered"})
+	f.calls = []map[string]any{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go b.Run(ctx)
+	waitFor(t, "its pushed call ended", func() bool {
+		var ok bool
+		eng.Read(func(s *cad.State) { ok = s.Calls["pushed"].State == "ended" })
+		return ok
+	})
+	var st string
+	eng.Read(func(s *cad.State) { st = s.Calls["elsewhere"].State })
+	if st != "answered" {
+		t.Fatalf("the main system's EIDO-only call: %s", st)
+	}
+}
