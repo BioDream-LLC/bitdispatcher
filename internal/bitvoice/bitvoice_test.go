@@ -388,3 +388,24 @@ func TestHandlingFromBitVoice(t *testing.T) {
 		return st == "ended" && cause == "the caller's audio stopped"
 	})
 }
+
+// Two BitVoice systems: a reconnecting one ends only its own calls it no longer has, never the other's.
+func TestResyncLeavesOtherSystemsCalls(t *testing.T) {
+	eng, b, f, _ := setup(t)
+	eng.UpsertCall(cad.BitVoiceActor, "mine", cad.CallData{Source: "bitvoice", State: "ringing"})
+	eng.UpsertCall(cad.BitVoiceActor, "theirs", cad.CallData{Source: "bitvoice", State: "ringing", System: "bv2"})
+	f.calls = []map[string]any{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go b.Run(ctx)
+	waitFor(t, "its own stale call ended", func() bool {
+		var ok bool
+		eng.Read(func(s *cad.State) { ok = s.Calls["mine"].State == "ended" })
+		return ok
+	})
+	var st, sys string
+	eng.Read(func(s *cad.State) { st, sys = s.Calls["theirs"].State, s.Calls["theirs"].System })
+	if st != "ringing" || sys != "bv2" {
+		t.Fatalf("the other system's call: %s on %q", st, sys)
+	}
+}

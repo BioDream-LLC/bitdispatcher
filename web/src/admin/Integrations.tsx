@@ -7,7 +7,8 @@ import { ago, cx, useNow } from '../util'
 import type { NERISConfig, View, ViewsConfig } from '../types'
 import { Page } from './Admin'
 
-type IV = { bitvoiceUrl: string; bitvoiceFingerprint: string; bitvoiceTokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean; aliListen: string }
+type MV = { id: string; name: string; url: string; fingerprint: string; tokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean }
+type IV = { bitvoiceUrl: string; bitvoiceFingerprint: string; bitvoiceTokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean; aliListen: string; more?: MV[] }
 
 function Copyable({ text }: { text: string }) {
   return (
@@ -179,6 +180,7 @@ export default function Integrations({ view }: { view: View }) {
           </section>
         </div>
       )}
+      {iv && <MoreBitVoice view={view} list={iv.more ?? []} reload={() => load().catch((e) => toast.error(errText(e)))} />}
       <Connections view={view} />
       <ViewsSettings />
       <NERISSettings />
@@ -186,6 +188,100 @@ export default function Integrations({ view }: { view: View }) {
       <Partners />
       <PublicFeedSettings view={view} />
     </Page>
+  )
+}
+
+const blankMore = { id: '', name: '', url: '', fingerprint: '', token: '', eidoToken: '', radioSecret: '' }
+
+// More BitVoice systems: others followed besides the main one (a neighbouring PSAP's, a second site's).
+// Each has its own link and push secrets; its calls show its name, and what a dispatcher does with
+// one goes back to it.
+function MoreBitVoice({ view, list, reload }: { view: View; list: MV[]; reload: () => void }) {
+  const now = useNow()
+  const [f, setF] = useState<typeof blankMore | null>(null)
+  const set = (k: keyof typeof blankMore) => (e: React.ChangeEvent<HTMLInputElement>) => setF((o) => (o ? { ...o, [k]: e.target.value } : o))
+  const health = new Map((view.health.moreBitvoice ?? []).map((m) => [m.id, m.health]))
+  const here = location.origin
+  const save = async () => {
+    if (!f) return
+    try {
+      const body = { name: f.name, url: f.url, fingerprint: f.fingerprint, token: f.token, eidoToken: f.eidoToken, radioSecret: f.radioSecret }
+      if (f.id) await api.put(`/admin/integrations/more/${encodeURIComponent(f.id)}`, body)
+      else await api.post('/admin/integrations/more', body)
+      toast.success(`${f.name} saved`)
+      setF(null)
+      reload()
+    } catch (e) {
+      toast.error(errText(e))
+    }
+  }
+  const secret = async (k: 'eidoToken' | 'radioSecret') => {
+    const r = await api.post<{ secret: string }>('/admin/integrations/secret')
+    setF((o) => (o ? { ...o, [k]: r.secret } : o))
+  }
+  return (
+    <section className="panel mt-4 space-y-3 rounded-lg p-4" aria-labelledby="morebv">
+      <div className="flex items-center gap-2">
+        <h2 id="morebv" className="flex items-center gap-2 font-semibold text-slate-100"><Server size={16} className="text-sky-300" aria-hidden /> More BitVoice systems</h2>
+        {!f && <button className="btn ml-auto" onClick={() => setF({ ...blankMore })}>Add a BitVoice</button>}
+      </div>
+      <p className="text-xs text-slate-400">Follow another BitVoice besides the main one above, such as a neighbouring PSAP's. It sends to the same addresses ({here}/api/ng911/eido and /api/radio/events) with its own EIDO token and radio secret.</p>
+      {list.length === 0 && !f && <p className="text-xs text-slate-500">None.</p>}
+      <ul className="space-y-2">
+        {list.map((m) => {
+          const h = health.get(m.id)
+          return (
+            <li key={m.id} className="flex flex-wrap items-center gap-2 rounded border border-slate-800 p-2 text-xs">
+              {h?.connected ? <CheckCircle2 size={14} className="text-emerald-400" aria-label="connected" /> : <XCircle size={14} className="text-rose-400" aria-label="not connected" />}
+              <span className="font-semibold text-slate-100">{m.name}</span>
+              <span className="font-mono text-slate-400">{m.url}</span>
+              <span className="text-slate-400">
+                {h?.connected ? `connected ${ago(h.since, now)} ago · ${h.events} events` : h?.lastError ? `not connected: ${h.lastError}` : 'not connected'}
+                {h?.lastPush ? ` · EIDO pushed ${ago(h.lastPush, now)} ago` : ''}
+              </span>
+              <span className="ml-auto flex gap-1">
+                <button className="btn" onClick={async () => { try { toast.success((await api.post<{ detail: string }>(`/admin/integrations/more/${encodeURIComponent(m.id)}/test`)).detail) } catch (e) { toast.error(errText(e)) } }}><PlugZap size={13} aria-hidden /> Test</button>
+                <button className="btn" onClick={() => setF({ ...blankMore, id: m.id, name: m.name, url: m.url, fingerprint: m.fingerprint })}>Edit</button>
+                <button className="btn" onClick={async () => { if (!confirm(`Stop following ${m.name}?`)) return; try { await api.del(`/admin/integrations/more/${encodeURIComponent(m.id)}`); reload() } catch (e) { toast.error(errText(e)) } }}>Remove</button>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      {f && (
+        <div className="space-y-3 rounded border border-slate-700 p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Name" htmlFor="mbn"><input id="mbn" className="input" placeholder="Neighbour 911" value={f.name} onChange={set('name')} /></Field>
+            <Field label="BitVoice address" htmlFor="mbu"><input id="mbu" className="input font-mono" placeholder="https://bitvoice.example" value={f.url} onChange={set('url')} /></Field>
+            {(() => {
+              const m = list.find((x) => x.id === f.id)
+              return (
+                <>
+                  <Field label="API token" htmlFor="mbt" hint={m?.tokenSet ? 'Set. Leave empty to keep it.' : 'Not set'}><input id="mbt" type="password" autoComplete="off" className="input font-mono" placeholder="bv_…" value={f.token} onChange={set('token')} /></Field>
+                  <Field label="Certificate pin (SHA-256)" htmlFor="mbf" hint="Only for a self-signed certificate; empty trusts the system's authorities.">
+                    <div className="flex gap-1">
+                      <input id="mbf" className="input font-mono text-xs" value={f.fingerprint} onChange={set('fingerprint')} />
+                      <button className="btn shrink-0" disabled={!f.url} onClick={async () => { try { const r = await api.post<{ fingerprint: string }>('/admin/integrations/bitvoice/fingerprint', { url: f.url }); setF((o) => (o ? { ...o, fingerprint: r.fingerprint } : o)) } catch (e) { toast.error(errText(e)) } }}><Fingerprint size={13} aria-hidden /> Read it</button>
+                    </div>
+                  </Field>
+                  <Field label="EIDO token it sends" htmlFor="mbe" hint={m?.eidoTokenSet ? 'Set. New value replaces it.' : 'Not set: its EIDO pushes are refused'}>
+                    <div className="flex gap-1"><input id="mbe" className="input font-mono text-xs" autoComplete="off" value={f.eidoToken} onChange={set('eidoToken')} /><button className="btn shrink-0" onClick={() => secret('eidoToken')}>New</button></div>
+                  </Field>
+                  <Field label="Radio secret it sends" htmlFor="mbr" hint={m?.radioSecretSet ? 'Set. New value replaces it.' : 'Not set: its radio pushes are refused'}>
+                    <div className="flex gap-1"><input id="mbr" className="input font-mono text-xs" autoComplete="off" value={f.radioSecret} onChange={set('radioSecret')} /><button className="btn shrink-0" onClick={() => secret('radioSecret')}>New</button></div>
+                  </Field>
+                </>
+              )
+            })()}
+          </div>
+          {(f.eidoToken || f.radioSecret) && <p className="text-xs text-amber-300">Copy the new values into that BitVoice now, then Save: they are not shown again.</p>}
+          <div className="flex gap-2">
+            <button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save</button>
+            <button className="btn" onClick={() => setF(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

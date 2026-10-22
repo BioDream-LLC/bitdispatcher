@@ -435,7 +435,7 @@ func (s *Server) reply(w http.ResponseWriter, r *http.Request, se *auth.Session,
 	}
 	sent := ""
 	if b.Send {
-		if err := s.BV.Text(r.Context(), id, "", out); err != nil {
+		if err := s.bvFor(id).Text(r.Context(), id, "", out); err != nil {
 			sent = "not texted: " + err.Error()
 		} else {
 			sent = "texted"

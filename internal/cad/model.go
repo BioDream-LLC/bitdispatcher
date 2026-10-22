@@ -250,7 +250,10 @@ type Video struct {
 
 // CallData is what a source says about a call. Empty fields mean "not said", never "cleared".
 type CallData struct {
-	Source     string          `json:"source"` // eido, ali, bitvoice
+	Source string `json:"source"` // eido, ali, bitvoice
+	// System is which BitVoice the call is on, when bitdispatcher talks to more than one: "" is the
+	// main one, else the other's id (Integrations, More BitVoice systems).
+	System     string          `json:"system,omitempty"`
 	State      string          `json:"state,omitempty"`
 	Callback   string          `json:"callback,omitempty"`
 	CallerName string          `json:"callerName,omitempty"`
@@ -283,7 +286,8 @@ type CallData struct {
 type Call struct {
 	ID         string           `json:"id"`
 	Sources    []string         `json:"sources"`
-	State      string           `json:"state"` // ringing, answered, ended
+	System     string           `json:"system,omitempty"` // which BitVoice it is on ("" the main one)
+	State      string           `json:"state"`            // ringing, answered, ended
 	Callback   string           `json:"callback,omitempty"`
 	CallerName string           `json:"callerName,omitempty"`
 	Class      string           `json:"class,omitempty"`

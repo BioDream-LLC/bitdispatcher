@@ -98,6 +98,15 @@ The status bar shows each hook's state and age of its last message: event stream
 EIDO, last ALI spill, last radio event, and delivery failures BitVoice reported. Admin › Integrations
 shows the full detail and a test for each hook.
 
+### More than one BitVoice
+
+Admin › Integrations › More BitVoice systems follows other BitVoice systems besides the main one,
+each with its own address, API token and pin, and its own EIDO token and radio secret. All send to
+the same `/api/ng911/eido` and `/api/radio/events`; the secret says which system a push is from, so
+no two may share one. Each call keeps the system it came from (`system` on the call, its name shown
+in the queue), every caller action goes back to that system, and a system reconnecting ends only its
+own calls. Health lists each system's link (`moreBitvoice`).
+
 ## 6. Tested live (2026-10-21)
 
 Against BitVoice built from main (fc96b19) on another computer on the LAN, with a lab ESInet trunk, a

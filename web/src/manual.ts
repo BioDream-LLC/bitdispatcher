@@ -480,6 +480,7 @@ Search results from county data are marked as such. ArcGIS layers are read with 
     body: `How bitdispatcher connects to call handling and radio. Each integration shows its live state and a checklist of the hooks in use.
 
 - **BitVoice**: its address and API token, and its certificate pinned with Read it. See [BitVoice](#bitvoice).
+- **More BitVoice systems**: Add a BitVoice follows another one too, such as a neighbouring PSAP's: its name, address, API token, and its own EIDO token and radio secret (New makes them). Its calls show its name in the call queue, and what you do with one of them (text, rebid, video, photos) goes back to that BitVoice.
 - **Neighbouring agencies**: their CADs, for sending and receiving incidents. See [Incidents with neighbouring agencies](#cad-to-cad).
 - **Supplemental location (RapidSOS, NG9-1-1 LIS)**: a location server asked by HELD for where the caller's phone is: its address and the credentials the provider gives you, **Ask for every new 911 call**, and **Try a number**. The call-taker can press **Ask <name>** on the ANI / ALI panel. Not yet tested against RapidSOS itself (docs/SUPPLEMENTAL-LOCATION.md).
 - **Public incident feed**: open incidents for the public or apps like PulsePoint: hundred-block addresses, points to about 100 m, no callers or notes; optional token and push address; **See what it shows** before turning it on.

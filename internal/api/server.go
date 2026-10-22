@@ -35,14 +35,15 @@ import (
 
 // Integrations is the integration configuration kept in the data directory (with its secrets, mode 0600).
 type Integrations struct {
-	BitVoice   bitvoice.Config `json:"bitvoice"`
-	ALIListen  string          `json:"aliListen"`  // host:port to accept ALI spills on; empty: off
-	Extra      Extra           `json:"extra"`      // hooks, the drone system, the language model
-	Views      views.Config    `json:"views"`      // pictures of a place from the side
-	NERIS      neris.Config    `json:"neris"`      // fire and EMS incidents to the national reporting system
-	Partners   []Partner       `json:"partners"`   // neighbouring agencies' CADs (CAD-to-CAD)
-	PublicFeed PublicFeed      `json:"publicFeed"` // what is happening, for the public and apps like PulsePoint
-	LIS        LIS             `json:"lis"`        // a location server asked by HELD (supplemental location)
+	BitVoice   bitvoice.Config   `json:"bitvoice"`
+	More       []bitvoice.Config `json:"moreBitvoice"` // other BitVoice systems followed besides the main one
+	ALIListen  string            `json:"aliListen"`    // host:port to accept ALI spills on; empty: off
+	Extra      Extra             `json:"extra"`        // hooks, the drone system, the language model
+	Views      views.Config      `json:"views"`        // pictures of a place from the side
+	NERIS      neris.Config      `json:"neris"`        // fire and EMS incidents to the national reporting system
+	Partners   []Partner         `json:"partners"`     // neighbouring agencies' CADs (CAD-to-CAD)
+	PublicFeed PublicFeed        `json:"publicFeed"`   // what is happening, for the public and apps like PulsePoint
+	LIS        LIS               `json:"lis"`          // a location server asked by HELD (supplemental location)
 }
 
 // Server is the API.
@@ -52,6 +53,7 @@ type Server struct {
 	Eng            *cad.Engine
 	Auth           *auth.Store
 	BV             *bitvoice.Bridge
+	moreBV         moreBridges // other BitVoice systems (Integrations.More)
 	Log            *slog.Logger
 	DataDir        string
 	Version        string
@@ -149,6 +151,9 @@ func (s *Server) loadIntegrations() error {
 func (s *Server) applyIntegrations() {
 	s.BV.Configure(s.integ.BitVoice)
 	if !s.isTraining {
+		s.applyMore(s.integ.More)
+	}
+	if !s.isTraining {
 		s.Views.Configure(s.integ.Views) // a training board shares the live board's
 	}
 	if s.ali != nil {
@@ -223,8 +228,8 @@ func (s *Server) spill(a ng911.ALI, from string) {
 // sender cannot be made to trust bitdispatcher's certificate. Nothing else is reachable through it.
 func (s *Server) HooksHandler() http.Handler {
 	m := http.NewServeMux()
-	m.Handle("POST /api/ng911/eido", s.BV.EIDOHandler())
-	m.Handle("POST /api/radio/events", s.BV.RadioHandler())
+	m.Handle("POST /api/ng911/eido", s.eidoPush())
+	m.Handle("POST /api/radio/events", s.radioPush())
 	return m
 }
 
@@ -366,8 +371,8 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/auth/demo", s.loginDemo)
 	m.HandleFunc("GET /api/auth/me", s.me)
 	// Integration endpoints BitVoice (or any EIDO / radio-data sender) posts to; bearer-authenticated.
-	m.Handle("POST /api/ng911/eido", s.BV.EIDOHandler())
-	m.Handle("POST /api/radio/events", s.BV.RadioHandler())
+	m.Handle("POST /api/ng911/eido", s.eidoPush())
+	m.Handle("POST /api/radio/events", s.radioPush())
 
 	s.handle("GET /api/state", auth.Viewer, s.state)
 	s.handle("GET /api/stream", auth.Viewer, s.stream)
@@ -416,7 +421,7 @@ func (s *Server) routes() {
 	})
 	s.handle("POST /api/calls/{id}/take", auth.Dispatcher, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		id := r.PathValue("id")
-		s.callAction(w, a, id, "text taken", func() (string, error) { return "taken by " + a.User, s.BV.TakeText(r.Context(), id) })
+		s.callAction(w, a, id, "text taken", func() (string, error) { return "taken by " + a.User, s.bvFor(id).TakeText(r.Context(), id) })
 	})
 	s.handle("POST /api/calls/{id}/video-link", auth.Dispatcher, s.videoLink)
 	s.handle("POST /api/calls/{id}/eido", auth.Dispatcher, s.refreshEIDO)
@@ -443,6 +448,7 @@ func (s *Server) routes() {
 	s.handle("POST /api/admin/integrations/bitvoice/fingerprint", auth.Admin, s.fingerprint)
 	s.handle("POST /api/admin/integrations/secret", auth.Admin, s.newSecret)
 	s.handle("POST /api/admin/integrations/ali/test", auth.Admin, s.testALI)
+	s.moreRoutes()
 	s.handle("GET /api/ledger", auth.Supervisor, s.ledgerEvents)
 	s.handle("GET /api/ledger/verify", auth.Supervisor, s.verify)
 	s.handle("GET /api/reports/operations", auth.Supervisor, s.report)
@@ -615,6 +621,7 @@ type View struct {
 // HealthView is every interface's health.
 type HealthView struct {
 	BitVoice bitvoice.Health  `json:"bitvoice"`
+	More     []MoreHealth     `json:"moreBitvoice"` // the other BitVoice systems' links
 	ALI      ALIHealth        `json:"ali"`
 	Ledger   uint64           `json:"ledger"`
 	Tiles    bool             `json:"tiles"`
@@ -652,7 +659,7 @@ func (s *Server) health() HealthView {
 	var seq uint64
 	s.Eng.Read(func(st *cad.State) { seq = st.Seq })
 	x := s.extra()
-	return HealthView{BitVoice: s.BV.Health(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth(),
+	return HealthView{BitVoice: s.BV.Health(), More: s.moreHealth(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth(),
 		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig())}
 }
 
@@ -1114,7 +1121,7 @@ func (s *Server) callAction(w http.ResponseWriter, a cad.Actor, call, action str
 func (s *Server) rebid(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 	id := r.PathValue("id")
 	s.callAction(w, a, id, "rebid", func() (string, error) {
-		loc, err := s.BV.Rebid(r.Context(), id)
+		loc, err := s.bvFor(id).Rebid(r.Context(), id)
 		if err != nil {
 			return "", err
 		}
@@ -1141,7 +1148,7 @@ func (s *Server) textCaller(w http.ResponseWriter, r *http.Request, se *auth.Ses
 	}
 	id := r.PathValue("id")
 	s.callAction(w, a, id, "text", func() (string, error) {
-		return "sent: " + b.Text, s.BV.Text(r.Context(), id, b.Via, b.Text)
+		return "sent: " + b.Text, s.bvFor(id).Text(r.Context(), id, b.Via, b.Text)
 	})
 }
 
@@ -1150,7 +1157,7 @@ func (s *Server) videoLink(w http.ResponseWriter, r *http.Request, se *auth.Sess
 	var v bitvoice.VideoLink
 	detail, err := func() (string, error) {
 		var err error
-		v, err = s.BV.RequestVideo(r.Context(), id)
+		v, err = s.bvFor(id).RequestVideo(r.Context(), id)
 		if err != nil {
 			return "", err
 		}
@@ -1176,7 +1183,7 @@ func (s *Server) videoLink(w http.ResponseWriter, r *http.Request, se *auth.Sess
 
 func (s *Server) refreshEIDO(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 	id := r.PathValue("id")
-	s.callAction(w, a, id, "EIDO refresh", func() (string, error) { return "", s.BV.RefreshEIDO(r.Context(), id) })
+	s.callAction(w, a, id, "EIDO refresh", func() (string, error) { return "", s.bvFor(id).RefreshEIDO(r.Context(), id) })
 }
 
 // whep forwards the browser's WebRTC offer for a call's live video to BitVoice.
@@ -1197,7 +1204,7 @@ func (s *Server) whep(w http.ResponseWriter, r *http.Request, se *auth.Session, 
 		fail(w, 400, "offer too large")
 		return
 	}
-	answer, _, err := s.BV.WHEP(r.Context(), view, offer)
+	answer, _, err := s.bvFor(id).WHEP(r.Context(), view, offer)
 	if err != nil {
 		fail(w, http.StatusBadGateway, err.Error())
 		return
@@ -1222,7 +1229,7 @@ func (s *Server) media(w http.ResponseWriter, r *http.Request, se *auth.Session,
 		fail(w, 404, "no such media")
 		return
 	}
-	resp, err := s.BV.Fetch(r.Context(), src)
+	resp, err := s.bvFor(id).Fetch(r.Context(), src)
 	if err != nil {
 		fail(w, http.StatusBadGateway, err.Error())
 		return
@@ -1262,7 +1269,7 @@ func (s *Server) evidence(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 		fail(w, 404, "no such photo or clip")
 		return
 	}
-	resp, err := s.BV.Evidence(r.Context(), id, n)
+	resp, err := s.bvFor(id).Evidence(r.Context(), id, n)
 	if err != nil {
 		fail(w, http.StatusBadGateway, err.Error())
 		return
@@ -1293,7 +1300,7 @@ func (s *Server) holdEvidence(w http.ResponseWriter, r *http.Request, se *auth.S
 		return
 	}
 	id := r.PathValue("id")
-	err := s.BV.HoldEvidence(r.Context(), id, b.Hold)
+	err := s.bvFor(id).HoldEvidence(r.Context(), id, b.Hold)
 	s.Eng.RecordCallAction(a, id, map[bool]string{true: "evidence held", false: "evidence released"}[b.Hold], err == nil, errString(err))
 	if err != nil {
 		fail(w, http.StatusBadGateway, err.Error())
@@ -1304,7 +1311,7 @@ func (s *Server) holdEvidence(w http.ResponseWriter, r *http.Request, se *auth.S
 
 func (s *Server) revealVideo(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 	id := r.PathValue("id")
-	err := s.BV.RevealVideo(r.Context(), id)
+	err := s.bvFor(id).RevealVideo(r.Context(), id)
 	s.Eng.RecordCallAction(a, id, "live video revealed", true, errString(err))
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1486,12 +1493,13 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request, se *auth.Ses
 
 // IntegrationsView is the integration configuration with secrets replaced by whether they are set.
 type IntegrationsView struct {
-	BitVoiceURL         string `json:"bitvoiceUrl"`
-	BitVoiceFingerprint string `json:"bitvoiceFingerprint"`
-	BitVoiceToken       bool   `json:"bitvoiceTokenSet"`
-	EIDOToken           bool   `json:"eidoTokenSet"`
-	RadioSecret         bool   `json:"radioSecretSet"`
-	ALIListen           string `json:"aliListen"`
+	BitVoiceURL         string     `json:"bitvoiceUrl"`
+	BitVoiceFingerprint string     `json:"bitvoiceFingerprint"`
+	BitVoiceToken       bool       `json:"bitvoiceTokenSet"`
+	EIDOToken           bool       `json:"eidoTokenSet"`
+	RadioSecret         bool       `json:"radioSecretSet"`
+	ALIListen           string     `json:"aliListen"`
+	More                []MoreView `json:"more"` // the other BitVoice systems
 }
 
 func (s *Server) integrationsView() IntegrationsView {
@@ -1499,7 +1507,7 @@ func (s *Server) integrationsView() IntegrationsView {
 	defer s.mu.Unlock()
 	c := s.integ.BitVoice
 	return IntegrationsView{BitVoiceURL: c.URL, BitVoiceFingerprint: c.Fingerprint, BitVoiceToken: c.Token != "", EIDOToken: c.EIDOToken != "",
-		RadioSecret: c.RadioSecret != "", ALIListen: s.integ.ALIListen}
+		RadioSecret: c.RadioSecret != "", ALIListen: s.integ.ALIListen, More: moreViews(s.integ.More)}
 }
 
 func (s *Server) getIntegrations(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -1692,6 +1700,7 @@ func (s *Server) positions(w http.ResponseWriter, r *http.Request, se *auth.Sess
 // Run starts the background work (the BitVoice stream) until ctx ends.
 func (s *Server) Run(ctx context.Context) {
 	go s.BV.Run(ctx)
+	s.runMore(ctx)
 	go s.runSites(ctx)
 	go s.droneRule(ctx)
 	go s.endDataCalls(ctx)

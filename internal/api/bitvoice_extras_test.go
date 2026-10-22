@@ -172,3 +172,78 @@ func TestHooksHandlerOffersOnlyPushes(t *testing.T) {
 		t.Fatalf("an EIDO without a token: %d", resp.StatusCode)
 	}
 }
+
+// A second BitVoice: added from Integrations, its calls' actions go to it (not the main one), its
+// pushes are told apart by their secrets, and it shows on the status screens.
+func TestMoreBitVoice(t *testing.T) {
+	ts, s, pw := newServer(t)
+	mainBV, otherBV := &fakeBV{}, &fakeBV{}
+	ms, os2 := mainBV.server(t), otherBV.server(t)
+	pin := func(srv *httptest.Server) string {
+		sum := sha256.Sum256(srv.Certificate().Raw)
+		return hex.EncodeToString(sum[:])
+	}
+	admin := login(t, ts, "admin", pw["admin"])
+	if code, b := admin.do("PUT", "/api/admin/integrations", map[string]any{"bitvoiceUrl": ms.URL, "bitvoiceFingerprint": pin(ms),
+		"bitvoiceToken": "bv_test", "eidoToken": "bd_e1"}, true); code != 200 {
+		t.Fatalf("main: %d %s", code, b)
+	}
+	// Its secrets must differ from the main one's.
+	if code, _ := admin.do("POST", "/api/admin/integrations/more", map[string]any{"name": "Neighbour 911", "url": os2.URL, "eidoToken": "bd_e1"}, true); code != 422 {
+		t.Fatalf("a shared EIDO token: %d", code)
+	}
+	code, b := admin.do("POST", "/api/admin/integrations/more", map[string]any{"name": "Neighbour 911", "url": os2.URL, "fingerprint": pin(os2),
+		"token": "bv_test", "eidoToken": "bd_e2", "radioSecret": "bd_r2"}, true)
+	var out struct {
+		ID   string     `json:"id"`
+		More []MoreView `json:"more"`
+	}
+	if json.Unmarshal(b, &out); code != 200 || out.ID == "" || len(out.More) != 1 || !out.More[0].Token || out.More[0].Name != "Neighbour 911" {
+		t.Fatalf("add: %d %s", code, b)
+	}
+	if strings.Contains(string(b), "bd_e2") || strings.Contains(string(b), "bv_test") {
+		t.Fatal("a secret came back")
+	}
+	// A call on the second BitVoice: holding its evidence goes there.
+	s.Eng.UpsertCall(cad.BitVoiceActor, "n1", cad.CallData{Source: "bitvoice", System: out.ID, Callback: "+15405550101"})
+	d := login(t, ts, "d1", pw["d1"])
+	if code, b := d.do("POST", "/api/calls/n1/evidence/hold", map[string]bool{"hold": true}, true); code != 204 {
+		t.Fatalf("hold: %d %s", code, b)
+	}
+	otherBV.mu.Lock()
+	got := strings.Join(otherBV.paths, ",")
+	otherBV.mu.Unlock()
+	mainBV.mu.Lock()
+	gotMain := len(mainBV.paths)
+	mainBV.mu.Unlock()
+	if !strings.Contains(got, "POST /api/calls/n1/media/hold") || gotMain != 0 {
+		t.Fatalf("the second BitVoice saw %q, the main one %d requests", got, gotMain)
+	}
+	// Pushes: each secret is taken (the empty EIDO is then refused as an EIDO), others are not.
+	push := func(path, secret string) int {
+		req, _ := http.NewRequest("POST", ts.URL+path, strings.NewReader("{}"))
+		req.Header.Set("Authorization", "Bearer "+secret)
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if c1, c2, c3, c4 := push("/api/ng911/eido", "bd_e1"), push("/api/ng911/eido", "bd_e2"), push("/api/ng911/eido", "nope"), push("/api/radio/events", "bd_r2"); c1 != 400 || c2 != 400 || c3 != 401 || c4 != 400 {
+		t.Fatalf("pushes: main %d, second %d, wrong %d, radio %d", c1, c2, c3, c4)
+	}
+	if h := s.health(); len(h.More) != 1 || h.More[0].Name != "Neighbour 911" || !h.More[0].Health.Configured {
+		t.Fatalf("health: %+v", h.More)
+	}
+	// Removed: its calls' actions no longer go anywhere.
+	if code, _ := admin.do("DELETE", "/api/admin/integrations/more/"+out.ID, nil, true); code != 204 {
+		t.Fatalf("remove: %d", code)
+	}
+	if code, _ := d.do("POST", "/api/calls/n1/evidence/hold", map[string]bool{"hold": false}, true); code == 204 {
+		t.Fatal("an action on a removed system's call")
+	}
+	if len(s.health().More) != 0 {
+		t.Fatal("still in health")
+	}
+}

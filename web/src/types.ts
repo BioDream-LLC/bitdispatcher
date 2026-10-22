@@ -102,7 +102,7 @@ export type Media = { id: string; url: string; purpose: string }
 export type TextLine = { at: string; from: string; name?: string; via: string; text: string }
 
 export type Call = { handling?: Handling;
-  id: string; sources: string[]; state: 'ringing' | 'answered' | 'data' | 'ended'; callback?: string; callerName?: string; class?: string
+  id: string; sources: string[]; system?: string; state: 'ringing' | 'answered' | 'data' | 'ended'; callback?: string; callerName?: string; class?: string
   provider?: string; location?: Location; locations: number; agent?: string; position?: string; start: string; answer?: string; end?: string
   media?: Media[]; video?: { live: boolean; viewUrl?: string; source?: string }; text?: TextLine[]; textOnly?: boolean; notes?: string[]
   canRebid?: boolean; problems?: string[]; ali?: string; incident?: string; updated: string
@@ -162,6 +162,8 @@ export type BitVoiceHealth = {
 
 export type Health = {
   bitvoice: BitVoiceHealth
+  // The other BitVoice systems followed besides the main one.
+  moreBitvoice?: { id: string; name: string; url: string; health: BitVoiceHealth }[]
   ali: { listening?: string; error?: string; last?: string; count: number }
   ledger: number
   tiles: boolean

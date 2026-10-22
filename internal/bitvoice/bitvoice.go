@@ -31,6 +31,10 @@ import (
 
 // Config is how bitdispatcher reaches BitVoice and how BitVoice proves itself to bitdispatcher.
 type Config struct {
+	// ID and Name tell apart the BitVoice systems bitdispatcher talks to besides the main one (whose
+	// are empty): a call carries its system's ID, so what a dispatcher does goes to that BitVoice.
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
 	URL         string `json:"url"`         // https://bitvoice.example:8443
 	Token       string `json:"token"`       // BitVoice API token (bv_...), secret
 	Fingerprint string `json:"fingerprint"` // SHA-256 of BitVoice's certificate when it is self-signed; empty trusts the system roots
@@ -438,9 +442,10 @@ func (b *Bridge) resync(ctx context.Context) {
 		}
 		// 911 calls bitdispatcher thinks are live but BitVoice no longer has ended while the link was down.
 		var stale []string
+		sys := b.System()
 		b.eng.Read(func(s *cad.State) {
 			for id, c := range s.Calls {
-				if c.State != "ended" && !live[id] && containsStr(c.Sources, "bitvoice") {
+				if c.State != "ended" && !live[id] && containsStr(c.Sources, "bitvoice") && c.System == sys {
 					stale = append(stale, id)
 				}
 			}
@@ -569,7 +574,7 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 					}
 				}
 			}
-			b.eng.UpsertCall(cad.BitVoiceActor, t.CallID, d)
+			b.upsert(t.CallID, d)
 		}
 	case "call.briefing":
 		var br struct {
@@ -600,7 +605,7 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 			known := false
 			b.eng.Read(func(s *cad.State) { _, known = s.Calls[raw.Call] })
 			if known {
-				b.eng.UpsertCall(cad.BitVoiceActor, raw.Call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Routes: []cad.Route{r}}})
+				b.upsert(raw.Call, cad.CallData{Source: "bitvoice", Handling: &cad.Handling{Routes: []cad.Route{r}}})
 			} else {
 				b.holdRoute(raw.Call, r)
 			}
@@ -700,7 +705,7 @@ func (b *Bridge) handle(ctx context.Context, event string, raw []byte) {
 					}
 					lines = append(lines, cad.TranscriptLine{Speaker: sp, Text: l})
 				}
-				b.eng.UpsertCall(cad.BitVoiceActor, t.CallID, cad.CallData{Source: "bitvoice", Transcript: lines})
+				b.upsert(t.CallID, cad.CallData{Source: "bitvoice", Transcript: lines})
 			}
 		}
 	}
@@ -756,7 +761,7 @@ func (b *Bridge) eido(raw []byte, source string) error {
 			d.Video = &cad.Video{Live: true, ViewURL: m.URL}
 		}
 	}
-	return b.eng.UpsertCall(cad.BitVoiceActor, c.CallID, d)
+	return b.upsert(c.CallID, d)
 }
 
 // ---- calls ----
@@ -874,7 +879,7 @@ func (b *Bridge) call(c CallInfo) {
 	if rs := b.takeRoutes(c.ID); len(rs) > 0 {
 		h.Routes = rs
 	}
-	b.eng.UpsertCall(cad.BitVoiceActor, c.ID, d)
+	b.upsert(c.ID, d)
 	b.checkAddress(c.ID, d.Location)
 }
 
@@ -1164,7 +1169,7 @@ func (b *Bridge) Rebid(ctx context.Context, call string) (*ng911.Location, error
 	if loc.At.IsZero() {
 		loc.At = time.Now()
 	}
-	return loc, b.eng.UpsertCall(cad.BitVoiceActor, call, cad.CallData{Source: "bitvoice", Location: loc})
+	return loc, b.upsert(call, cad.CallData{Source: "bitvoice", Location: loc})
 }
 
 // Text sends text to the caller (TTY, RTT, MSRP or SIP; empty lets BitVoice choose).
@@ -1191,7 +1196,7 @@ func (b *Bridge) RequestVideo(ctx context.Context, call string) (VideoLink, erro
 	var v VideoLink
 	err := b.do(ctx, http.MethodPost, "/api/calls/"+url.PathEscape(call)+"/video/link", map[string]any{}, &v)
 	if err == nil && v.ViewURL != "" {
-		b.eng.UpsertCall(cad.BitVoiceActor, call, cad.CallData{Source: "bitvoice", Video: &cad.Video{ViewURL: v.ViewURL, Source: "link"}})
+		b.upsert(call, cad.CallData{Source: "bitvoice", Video: &cad.Video{ViewURL: v.ViewURL, Source: "link"}})
 	}
 	return v, err
 }
@@ -1263,9 +1268,26 @@ func (b *Bridge) upsertKnown(id string, d cad.CallData) {
 	known := false
 	b.eng.Read(func(s *cad.State) { _, known = s.Calls[id] })
 	if known {
-		b.eng.UpsertCall(cad.BitVoiceActor, id, d)
+		b.upsert(id, d)
 	}
 }
+
+// upsert records what this BitVoice says about a call, marking the call as on this system.
+func (b *Bridge) upsert(id string, d cad.CallData) error {
+	d.System = b.System()
+	return b.eng.UpsertCall(cad.BitVoiceActor, id, d)
+}
+
+// System is this BitVoice's ID ("" for the main one).
+func (b *Bridge) System() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.cfg.ID
+}
+
+// TakesEIDO and TakesRadio say whether a push carries this BitVoice's secret.
+func (b *Bridge) TakesEIDO(r *http.Request) bool  { return bearerOK(r, b.Config().EIDOToken) }
+func (b *Bridge) TakesRadio(r *http.Request) bool { return bearerOK(r, b.Config().RadioSecret) }
 
 // pullEvidence reads a call's photos and clips: their hash, the camera's time and GPS, and whether
 // they are held as evidence. The files stay in BitVoice.

@@ -36,6 +36,7 @@ function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: Vie
           <span className="font-mono text-[13px] font-bold text-slate-50">{phone(c.callback) || (c.alert ? c.alert.premise || c.alert.sender : 'No callback')}</span>
           {c.handling?.callerId?.verified === 'failed' && <span className="chip bg-rose-500/25 text-rose-200" title={c.handling.callerId.why}>number NOT verified</span>}
           {c.class && <span className="chip bg-slate-800 font-mono text-slate-300">{c.class}</span>}
+          {c.system && <span className="chip bg-violet-500/20 text-violet-200" title="The BitVoice system this call is on">{view.health.moreBitvoice?.find((m) => m.id === c.system)?.name ?? 'other BitVoice'}</span>}
           <span className={cx('chip uppercase', ringing ? 'bg-rose-500 text-white' : c.state === 'data' ? 'bg-amber-500/25 text-amber-200' : c.state === 'ended' ? 'bg-slate-700 text-slate-300' : 'bg-sky-500/20 text-sky-300')} title={c.state === 'data' ? `Data only (no voice): ${c.alert ? alertName(c.alert) : 'a vehicle crash notification'}. Attaching it to an incident ends it.` : undefined}>{c.state === 'data' ? (c.alert ? `${alertName(c.alert)} · data only` : 'crash data only') : c.state}</span>
           <span className="ml-auto font-mono font-semibold text-slate-300 tnum">{clock(c.start, now)}</span>
         </div>

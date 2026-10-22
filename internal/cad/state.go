@@ -690,6 +690,9 @@ func (s *State) mergeCall(id string, d CallData, at time.Time) {
 	if d.Source != "" && !slices.Contains(c.Sources, d.Source) {
 		c.Sources = append(c.Sources, d.Source)
 	}
+	if d.System != "" && c.System == "" {
+		c.System = d.System
+	}
 	if d.State != "" && c.State != "ended" {
 		c.State = d.State
 	}
