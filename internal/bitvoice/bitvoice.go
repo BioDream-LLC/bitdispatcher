@@ -1263,6 +1263,39 @@ func (b *Bridge) AckRadio(ctx context.Context, channel string) error {
 	return b.do(ctx, http.MethodPost, "/api/radio/channels/"+url.PathEscape(channel)+"/ack", map[string]any{}, nil)
 }
 
+// AckRadioFor acknowledges a radio's emergency on BitVoice's console only when that is the one the
+// channel holds: BitVoice keeps one emergency per channel (the latest) and its acknowledgement
+// names only the channel, so acknowledging an older one there would clear a newer one unseen.
+// It says what it did.
+func (b *Bridge) AckRadioFor(ctx context.Context, channel, unit string) (string, error) {
+	var st struct {
+		Channels []struct {
+			ID             string `json:"id"`
+			EmergencyUnit  string `json:"emergencyUnit"`
+			EmergencyAlias string `json:"emergencyAlias"`
+		} `json:"channels"`
+	}
+	if err := b.do(ctx, http.MethodGet, "/api/radio", nil, &st); err != nil {
+		return "", err
+	}
+	for _, ch := range st.Channels {
+		if ch.ID != channel {
+			continue
+		}
+		switch {
+		case ch.EmergencyUnit == "":
+			return "already clear on the radio console", nil
+		case unit != "" && !strings.EqualFold(ch.EmergencyUnit, unit):
+			return "not acknowledged on the radio console: it shows a newer emergency, from " + firstNonEmpty(ch.EmergencyAlias, ch.EmergencyUnit), nil
+		}
+		if err := b.AckRadio(ctx, channel); err != nil {
+			return "", err
+		}
+		return "acknowledged on the radio console", nil
+	}
+	return "", errors.New("BitVoice has no channel " + channel)
+}
+
 // Fetch reads a URL on the configured BitVoice (caller photos, clips) with the pinned client, for the
 // dispatcher's browser. Any other host is refused, so this is never an open proxy.
 func (b *Bridge) Fetch(ctx context.Context, raw string) (*http.Response, error) {

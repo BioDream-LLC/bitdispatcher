@@ -1318,10 +1318,10 @@ func (s *Server) revealVideo(w http.ResponseWriter, r *http.Request, se *auth.Se
 
 func (s *Server) ackEmergency(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 	key := r.PathValue("key")
-	channel, sys := "", ""
+	channel, sys, unit := "", "", ""
 	s.Eng.Read(func(st *cad.State) {
 		if em, ok := st.Emergencies[key]; ok {
-			channel, sys = em.Channel, em.System
+			channel, sys, unit = em.Channel, em.System, em.RadioUnit
 		}
 	})
 	if err := s.Eng.AckEmergency(a, key, "bitdispatcher"); err != nil {
@@ -1332,10 +1332,10 @@ func (s *Server) ackEmergency(w http.ResponseWriter, r *http.Request, se *auth.S
 	out := map[string]string{"bitvoice": "not configured"}
 	bv := s.bvSystem(sys)
 	if channel != "" && bv.Health().Configured {
-		if err := bv.AckRadio(r.Context(), channel); err != nil {
+		if what, err := bv.AckRadioFor(r.Context(), channel, unit); err != nil {
 			out["bitvoice"] = "not acknowledged on the radio console: " + err.Error()
 		} else {
-			out["bitvoice"] = "acknowledged on the radio console"
+			out["bitvoice"] = what
 		}
 	}
 	writeJSON(w, 200, out)

@@ -65,6 +65,9 @@ func (f *fakeBV) server(t *testing.T) *httptest.Server {
 		f.mu.Unlock()
 		w.Write([]byte(`{}`))
 	}))
+	mux.HandleFunc("GET /api/radio", auth(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"channels":[{"id":"tg9","emergencyUnit":"bee07.1d5.000517","emergencyAlias":"Engine 1"}]}`))
+	}))
 	mux.HandleFunc("POST /api/radio/channels/{ch}/ack", auth(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{}`)) }))
 	mux.HandleFunc("POST /api/calls/{id}/video/reveal", auth(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{}`)) }))
 	mux.HandleFunc("GET /api/psap/report", auth(func(w http.ResponseWriter, r *http.Request) {
@@ -238,11 +241,19 @@ func TestMoreBitVoice(t *testing.T) {
 		t.Fatalf("health: %+v", h.More)
 	}
 	// An emergency from its radio: acknowledged on its radio console, not the main one's.
-	key, err := s.Eng.RaiseEmergency(cad.RadioActor, cad.Emergency{System: out.ID, RadioUnit: "Medic 3", Channel: "tg9"})
+	// An older one first: BitVoice's console holds a newer one on the channel, which is left alone.
+	old, err := s.Eng.RaiseEmergency(cad.RadioActor, cad.Emergency{System: out.ID, RadioUnit: "bee07.1d5.000303", Alias: "Medic 3", Channel: "tg9"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code, b := d.do("POST", "/api/emergencies/"+key+"/ack", map[string]any{}, true); code != 200 || !strings.Contains(string(b), "acknowledged on the radio console") {
+	if code, b := d.do("POST", "/api/emergencies/"+old+"/ack", map[string]any{}, true); code != 200 || !strings.Contains(string(b), "newer emergency, from Engine 1") {
+		t.Fatalf("older ack: %d %s", code, b)
+	}
+	key, err := s.Eng.RaiseEmergency(cad.RadioActor, cad.Emergency{System: out.ID, RadioUnit: "bee07.1d5.000517", Alias: "Engine 1", Channel: "tg9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, b := d.do("POST", "/api/emergencies/"+key+"/ack", map[string]any{}, true); code != 200 || !strings.Contains(string(b), `"acknowledged on the radio console"`) {
 		t.Fatalf("ack: %d %s", code, b)
 	}
 	otherBV.mu.Lock()

@@ -108,6 +108,7 @@ type radioUnit struct {
 
 type sim struct {
 	mu     sync.Mutex
+	emUnit string // the radio emergency the channel holds until acknowledged, as BitVoice keeps one per channel
 	calls  map[string]*call
 	subs   map[chan string]struct{}
 	seq    uint64
@@ -685,7 +686,16 @@ func main() {
 		s.mu.Unlock()
 		writeJSON(w, map[string]any{"items": out})
 	}))
+	mux.HandleFunc("GET /api/radio", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		em := s.emUnit
+		s.mu.Unlock()
+		writeJSON(w, map[string]any{"channels": []any{map[string]any{"id": "tg1", "name": "County dispatch", "emergencyUnit": em}}, "positions": []any{}})
+	}))
 	mux.HandleFunc("POST /api/radio/channels/{id}/ack", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		s.emUnit = ""
+		s.mu.Unlock()
 		s.publish("radio.emergency.ack", map[string]any{"channel": r.PathValue("id"), "channelName": "County dispatch", "by": "bitdispatcher", "at": time.Now().UTC()})
 		writeJSON(w, map[string]any{})
 	}))
@@ -693,6 +703,9 @@ func main() {
 	mux.HandleFunc("POST /sim/emergency", func(w http.ResponseWriter, r *http.Request) {
 		id := 197
 		fmt.Sscan(r.URL.Query().Get("unit"), &id)
+		s.mu.Lock()
+		s.emUnit = fmt.Sprintf("bee07.ad5.%06x", id)
+		s.mu.Unlock()
 		s.publish("radio.emergency", map[string]any{"channel": "tg1", "channelName": "County dispatch", "unit": fmt.Sprintf("bee07.ad5.%06x", id), "unitId": id, "emergency": true, "at": time.Now().UTC()})
 		w.Write([]byte("ok\n"))
 	})
