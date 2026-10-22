@@ -433,3 +433,24 @@ func TestResyncEndsOwnPushedCalls(t *testing.T) {
 		t.Fatalf("the main system's EIDO-only call: %s", st)
 	}
 }
+
+// A transmission comes on the event stream and to the radio address too: one line in the radio log.
+// One not transcribed still says who talked, for how long.
+func TestRadioOnceAndUntranscribed(t *testing.T) {
+	eng, b, _, _ := setup(t)
+	start := time.Date(2026, 10, 22, 14, 0, 0, 0, time.UTC)
+	tx := fmt.Sprintf(`{"channel":"tg9","channelName":"County fire dispatch (demo)","direction":"rx","start":%q,"end":%q,"unit":"1207","unitName":"Engine 7"}`,
+		start.Format(time.RFC3339Nano), start.Add(4*time.Second).Format(time.RFC3339Nano))
+	if err := b.Radio("radio.transmission", json.RawMessage(tx), false); err != nil {
+		t.Fatal(err)
+	}
+	// The same event, spaced differently, by the other path.
+	if err := b.Radio("radio.transmission", json.RawMessage(strings.ReplaceAll(tx, ",", ", ")), true); err != nil {
+		t.Fatal(err)
+	}
+	var lines []cad.RadioLine
+	eng.Read(func(s *cad.State) { lines = append(lines, s.Radio...) })
+	if len(lines) != 1 || lines[0].Text != "(talked 4 s, no transcript)" || lines[0].RadioUnit != "Engine 7" {
+		t.Fatalf("%+v", lines)
+	}
+}

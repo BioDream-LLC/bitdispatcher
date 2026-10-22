@@ -324,7 +324,8 @@ type Call struct {
 // Emergency is an emergency button or duress alert from a radio, open until a person acknowledges it.
 type Emergency struct {
 	Key         string    `json:"key"`
-	Unit        string    `json:"unit,omitempty"` // the bitdispatcher unit, when the radio is mapped to one
+	Unit        string    `json:"unit,omitempty"`   // the bitdispatcher unit, when the radio is mapped to one
+	System      string    `json:"system,omitempty"` // which BitVoice's radio it came from ("" the main one)
 	RadioUnit   string    `json:"radioUnit,omitempty"`
 	RadioID     int       `json:"radioId,omitempty"`
 	Alias       string    `json:"alias,omitempty"`

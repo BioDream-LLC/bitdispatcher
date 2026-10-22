@@ -65,6 +65,7 @@ func (f *fakeBV) server(t *testing.T) *httptest.Server {
 		f.mu.Unlock()
 		w.Write([]byte(`{}`))
 	}))
+	mux.HandleFunc("POST /api/radio/channels/{ch}/ack", auth(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{}`)) }))
 	mux.HandleFunc("POST /api/calls/{id}/video/reveal", auth(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{}`)) }))
 	mux.HandleFunc("GET /api/psap/report", auth(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"calls":3,"answered":3,"target":15,"withinTarget":100,"from":"` + r.URL.Query().Get("from") + `"}`))
@@ -235,6 +236,23 @@ func TestMoreBitVoice(t *testing.T) {
 	}
 	if h := s.health(); len(h.More) != 1 || h.More[0].Name != "Neighbour 911" || !h.More[0].Health.Configured {
 		t.Fatalf("health: %+v", h.More)
+	}
+	// An emergency from its radio: acknowledged on its radio console, not the main one's.
+	key, err := s.Eng.RaiseEmergency(cad.RadioActor, cad.Emergency{System: out.ID, RadioUnit: "Medic 3", Channel: "tg9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, b := d.do("POST", "/api/emergencies/"+key+"/ack", map[string]any{}, true); code != 200 || !strings.Contains(string(b), "acknowledged on the radio console") {
+		t.Fatalf("ack: %d %s", code, b)
+	}
+	otherBV.mu.Lock()
+	got = strings.Join(otherBV.paths, ",")
+	otherBV.mu.Unlock()
+	mainBV.mu.Lock()
+	gotMain = len(mainBV.paths)
+	mainBV.mu.Unlock()
+	if !strings.Contains(got, "POST /api/radio/channels/tg9/ack") || gotMain != 0 {
+		t.Fatalf("ack went to: second %q, main %d", got, gotMain)
 	}
 	// Removed: its calls' actions no longer go anywhere.
 	if code, _ := admin.do("DELETE", "/api/admin/integrations/more/"+out.ID, nil, true); code != 204 {

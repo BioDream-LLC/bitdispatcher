@@ -20,6 +20,16 @@ api PUT /admin/integrations "{\"bitvoiceUrl\":\"https://127.0.0.1:9444\",\"bitvo
 echo "simulated BitVoice pinned at $FP"
 # The hooks the simulator sends crash data and drone reports to, its drone system, and the demo's
 # non-emergency line and support number.
+# The BitVoice demo's radio crews, matched to the demonstration's fire units by their radio names
+# (the simulated radio uses the medics and police units, by radio ID).
+for f in 'E1|Engine 1' 'E2|Engine 2' 'L1|Ladder 1' 'BC1|Battalion 1' 'A5|Ambulance 5'; do
+  IFS='|' read -r id alias <<EOF2
+$f
+EOF2
+  u=$(api GET /state | jq -c --arg id "$id" --arg a "$alias" '.units | (if type == "object" then .[] else .[] end) | select(.id == $id)
+    | {id, name, type, station, capabilities, radioId, agency, area, radioAlias: $a}')
+  [ -n "$u" ] && api PUT "/admin/units/$id" "$u" >/dev/null || true
+done
 # Views of a place from the side: open street photos (Panoramax) and the Street View link. EagleView needs an
 # agency's own licence, so the demo has none.
 api PUT /admin/views '{"panoramaxOn":true,"googleLink":true}' >/dev/null

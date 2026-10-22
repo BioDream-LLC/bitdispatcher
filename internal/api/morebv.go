@@ -85,6 +85,11 @@ func (s *Server) bvFor(call string) *bitvoice.Bridge {
 			sys = c.System
 		}
 	})
+	return s.bvSystem(sys)
+}
+
+// bvSystem is the BitVoice with that ID ("" the main one).
+func (s *Server) bvSystem(sys string) *bitvoice.Bridge {
 	if sys == "" {
 		return s.BV
 	}

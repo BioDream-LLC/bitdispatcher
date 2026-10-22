@@ -98,6 +98,39 @@ type Bridge struct {
 	// early holds routing decisions for calls not yet seen: the ESRP routes a call before BitVoice
 	// announces it. They join the call when it comes, or are dropped after earlyFor.
 	early map[string][]cad.Route
+	// seen holds the radio events lately taken: BitVoice sends each on its event stream and to the
+	// radio address too, and it is recorded once.
+	seen map[[32]byte]time.Time
+}
+
+// seenRadio says whether this radio event was already taken in the last few minutes, and marks it.
+func (b *Bridge) seenRadio(typ string, data []byte) bool {
+	// The same event may come spaced or ordered differently on the two paths: compare it re-encoded.
+	var v any
+	if json.Unmarshal(data, &v) == nil {
+		if n, err := json.Marshal(v); err == nil {
+			data = n
+		}
+	}
+	k := sha256.Sum256(append([]byte(typ+"\x00"), data...))
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	if b.seen == nil {
+		b.seen = map[[32]byte]time.Time{}
+	}
+	if t, ok := b.seen[k]; ok && now.Sub(t) < 5*time.Minute {
+		return true
+	}
+	if len(b.seen) > 5000 {
+		for x, t := range b.seen {
+			if now.Sub(t) > 5*time.Minute {
+				delete(b.seen, x)
+			}
+		}
+	}
+	b.seen[k] = now
+	return false
 }
 
 const earlyFor = 2 * time.Minute
@@ -1009,6 +1042,9 @@ func (b *Bridge) Radio(typ string, data json.RawMessage, webhook bool) error {
 		b.health.LastRadioWH = time.Now()
 	}
 	b.mu.Unlock()
+	if b.seenRadio(typ, bytes.TrimSpace(data)) {
+		return nil
+	}
 	switch typ {
 	case "radio.unit", "radio.emergency":
 		var ev RadioUnitEvent
@@ -1024,7 +1060,7 @@ func (b *Bridge) Radio(typ string, data json.RawMessage, webhook bool) error {
 			b.eng.Heard(unit, at)
 		}
 		if typ == "radio.emergency" || ev.Emergency {
-			_, err := b.eng.RaiseEmergency(cad.RadioActor, cad.Emergency{Unit: unit, RadioUnit: ev.Unit, RadioID: ev.UnitID, Alias: ev.Alias,
+			_, err := b.eng.RaiseEmergency(cad.RadioActor, cad.Emergency{Unit: unit, System: b.System(), RadioUnit: ev.Unit, RadioID: ev.UnitID, Alias: ev.Alias,
 				Channel: ev.Channel, ChannelName: ev.ChannelName, Raised: at})
 			return err
 		}
@@ -1051,10 +1087,20 @@ func (b *Bridge) Radio(typ string, data json.RawMessage, webhook bool) error {
 			if unit != "" {
 				b.eng.Heard(unit, firstTime(ev.End, ev.Start))
 			}
-			if strings.TrimSpace(ev.Text) != "" {
-				return b.eng.RadioText(cad.RadioActor, cad.RadioLine{At: firstTime(ev.Start, ev.End), Unit: unit, RadioUnit: firstNonEmpty(ev.UnitName, ev.Unit),
-					Channel: ev.Channel, ChannelName: ev.ChannelName, Text: ev.Text})
+			text := strings.TrimSpace(ev.Text)
+			if text == "" {
+				// Not transcribed: the radio log still shows who talked, for how long.
+				secs := int(ev.End.Sub(ev.Start).Round(time.Second) / time.Second)
+				if ev.Start.IsZero() || ev.End.IsZero() || secs < 1 {
+					secs = 1
+				}
+				text = fmt.Sprintf("(talked %d s, no transcript)", secs)
+				if ev.Emergency {
+					text = fmt.Sprintf("(talked %d s with the emergency button, no transcript)", secs)
+				}
 			}
+			return b.eng.RadioText(cad.RadioActor, cad.RadioLine{At: firstTime(ev.Start, ev.End), Unit: unit, RadioUnit: firstNonEmpty(ev.UnitName, ev.Unit),
+				Channel: ev.Channel, ChannelName: ev.ChannelName, Text: text})
 		}
 	case "radio.location":
 		var f RadioFix
