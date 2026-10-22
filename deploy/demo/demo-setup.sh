@@ -4,6 +4,7 @@
 set -eu
 B=https://127.0.0.1:8443/api
 PW=$(cat /etc/bitdispatcher/admin-password)
+. /etc/bitdispatcher/push.env
 J=$(mktemp)
 trap 'rm -f "$J"' EXIT
 for i in $(seq 1 60); do curl -skf "$B/health" >/dev/null 2>&1 && break; sleep 1; done
@@ -15,14 +16,14 @@ api PUT /admin/users/demo '{"name":"Demo user","role":"supervisor","password":"t
 # The demo user may work every duty but administration, so a visitor can try each workspace.
 api PUT /admin/users/demo/duties '{"duties":["dispatcher","calltaker","police","fire","ems","supervisor","records"]}' >/dev/null
 FP=$(api POST /admin/integrations/bitvoice/fingerprint '{"url":"https://127.0.0.1:9444"}' | jq -r .fingerprint)
-api PUT /admin/integrations "{\"bitvoiceUrl\":\"https://127.0.0.1:9444\",\"bitvoiceFingerprint\":\"$FP\",\"aliListen\":\"127.0.0.1:5001\"}" >/dev/null
+api PUT /admin/integrations "{\"bitvoiceUrl\":\"https://127.0.0.1:9444\",\"bitvoiceFingerprint\":\"$FP\",\"aliListen\":\"127.0.0.1:5001\",\"eidoToken\":\"$EIDO_TOKEN\",\"radioSecret\":\"$RADIO_SECRET\"}" >/dev/null
 echo "simulated BitVoice pinned at $FP"
 # The hooks the simulator sends crash data and drone reports to, its drone system, and the demo's
 # non-emergency line and support number.
 # Views of a place from the side: open street photos (Panoramax) and the Street View link. EagleView needs an
 # agency's own licence, so the demo has none.
 api PUT /admin/views '{"panoramaxOn":true,"googleLink":true}' >/dev/null
-api PUT /admin/connections '{"hookToken":"bd_hook_demo","droneUrl":"http://127.0.0.1:9445/launch","droneToken":"bd_drone_demo","droneAuto":true,"stationAlerts":true}' >/dev/null
+api PUT /admin/connections "{\"hookToken\":\"$HOOK_TOKEN\",\"droneUrl\":\"http://127.0.0.1:9445/launch\",\"droneToken\":\"bd_drone_demo\",\"droneAuto\":true,\"stationAlerts\":true}" >/dev/null
 S=$(api GET /state | jq -c '.settings | .nonEmergencyLines = ["+15408532121"] | .supportLine = "Employee assistance: 540-555-0199 (demo number)"
   | .talkgroups = ["FIRE-DISP","FIRE-OPS2","EMS-1","PD-MAIN","PD-TAC3"]')
 api PUT /admin/settings "$S" >/dev/null

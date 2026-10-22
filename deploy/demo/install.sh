@@ -26,6 +26,12 @@ if [ ! -s /etc/bitdispatcher/admin-password ]; then
   journalctl -u bitdispatcher --no-pager | grep -o 'with password  [^ ]*' | tail -1 | awk '{print $3}' > /etc/bitdispatcher/admin-password
   chmod 600 /etc/bitdispatcher/admin-password
 fi
+# The secrets for what is pushed to the demo (EIDOs, radio events, hooks): random, kept here, set in
+# bitdispatcher by demo-setup.sh and sent by bvsim. A real BitVoice pushing here is given the same.
+if [ ! -s /etc/bitdispatcher/push.env ]; then
+  (umask 077; printf 'EIDO_TOKEN=bd_eido_%s\nRADIO_SECRET=bd_radio_%s\nHOOK_TOKEN=bd_hook_%s\n' \
+    "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > /etc/bitdispatcher/push.env)
+fi
 systemctl enable -q demo-reset.timer bvsim
 systemctl start demo-reset.timer
 systemctl restart bvsim caddy
