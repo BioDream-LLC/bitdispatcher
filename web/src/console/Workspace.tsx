@@ -177,7 +177,8 @@ function Section({ s, ws, onChange, render, drag }: { s: SectionId; ws: Workspac
           </button>
         </div>
       )}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{render(s)}</div>
+      {/* One grid cell: whatever the section is (the map draws itself inside its box), it fills the space. */}
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">{render(s)}</div>
       {drag && drag.s !== s && (
         // Over the section while dragging (the map would take the pointer otherwise); the section is found by
         // its data-section, under this.

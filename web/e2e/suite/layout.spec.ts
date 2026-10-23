@@ -6,6 +6,10 @@ test('the console layout: ready-made layouts per duty, sections dragged and snap
   const sec = (s: string) => page.locator(`[data-section=${s}]`)
   // A supervisor starts on the full console, locked: nothing to drag.
   for (const s of ['queue', 'map', 'units', 'incident']) await expect(sec(s)).toBeVisible()
+  // Every section fills its space: the map, drawn inside its box, too.
+  await expect(sec('map').locator('canvas.maplibregl-canvas')).toBeVisible()
+  const outer = (await sec('map').boundingBox())!.height
+  await expect.poll(async () => (await sec('map').locator('canvas.maplibregl-canvas').boundingBox())!.height).toBeGreaterThan(outer - 40)
   await expect(page.getByLabel('Move Map')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Layout', exact: true }).click()
