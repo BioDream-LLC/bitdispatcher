@@ -42,6 +42,7 @@ export default function Login() {
   const [demo, setDemo] = useState<{ name: string; role: string; duties?: Duty[] } | null>(null)
   const [demoDuty, setDemoDuty] = useState<Duty>((localStorage.getItem('bd.demo.duty') as Duty) || 'dispatcher')
   const [notice, setNotice] = useState('')
+  const [unreachable, setUnreachable] = useState(false) // the server has not answered: this may be the saved copy
   // Ask until the server answers: a page opened while it was restarting (or kept by the offline cache)
   // would otherwise never offer the demo account or show the notice.
   useEffect(() => {
@@ -49,8 +50,8 @@ export default function Login() {
     let timer: ReturnType<typeof setTimeout> | undefined
     const ask = (wait: number) => {
       api.get<{ demo?: { name: string; role: string; duties?: Duty[] }; notice?: string }>('/auth/me').then(
-        (r) => { if (!stop) { setDemo(r.demo ?? null); setNotice(r.notice ?? '') } },
-        () => { if (!stop) timer = setTimeout(() => ask(Math.min(wait * 2, 30_000)), wait) },
+        (r) => { if (!stop) { setDemo(r.demo ?? null); setNotice(r.notice ?? ''); setUnreachable(false) } },
+        () => { if (!stop) { setUnreachable(true); timer = setTimeout(() => ask(Math.min(wait * 2, 30_000)), wait) } },
       )
     }
     ask(2000)
@@ -123,6 +124,11 @@ export default function Login() {
               <PlayCircle size={15} aria-hidden /> Sign in as the demo user
             </button>
           </section>
+        )}
+        {unreachable && (
+          <p role="alert" className="w-full rounded-lg border border-rose-700 bg-rose-950/60 p-3 text-xs leading-relaxed text-rose-100">
+            <b>The bitdispatcher server is not answering.</b> This page may be the copy this browser saved, so signing in will not work yet. It keeps trying; check the network connection, or that nothing between here and the server (a firewall or web filter) blocks it.
+          </p>
         )}
         {notice && <section aria-label="System use notice" className="w-full whitespace-pre-wrap rounded-lg border border-amber-600/60 bg-amber-950/40 p-3 text-xs leading-relaxed text-amber-100">{notice}</section>}
         <form onSubmit={submit} className="panel w-full space-y-4 rounded-xl p-6 shadow-2xl" aria-labelledby="login-h">
