@@ -30,6 +30,8 @@ import { applyLens, parseLens } from './lens'
 import { screenDef, type ScreenKind } from './screens'
 import { loadLayout, rememberBounds, screensChannel } from './layout'
 import { MonitorCheck, X } from 'lucide-react'
+import WorkspaceView, { LayoutMenu, LockButton } from './console/Workspace'
+import { useWorkspace, type SectionId } from './workspace'
 
 // slotOf is the layout slot this window was opened as, if it is one of the position's screens.
 const slotOf = () => new URLSearchParams(location.hash.split('?')[1] ?? '').get('slot')
@@ -63,6 +65,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   const position = me?.console || me?.username || ''
   const [offer, setOffer] = useState(() => screen === 'full' && !slotOf() && !sessionStorage.getItem('bd.screens.offered'))
   const layout = loadLayout(position)
+  const [ws, setWs] = useWorkspace(me?.username ?? '', me?.duty ?? '')
   const def = screenDef(screen)
 
   // A screen opened without a lens in its address starts with its own (police for the police board).
@@ -168,9 +171,19 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   const map = <Boundary name="map"><MapView view={view} rec={rec} onCreateAt={(lat, lon, address) => setSeed({ lat, lon, address })} /></Boundary>
   const panel = <Boundary key={inc?.number ?? '-'} name="incident">{inc ? <IncidentPanel view={raw!} inc={inc} rec={rec} reloadRec={loadRec} /> : <Situation view={view} onCreateFromCall={fromCall} />}</Boundary>
   const cell = 'flex min-h-0 flex-col bg-slate-950'
+  // The sections a workspace can arrange (the full console's).
+  const sections: Record<SectionId, React.ReactNode> = {
+    queue,
+    map,
+    incident: panel,
+    units: <Boundary name="unit board"><UnitBoard view={view} /></Boundary>,
+    stations: <Boundary name="fire houses"><StationBoard view={view} /></Boundary>,
+    police: <Boundary name="police board"><PoliceBoard view={view} /></Boundary>,
+  }
   return (
     <div className="flex h-full min-h-[600px] flex-col overflow-hidden bg-slate-950">
-      <Boundary name="status"><StatusBar view={view} screen={screen} onScreens={() => setScreens(true)} /></Boundary>
+      <Boundary name="status"><StatusBar view={view} screen={screen} onScreens={() => setScreens(true)}
+        layout={screen === 'full' ? <><LayoutMenu ws={ws} onChange={setWs} duty={me?.duty} /><LockButton ws={ws} onChange={setWs} /></> : undefined} /></Boundary>
       <Boundary name="training"><TrainingBar view={raw!} /></Boundary>
       <Boundary name="offline"><OfflineBar view={raw!} /></Boundary>
       <Boundary name="emergency"><EmergencyBanner view={raw!} /></Boundary>
@@ -190,14 +203,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
         const inc = e.over ? String(e.over.id).replace(/^inc:/, '') : ''
         if (inc) dispatchUnit(unit, inc)
       }}>
-      {screen === 'full' && (
-        <main className="grid min-h-0 flex-1 grid-cols-[minmax(300px,22%)_1fr_minmax(380px,28%)] grid-rows-[1fr_minmax(150px,26%)] gap-px bg-slate-800">
-          <div className="row-span-2 flex min-h-0 min-w-0 overflow-hidden bg-slate-950"><div className="flex min-h-0 min-w-0 flex-1 flex-col">{queue}</div></div>
-          {map}
-          <div className={cx('row-span-2', cell)}>{panel}</div>
-          <Boundary name="unit board"><UnitBoard view={view} /></Boundary>
-        </main>
-      )}
+      {screen === 'full' && <WorkspaceView ws={ws} onChange={setWs} render={(s: SectionId) => sections[s]} />}
       {screen === 'calls' && (
         <main className="grid min-h-0 flex-1 grid-cols-[minmax(380px,42%)_1fr] gap-px bg-slate-800">
           <div className={cell}>{queue}</div>
@@ -218,7 +224,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
       {screen === 'map' && <main className="flex min-h-0 flex-1">{map}</main>}
       {screen === 'incident' && <main className={cx('min-h-0 flex-1', cell)}>{panel}</main>}
       </DndContext>
-      {screen !== 'map' && <Boundary name="command line"><CommandLine ref={cmd} view={view} /></Boundary>}
+      {screen !== 'map' && (screen !== 'full' || ws.cmd) && <Boundary name="command line"><CommandLine ref={cmd} view={view} /></Boundary>}
       <ScreensDialog open={screens} onClose={() => setScreens(false)} />
       <MarkOutDialog />
       <AskHost />

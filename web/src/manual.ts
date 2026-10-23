@@ -8,7 +8,7 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'signin', 'taker', 'resources', 'console', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'messages', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
+    ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'messages', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
@@ -53,6 +53,29 @@ Started with \`-demo\`, bitdispatcher seeds a fictional agency on the Roanoke, V
 | Command line (bottom) | Type anywhere to start a command (see [The command line](#command)) |
 
 Select an incident by clicking it, with \`[\` and \`]\`, or from the palette (\`Ctrl K\`). \`Esc\` clears the selection.`,
+  },
+  {
+    id: 'layout', title: 'Your own layout', keys: 'layout arrange drag drop snap sections palette lock unlock stock ready-made simple overwhelming new dispatcher getting started workspace',
+    body: `The dispatcher screen shows only the sections you want, where you want them. Someone new can start with two and add more when ready.
+
+Open **Layout** at the top left of the status bar.
+
+- **Ready-made layouts**: three for the duty you signed in as, drawn as small pictures. One click shows one. Every duty has **Getting started**: just the calls and the incident being worked.
+- **Sections**: calls and incidents, map, incident, unit board, fire houses, police board and the command line. Click one to add it or take it away, or drag it onto the screen.
+
+While the layout is **unlocked** (the lock button beside Layout, amber when unlocked), each section has a title bar:
+
+| To | Do |
+|---|---|
+| Put a section beside, above or below another | Drag it (from Layout, or by its title bar) to that edge of the other; the highlight shows where it will go |
+| Make two trade places | Drop one on the middle of the other |
+| Resize | Drag the line between two sections |
+| Take one away | Its **×** |
+| Start again from nothing | **Clear the screen** in Layout |
+
+Sections snap into place: nothing overlaps and nothing is left empty. **Lock** the layout when it is right: nothing can be moved, resized or taken away until it is unlocked again. Everyone starts locked on their duty's first ready-made layout.
+
+Each person's layout is kept per duty, in this browser. The status bar and the emergency banners are always shown. The layout lock is not the screen lock (Ctrl Shift L), which hides the screen until you sign in again.`,
   },
   {
     id: 'screens', title: 'Screens on several monitors', keys: 'screens monitors multiple windows layout lens fire police discipline second screen multi-monitor',

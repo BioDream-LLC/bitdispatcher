@@ -44,7 +44,7 @@ function Clock({ now }: { now: number }) {
   )
 }
 
-export default function StatusBar({ view, screen = 'full', onScreens }: { view: View; screen?: ScreenKind; onScreens?: () => void }) {
+export default function StatusBar({ view, screen = 'full', onScreens, layout }: { view: View; screen?: ScreenKind; onScreens?: () => void; layout?: React.ReactNode }) {
   const now = useNow()
   const me = useStore((s) => s.me)
   const lens = useStore((s) => s.lens)
@@ -85,6 +85,7 @@ export default function StatusBar({ view, screen = 'full', onScreens }: { view: 
           {me?.name || me?.username} · {me?.console || 'no position'} · {me?.role}
         </span>
       </div>
+      {layout && <div className="flex shrink-0 items-center gap-0.5">{layout}</div>}
       {screen !== 'full' && (
         <span className="chip h-6 shrink-0 gap-1 whitespace-nowrap bg-sky-500/15 px-2 text-[11px] font-bold text-sky-200" title={screenDef(screen).hint}>
           <MonitorCheck size={12} aria-hidden />{screenDef(screen).title}
