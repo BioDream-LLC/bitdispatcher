@@ -37,7 +37,8 @@ test('a BitVoice call shows its caller-ID check, and a caller photo stays hidden
   await signIn(page)
   const panel = page.getByRole('complementary', { name: `Incident ${number}` })
   await expect(async () => {
-    await page.getByRole('main').or(page.locator('body')).getByText(number, { exact: true }).first().click()
+    // The incident in the list of open incidents (its number also shows elsewhere: on a group of callers, on the map).
+    await page.getByRole('list', { name: 'Open incidents' }).getByRole('button', { name: new RegExp(number) }).first().click()
     await expect(panel).toBeVisible({ timeout: 2000 })
   }).toPass({ timeout: 20_000 })
   await expect(panel.getByText(/number (verified|NOT verified)/).first()).toBeVisible()
