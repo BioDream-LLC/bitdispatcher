@@ -16,6 +16,7 @@ import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
 import { AlarmBar, CallOutBox, CrewLine, EPCRBox, FiregroundBox, HistoryButton, PagingBox, SafetyFlags, TowBox } from './Roadmap'
 import { PublicAlertBox } from './PublicAlerts'
+import { IncidentAgencies } from './Coverage'
 import { run as runLine } from './UnitBoard'
 import { api, errText } from '../api'
 import EntryFacts, { AckCell } from './Entry'
@@ -355,6 +356,16 @@ function UnitsOn({ inc, view, now }: { inc: Incident; view: View; now: number })
                 <td className="px-1 py-0.5 font-mono font-bold text-slate-100">
                   {a.unit}{a.recommended ? '' : <span className="ml-0.5 text-[9px] text-slate-500" title="Not from the recommendation">*</span>}
                   {u?.emergency && <span className="chip flash ml-1 text-white">EMER</span>}
+                  {a.crew && a.crew.length > 0 && (
+                    <div className="max-w-40 truncate font-sans text-[9px] font-normal text-slate-400" title={'Aboard when assigned: ' + a.crew.map((c) => c.name + (c.role ? ' (' + c.role + ')' : '') + (c.quals?.length ? ' — ' + c.quals.join(', ') : '')).join('; ') + (a.crewCorrected ? ' (corrected)' : '')}>
+                      {a.crew.map((c) => c.name.split(' ').slice(-1)[0]).join(', ')}{a.crewCorrected ? ' *' : ''}
+                    </div>
+                  )}
+                  {u?.capability && u.capability.state !== 'full' && !cleared && (
+                    <div className={cx('font-sans text-[9px] font-semibold', u.capability.state === 'limited' ? 'text-amber-300' : 'text-rose-300')} title={u.capability.reasons?.join('; ')}>
+                      {u.capability.state === 'limited' ? 'LIMITED' : 'UNAVAILABLE'}: {u.capability.reasons?.[0]}
+                    </div>
+                  )}
                 </td>
                 <td>{cleared ? <span className="text-[10px] text-slate-500">cleared {hhmm(a.cleared)}</span> : <StatusChip status={u?.status ?? a.status} />}</td>
                 <td className={cx('font-mono tnum', over > 0 ? 'font-bold text-amber-300' : 'text-slate-300')}>{!cleared && u ? clock(u.statusAt, now) : ''}</td>
@@ -526,6 +537,10 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
         <AlarmBar inc={inc} view={view} reload={reloadRec} />
         {!closed && <RecommendBox inc={inc} rec={rec} reload={reloadRec} />}
         <UnitsOn inc={inc} view={view} now={now} />
+        <div className="flex flex-wrap items-center gap-2">
+          <IncidentAgencies view={view} inc={inc} />
+          {!closed && <button type="button" className="btn h-6 px-2 text-[11px]" onClick={() => window.dispatchEvent(new CustomEvent('bd:compose', { detail: { kind: 'bolo', incident: inc.number, subject: typeName(view, inc.type) + ' ' + inc.number } }))}>BOLO or message about this incident</button>}
+        </div>
         <PagingBox inc={inc} view={view} />
         <PublicAlertBox inc={inc} view={view} />
         <CallOutBox inc={inc} view={view} />

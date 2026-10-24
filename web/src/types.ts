@@ -20,9 +20,9 @@ export type Location = {
   vRadius?: number
 }
 
-export type Station = { id: string; name: string; address?: string; lat: number; lon: number }
+export type Station = { id: string; name: string; address?: string; lat: number; lon: number; agency?: string }
 
-export type UnitType = { code: string; name: string; discipline: string; capabilities: string[]; cover?: boolean; minStaff?: number }
+export type UnitType = { code: string; name: string; discipline: string; capabilities: string[]; cover?: boolean; minStaff?: number; positions?: string[]; signOn?: '' | 'self' | 'approve' | 'dispatch' }
 
 export type Position = { lat: number; lon: number; accuracy?: number; speed?: number; heading?: number; source: string; at: string }
 
@@ -31,19 +31,24 @@ export type Unit = {
   status: string; statusAt: string; incident?: string; position?: Position; lastHeard?: string; emergency?: string; covering?: string
   markOut?: MarkOut; checked?: string; checkedBy?: string; area?: string; minStaff?: number; crew?: CrewSeat[]
   caps: string[]
+  /** Live capability from who is aboard (full, limited, unavailable) and the unit's status-check minutes now. */
+  capability?: UnitCapability; checkMinutes?: number; staffOverride?: string
 }
+export type UnitCapability = { state: 'full' | 'limited' | 'unavailable'; reasons?: string[] }
 
 export type MarkOut = { code: string; location?: Location; note?: string }
-export type MarkOutType = { code: string; name: string; minutes: number; discipline?: string; interruptible?: boolean }
+export type MarkOutType = { code: string; name: string; minutes: number; discipline?: string; interruptible?: boolean; retired?: boolean; roles?: string[]; maxMinutes?: number; staffing?: boolean }
 
 export type Requirement = { capability: string; count: number }
 export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string
-  alarms?: AlarmLevel[]; par?: boolean; parMinutes?: number; nemsis?: string }
+  alarms?: AlarmLevel[]; par?: boolean; parMinutes?: number; nemsis?: string; agencies?: string[]; checkMinutes?: number }
 export type AlarmLevel = { name: string; runCard: Requirement[] }
 
 export type Assignment = {
   unit: string; status: string; recommended: boolean; dispatched: string
   enroute?: string; onScene?: string; transport?: string; atDest?: string; cleared?: string; acked?: string; ackedBy?: string
+  /** Who was aboard when it was assigned, with what they were qualified for then. */
+  crew?: CrewSeat[]; crewCorrected?: boolean; override?: string
 }
 
 export type Entry = { seq: number; at: string; actor: string; kind: string; text: string; unit?: string; priority?: boolean }
@@ -57,6 +62,7 @@ export type Incident = { files?: IncidentFile[]; protocol?: ProtocolRun; neris?:
   newLocation?: { location: Location; call?: string; metres: number; at: string }; guidance?: Shown[]
   changed?: { from?: Location; to: Location; at: string; by: string; why?: string }
   alarm?: number; fireground?: Fireground; epcr?: Record<string, EPCRRecord>
+  agency?: string; assisting?: string[]
 }
 
 export type Person = {
@@ -74,7 +80,7 @@ export type Modifier = { code: string; name: string; priority?: number; discipli
 export type BOLO = { id: string; kind: string; text: string; plate?: string; vehicle?: string; person?: string; incident?: string; disciplines?: string[]; issued: string; by: string; expires?: string; cancelled?: string; cancelledBy?: string; updates?: Entry[] }
 export type Facility = { id: string; name: string; kind?: string; lat?: number; lon?: number; phone?: string; status: 'open' | 'diversion' | 'closed'; note?: string; until?: string; updated?: string; by?: string }
 export type Passdown = { id: string; text: string; for?: string; at: string; by: string; until?: string }
-export type ResponsePlan = { id: string; name: string; callTypes?: string[]; modifiers?: string[]; area?: string; addresses?: string[]; from?: string; to?: string; order: string[]; note?: string; updated?: string }
+export type ResponsePlan = { id: string; name: string; callTypes?: string[]; modifiers?: string[]; area?: string; addresses?: string[]; from?: string; to?: string; order: string[]; note?: string; updated?: string; agency?: string }
 export type EntryView = { modifiers: Modifier[]; bolos: BOLO[]; facilities: Facility[]; passdown: Passdown[]; guidance: number }
 export type Passage = {
   doc: string; title: string; kind: 'policy' | 'guide' | 'prompt' | 'checklist'; version: string; effective: string; source?: string
@@ -98,7 +104,8 @@ export type FOIARequest = {
   status: 'received' | 'in-review' | 'awaiting-approval' | 'released' | 'denied' | 'closed'; assigned?: string; items?: FOIAItem[] | null; notes?: Entry[]
   released?: string; approvedBy?: string; started?: string; updated: string
 }
-export type Workstation = { id: string; name?: string; duties?: string[]; enrolled?: { hash: string; at: string; by: string; label?: string }[] }
+export type Workstation = { id: string; name?: string; duties?: string[]; enrolled?: { hash: string; at: string; by: string; label?: string }[]; agencies?: string[]; monitor?: string[]; monitors?: MonitorInfo[] }
+export type MonitorInfo = { width: number; height: number; left?: number; top?: number }
 export type Need = { duties?: string[]; last?: string; code?: boolean; enrol?: { secret: string; uri: string }; unit?: boolean }
 
 export type Media = { id: string; url: string; purpose: string }
@@ -153,6 +160,8 @@ export type Settings = {
   security?: { mfa?: '' | 'off' | 'admins' | 'everyone'; lockMinutes?: number; stagedChanges?: boolean }
   ackSeconds?: number; overrideReasonOff?: boolean; talkgroups?: string[]; moveMeters?: number; foiaDays?: number
   qualifications?: string[]; capNeeds?: CapNeed[] | null; parMinutes?: number; benchmarks?: Benchmark[]; towClasses?: string[]; towZones?: string[]
+  views?: ViewRule[]; staffing?: StaffingRules; commKinds?: CommKind[]; priorityRules?: PriorityRule[]; commFileTypes?: string[]; commFileMB?: number
+  multiCall?: MultiCall; commands?: CommandRules
 }
 
 export type Failure = { at: string; what: string; call?: string; error: string }
@@ -277,9 +286,9 @@ export type Handling = {
 // ---- the roadmap features (internal/cad alarm.go, crew.go, fireground.go, pages.go, tow.go, schedule.go,
 // directory.go, geofence.go, history.go, warrants.go; internal/api roadmap.go) ----
 
-export type CrewSeat = { member: string; name: string; role?: string; since: string }
-export type Member = { id: string; name: string; rank?: string; quals?: string[]; agency?: string; station?: string; volunteer?: boolean; phone?: string; email?: string; topic?: string; inactive?: boolean; note?: string; riding?: string }
-export type MemberBrief = { id: string; name: string; rank?: string; quals?: string[]; station?: string; volunteer?: boolean; inactive?: boolean; riding?: string }
+export type CrewSeat = { member: string; name: string; role?: string; since: string; secondary?: boolean; reason?: string; quals?: string[]; move?: boolean }
+export type Member = { id: string; name: string; rank?: string; quals?: string[]; agency?: string; station?: string; volunteer?: boolean; phone?: string; email?: string; topic?: string; inactive?: boolean; note?: string; riding?: string; radioId?: string; duty?: DutyPeriod; creds?: Credential[] }
+export type MemberBrief = { id: string; name: string; rank?: string; quals?: string[]; station?: string; volunteer?: boolean; inactive?: boolean; riding?: string; agency?: string; onDuty?: boolean; dutyKind?: string; availability?: string }
 export type CapNeed = { capability: string; qualification: string; count: number }
 
 export type PARCheck = { at: string; by: string; ok: string[]; missing?: string[]; pax?: Record<string, number>; note?: string }
@@ -352,3 +361,67 @@ export type AlertingSettings = {
   sender: string; senderName: string; jurisdiction: string; geocodes: string[]; feed: boolean; twoPerson: boolean; timeZone?: string
   web?: string; contact?: string; receivers: CAPReceiver[]; feedUrl: string; events: SAMEEvent[]; channels: string[]; ready: string[]
 }
+
+// ---- agencies, presets and supervisory views (cad/agency.go, cad/presets.go) ----
+export type Agency = { code: string; name: string; disciplines: string[]; inactive?: boolean; ori?: string; neris?: string; ids?: Record<string, string>
+  incidentPrefix?: string; dispositions?: string[]; timers?: Record<string, number>; talkgroups?: string[]; records?: string; note?: string; updated?: string; by?: string }
+export type Staff = { username: string; agencies?: string[]; home?: string; covered?: string[]; monitor?: string[]; trainee?: boolean; member?: string; note?: string; updated?: string; by?: string }
+export type WorkCoverage = { username: string; working: string; covered: string[]; monitored: string[]; console?: string; duty?: string; at?: string }
+export type AgencyView = { agencies: Agency[]; coverage: WorkCoverage; staff: Staff; may: string[] }
+export type Preset = { user: string; duty: string; workspace?: unknown; screens?: unknown; monitors?: MonitorInfo[]; protected?: boolean; version: number; updated: string; by: string; console?: string; reason?: string }
+export type PresetOut = { preset: Preset | null; source: '' | 'own' | 'assigned'; mayEdit: boolean; why?: string; trainee: boolean }
+export type ViewDef = { id: string; name: string; route: string }
+export type ViewRule = { id: string; off?: boolean; roles?: string[]; users?: string[]; agencies?: string[] }
+export type ConfigVersion = { seq: number; at: string; by: string; why: string; agency?: string; changes: number; parts: Record<string, string[]>; rollbackOf?: number; undoneBy?: number }
+
+// ---- staffing and qualifications (cad/staffing.go, cad/quals.go) ----
+export type DutyPeriod = { start: string; until?: string; shift?: string; kind?: string; availability?: string; detail?: string; note?: string; by?: string; entered?: string }
+export type StaffingRules = { short?: '' | 'warn' | 'limited' | 'oos'; dispatch?: '' | 'warn' | 'override' | 'block'; minimums?: StaffMinimum[] }
+export type StaffMinimum = { qual: string; count: number; agency?: string; note?: string }
+export type CrewChange = { crew: Partial<CrewSeat>[]; note?: string; reason?: string; effective?: string; override?: string }
+export type CrewTemplate = { id: string; name: string; unit: string; crew: CrewSeat[]; shift?: string }
+export type CrewRequest = { id: string; unit: string; change: CrewChange; by: string; at: string; decided?: string; why?: string }
+export type QualDef = { code: string; name: string; category: 'team' | 'specialty' | 'training' | 'credential'; agency?: string; levels?: string[]; months?: number; renewDays?: number
+  prereqs?: string[]; verify?: boolean; selfAvailable?: boolean; documents?: string; note?: string; updated?: string; by?: string }
+export type Credential = { qual: string; level?: string; state: string; issuer?: string; issued?: string; expires?: string; restriction?: string; files?: string[]
+  verifiedBy?: string; verifiedAt?: string; note?: string; updated?: string; by?: string; verify?: boolean; reason?: string }
+export type Equivalency = { id: string; fromAgency: string; from: string; to: string; agency?: string; scope?: string; expires?: string; approvedBy?: string; at?: string }
+export type PersonBrief = { id: string; name: string; rank?: string; agency?: string; station?: string; radioId?: string; onDuty: boolean; duty?: DutyPeriod; units?: string[]
+  quals: string[]; creds?: Credential[]; credProblems?: string[] }
+export type CoverageGap = StaffMinimum & { have: number; names: string[] }
+export type ExpiringCredential = { member: string; name: string; agency?: string; qual: string; expires: string; expired: boolean }
+export type StaffingCoverage = { gaps: CoverageGap[]; expiring: ExpiringCredential[]; requests: CrewRequest[]
+  units: { unit: string; agency?: string; status: string; crew: CrewSeat[] | null; capability: UnitCapability; override?: string }[] }
+
+// ---- communications (cad/comms.go) ----
+export type CommPriority = 'urgent' | 'high' | 'medium' | 'low'
+export type CommKind = { code: string; name: string; priority?: CommPriority; send?: string[]; hours?: number; noExpiry?: boolean; waits?: boolean }
+export type PriorityRule = { level: CommPriority; tone: 'alarm' | 'alert' | 'chime' | 'tick' | 'none'; repeat?: number; ack?: boolean; escalate?: number; silenceable?: boolean }
+export type Receipt = { at: string; duty?: string; console?: string; unit?: string }
+export type Comm = { id: string; thread: string; version: number; of?: string; kind: string; priority: CommPriority; subject: string; body: string; to: string[]; cc?: string[]
+  incident?: string; related?: string[]; files?: string[]; plate?: string; plateState?: string; vehicle?: string; person?: string; description?: string; agency?: string
+  from: string; fromName?: string; fromDuty?: string; fromAgency?: string; fromConsole?: string; fromUnit?: string; issued: string; effective?: string; expires?: string; noExpiry?: boolean
+  cancelled?: boolean; why?: string; supersededBy?: string; delivered?: Record<string, Receipt>; opened?: Record<string, Receipt>; acked?: Record<string, Receipt>; escalated?: string }
+export type CommView = Comm & { state: 'active' | 'updated' | 'expired' | 'cancelled' | 'scheduled'; openedByMe: boolean; ackedByMe: boolean; needsAck: boolean; mine: boolean }
+export type CommFile = { id: string; name: string; type: string; size: number; sha256: string; by: string; at: string; removed?: boolean; why?: string }
+export type CommDraft = { id: string; user: string; comm: Partial<Comm>; updated: string }
+export type CommList = { items: CommView[]; drafts: CommDraft[]; kinds: CommKind[]; priorities: PriorityRule[] }
+
+// ---- working calls (cad/calldrafts.go) ----
+export type MultiCall = { off?: boolean; max?: Record<string, number>; traineeMax?: number; defaultMax?: number; abandonMinutes?: number }
+export type CallDraftInfo = { id: string; owner: string; duty: string; console?: string; agency?: string; call?: string; opened: string; state: string; incident?: string; moves?: number }
+export type CallDraftView = CallDraftInfo & { content?: unknown; saved?: string }
+
+// ---- search (cad/find.go) ----
+export type FindQuery = { q: string; types?: string[]; agency?: string; from?: string; to?: string; status?: string; allAgencies?: boolean; fuzzy?: boolean }
+export type Found = { group: string; ref: string; incident?: string; title: string; detail?: string; agency?: string; status?: string; at?: string
+  field: string; strength: 'exact' | 'partial' | 'similar'; why: string; confirmed: boolean; limited?: boolean }
+export type FindResults = { query: FindQuery; groups: Record<string, Found[]>; counts: Record<string, number>; scope: string[] }
+
+// ---- command grammar and keys (cad/fieldcmd.go) ----
+export type StatusCode = { code: string; status: string; name?: string; retired?: boolean }
+export type KeyBinding = { key: string; screen?: '' | 'console' | 'taker' | 'mdt'; action: string; label?: string }
+export type KeyProfile = { id: string; name: string; bindings: KeyBinding[] }
+export type CommandRules = { delim?: string; fieldInitiate?: string[]; fiType?: string; twoPass?: boolean; fiMarkOut?: string; autoQuery?: boolean
+  unitStatus?: string[]; multiUnit?: boolean; statusCodes?: StatusCode[]; keyProfiles?: KeyProfile[]; keys?: Record<string, string> }
+export type CommandResult = { ok: boolean; message: string; incident?: string; refused?: boolean; form?: '' | 'unit-status' | 'field-initiate'; unit?: string; plate?: string; plateState?: string }

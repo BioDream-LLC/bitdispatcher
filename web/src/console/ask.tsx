@@ -7,7 +7,7 @@ import { Modal } from '../ui'
 // A question asked before sending units: why other units than recommended, or confirm the recommendation's
 // warnings (an unverified or uncertain location). One host on the page answers every caller.
 
-type Q = { kind: 'reason' | 'confirm'; text: string; warnings?: string[]; resolve: (v: string | null) => void }
+type Q = { kind: 'reason' | 'confirm' | 'override'; text: string; warnings?: string[]; resolve: (v: string | null) => void }
 let push: ((q: Q) => void) | null = null
 
 function ask(q: Omit<Q, 'resolve'>): Promise<string | null> {
@@ -21,9 +21,10 @@ const REASONS = ['Closer by radio or AVL', 'Crew asked for it', 'Supervisor deci
 export async function dispatchUnits(number: string, units: string[], recommended: string[]): Promise<boolean> {
   let reason = ''
   let confirm = false
-  for (let i = 0; i < 3; i++) {
+  let override = ''
+  for (let i = 0; i < 4; i++) {
     try {
-      await api.post(`/incidents/${number}/dispatch`, { units, recommended, reason, confirm })
+      await api.post(`/incidents/${number}/dispatch`, { units, recommended, reason, confirm, override })
       toast.success(`Dispatched ${units.join(' ')} to ${number}`)
       return true
     } catch (e) {
@@ -31,6 +32,13 @@ export async function dispatchUnits(number: string, units: string[], recommended
         const r = await ask({ kind: 'reason', text: e.message })
         if (!r) return false
         reason = r
+        continue
+      }
+      if (e instanceof ApiError && e.field === 'override') {
+        // A short-staffed unit: the agency wants a supervisor's override and reason.
+        const r = await ask({ kind: 'override', text: e.message })
+        if (!r) return false
+        override = r
         continue
       }
       if (e instanceof ApiError && e.field === 'confirm') {
@@ -59,13 +67,19 @@ export function AskHost() {
   }
   if (!q) return null
   return (
-    <Modal open onClose={() => done(null)} title={q.kind === 'reason' ? 'Why these units?' : 'Confirm before sending'}
+    <Modal open onClose={() => done(null)} title={q.kind === 'reason' ? 'Why these units?' : q.kind === 'override' ? 'Send short-staffed?' : 'Confirm before sending'}
       icon={q.kind === 'reason' ? <HelpCircle size={16} className="text-sky-300" aria-hidden /> : <AlertTriangle size={16} className="text-amber-300" aria-hidden />}
       footer={<>
         <button className="btn" onClick={() => done(null)}>Cancel</button>
-        <button className="btn btn-go" disabled={q.kind === 'reason' && !text.trim()} onClick={() => done(q.kind === 'reason' ? text.trim() : 'yes')}>{q.kind === 'reason' ? 'Send with this reason' : 'Confirmed: send'}</button>
+        <button className="btn btn-go" disabled={q.kind !== 'confirm' && !text.trim()} onClick={() => done(q.kind !== 'confirm' ? text.trim() : 'yes')}>{q.kind === 'reason' ? 'Send with this reason' : q.kind === 'override' ? 'Override and send' : 'Confirmed: send'}</button>
       </>}>
-      {q.kind === 'reason' ? (
+      {q.kind === 'override' ? (
+        <div className="space-y-2">
+          <p className="text-sm text-amber-100">{q.text}</p>
+          <p className="text-xs text-slate-400">Only a supervisor can override; the reason is kept with the dispatch.</p>
+          <input className="input" autoFocus placeholder="Why send it short-staffed" value={text} onChange={(e) => setText(e.target.value)} aria-label="Override reason" />
+        </div>
+      ) : q.kind === 'reason' ? (
         <div className="space-y-2">
           <p className="text-sm text-slate-300">{q.text}. The reason is kept with the dispatch in the ledger.</p>
           <div className="flex flex-wrap gap-1">{REASONS.map((r) => <button key={r} className="btn h-7 text-xs" onClick={() => done(r)}>{r}</button>)}</div>

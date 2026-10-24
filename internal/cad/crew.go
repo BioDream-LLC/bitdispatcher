@@ -39,14 +39,26 @@ type Member struct {
 	Topic     string `json:"topic,omitempty"` // a push topic (ntfy) for pages
 	Inactive  bool   `json:"inactive,omitempty"`
 	Note      string `json:"note,omitempty"`
+	RadioID   string `json:"radioId,omitempty"` // the person's own radio ID
+	// Duty is the person's current duty period (staffing.go), nil when off duty; Creds their credentials
+	// (quals.go). Both are kept by their own events, not by saving the member.
+	Duty  *DutyPeriod  `json:"duty,omitempty"`
+	Creds []Credential `json:"creds,omitempty"`
 }
 
 // CrewSeat is one member riding a unit.
 type CrewSeat struct {
 	Member string    `json:"member"`
 	Name   string    `json:"name"`
-	Role   string    `json:"role,omitempty"` // officer, driver, firefighter, paramedic…
+	Role   string    `json:"role,omitempty"` // the crew position: officer, driver, firefighter, paramedic…
 	Since  time.Time `json:"since"`
+	// Secondary: an authorised second assignment (with Reason) while also on another unit.
+	Secondary bool   `json:"secondary,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+	// Quals are what the person was validly qualified for, kept on an incident's record at dispatch.
+	Quals []string `json:"quals,omitempty"`
+	// Move (in a change only) moves the person from the unit they are on.
+	Move bool `json:"move,omitempty"`
 }
 
 // CapNeed is what a capability needs of a unit's crew: this many members with a qualification.
@@ -67,8 +79,11 @@ func DefaultQualifications() []string {
 }
 
 type crewData struct {
-	Crew []CrewSeat `json:"crew"`
-	Note string     `json:"note,omitempty"`
+	Crew      []CrewSeat `json:"crew"`
+	Note      string     `json:"note,omitempty"`
+	Reason    string     `json:"reason,omitempty"`
+	Effective time.Time  `json:"effective,omitzero"`
+	Override  string     `json:"override,omitempty"`
 }
 
 var reMember = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$`)
@@ -97,6 +112,7 @@ func (e *Engine) SaveMember(a Actor, m Member) error {
 		}
 	}
 	m.Quals = qs
+	m.Duty, m.Creds = nil, nil // kept by their own events
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if m.Station != "" && e.st.Stations[m.Station] == nil {
@@ -119,42 +135,10 @@ func (e *Engine) RemoveMember(a Actor, id string) error {
 	return err
 }
 
-// SetCrew sets who rides a unit. A member riding another unit moves to this one. An empty crew means
-// staffing is not recorded for the unit.
+// SetCrew sets who rides a unit (staffing.go applies the rules). An empty crew means staffing is not
+// recorded for the unit.
 func (e *Engine) SetCrew(a Actor, unit string, seats []CrewSeat, note string) error {
-	unit = strings.ToUpper(unit)
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	u, ok := e.st.Units[unit]
-	if !ok {
-		return problem("unit", "no unit %s", unit)
-	}
-	var crew []CrewSeat
-	now := e.now()
-	for _, c := range seats {
-		m := e.st.Members[c.Member]
-		if m == nil {
-			return problem("crew", "no member %s on the roster", c.Member)
-		}
-		if m.Inactive {
-			return problem("crew", "%s is marked inactive on the roster", m.Name)
-		}
-		if slices.ContainsFunc(crew, func(x CrewSeat) bool { return x.Member == m.ID }) {
-			continue
-		}
-		since := now
-		for _, old := range u.Crew {
-			if old.Member == m.ID {
-				since = old.Since
-			}
-		}
-		crew = append(crew, CrewSeat{Member: m.ID, Name: m.Name, Role: strings.TrimSpace(c.Role), Since: since})
-	}
-	if len(crew) > 12 {
-		return problem("crew", "up to 12 on a unit")
-	}
-	_, err := e.write(a, EvUnitCrew, refs{Unit: unit, Incident: u.Incident}, crewData{Crew: crew, Note: strings.TrimSpace(note)})
-	return err
+	return e.SetCrewChange(a, unit, CrewChange{Seats: seats, Note: note})
 }
 
 func (s *State) applyCrew(e ledger.Event) (bool, error) {
@@ -166,6 +150,9 @@ func (s *State) applyCrew(e ledger.Event) (bool, error) {
 		}
 		if s.Members == nil {
 			s.Members = map[string]*Member{}
+		}
+		if old := s.Members[m.ID]; old != nil {
+			m.Duty, m.Creds = old.Duty, old.Creds
 		}
 		s.Members[m.ID] = &m
 		for _, u := range s.Units {
@@ -193,26 +180,50 @@ func (s *State) applyCrew(e ledger.Event) (bool, error) {
 		if !ok {
 			return true, nil
 		}
-		// A member is on one unit at a time.
+		// A member is on one unit at a time, unless this is an authorised secondary assignment.
 		for _, c := range v.Crew {
+			if c.Secondary {
+				continue
+			}
 			for _, o := range s.Units {
 				if o.ID != u.ID {
-					o.Crew = slices.DeleteFunc(o.Crew, func(x CrewSeat) bool { return x.Member == c.Member })
+					o.Crew = slices.DeleteFunc(o.Crew, func(x CrewSeat) bool { return x.Member == c.Member && !x.Secondary })
 				}
 			}
 		}
-		before := len(u.Crew)
+		old := u.Crew
 		u.Crew = v.Crew
+		u.crewKnown = true
+		if v.Override == "" && len(s.Staffing(u)) == 0 {
+			u.StaffOverride = ""
+		}
 		if in, ok := s.Incidents[u.Incident]; ok && u.Incident != "" {
-			names := make([]string, len(v.Crew))
-			for i, c := range v.Crew {
-				names[i] = c.Name
+			var joined, left []string
+			for _, c := range v.Crew {
+				if !slices.ContainsFunc(old, func(x CrewSeat) bool { return x.Member == c.Member }) {
+					joined = append(joined, c.Name+roleIn(c.Role))
+				}
 			}
-			text := fmt.Sprintf("%s crew: %s", u.ID, strings.Join(names, ", "))
-			if len(v.Crew) == 0 {
-				text = fmt.Sprintf("%s crew cleared (was %d)", u.ID, before)
+			for _, c := range old {
+				if !slices.ContainsFunc(v.Crew, func(x CrewSeat) bool { return x.Member == c.Member }) {
+					left = append(left, c.Name)
+				}
 			}
-			in.add(e, "crew", text)
+			var parts []string
+			if len(joined) > 0 {
+				parts = append(parts, "joined: "+strings.Join(joined, ", "))
+			}
+			if len(left) > 0 {
+				parts = append(parts, "left: "+strings.Join(left, ", "))
+			}
+			if len(parts) == 0 {
+				parts = append(parts, "positions changed")
+			}
+			text := fmt.Sprintf("%s crew %s", u.ID, strings.Join(parts, "; "))
+			if !v.Effective.IsZero() && v.Effective.Before(e.At.Add(-time.Minute)) {
+				text += " (effective " + v.Effective.UTC().Format("15:04") + ")"
+			}
+			in.add(e, "crew", text+suffix(v.Reason))
 		}
 	default:
 		return false, nil
@@ -244,6 +255,7 @@ func (s *State) Staffing(u *Unit) []string {
 	if n := s.MinStaff(u); n > 0 && len(u.Crew) < n {
 		out = append(out, fmt.Sprintf("%d of %d aboard", len(u.Crew), n))
 	}
+	out = append(out, s.missingPositions(u)...)
 	return append(out, s.lostCaps(u)...)
 }
 
@@ -274,12 +286,20 @@ func (s *State) capNeeds() []CapNeed {
 
 func (s *State) crewWith(u *Unit, qual string) int {
 	n := 0
+	now := s.now()
 	for _, c := range u.Crew {
-		if m := s.Members[c.Member]; m != nil && slices.Contains(m.Quals, qual) {
+		if m := s.Members[c.Member]; m != nil && s.holds(m, qual, now) {
 			n++
 		}
 	}
 	return n
+}
+
+func roleIn(r string) string {
+	if r == "" {
+		return ""
+	}
+	return " (" + r + ")"
 }
 
 // crewDrops are the capabilities a unit loses for its crew.

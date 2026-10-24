@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers'
 
-test('the console layout: ready-made layouts per duty, sections dragged and snapped into place, the lock', async ({ page }) => {
+test('the console layout: ready-made layouts per duty, sections dragged and snapped into place, the preset kept with the account and locked', async ({ page, browser }) => {
   const errors = await signIn(page)
   const sec = (s: string) => page.locator(`[data-section=${s}]`)
   // A supervisor starts on the full console, locked: nothing to drag.
@@ -16,13 +16,13 @@ test('the console layout: ready-made layouts per duty, sections dragged and snap
   const menu = page.getByRole('dialog', { name: 'Layout' })
   await expect(menu.getByRole('button', { name: /Overview/ })).toBeVisible()
   await page.screenshot({ path: '/tmp/ws-menu.png' })
+  // The layout is a locked preset: choosing another one starts editing it.
   await menu.getByRole('button', { name: /Getting started/ }).click()
   await expect(sec('map')).toHaveCount(0)
   await expect(sec('queue')).toBeVisible()
-  await expect(menu.getByRole('button', { name: /^Map: click to add/ })).toBeDisabled()
+  await expect(page.getByText('Editing layout')).toBeVisible()
 
-  // Unlocked, the map is dragged from the menu onto the incident's right edge: they share that space.
-  await menu.getByRole('button', { name: 'Unlock layout', exact: true }).click()
+  // Unlocked for editing, the map is dragged from the menu onto the incident's right edge: they share that space.
   const tile = menu.getByRole('button', { name: /^Map: click to add/ })
   const inc = await sec('incident').boundingBox()
   await tile.hover()
@@ -53,13 +53,22 @@ test('the console layout: ready-made layouts per duty, sections dragged and snap
   await page.getByRole('dialog', { name: 'Layout' }).getByRole('button', { name: 'Clear the screen' }).click()
   await expect(page.getByText('No sections on this screen.')).toBeVisible()
 
-  // Locked, and kept: the next visit shows the same.
-  await page.getByRole('button', { name: /Layout unlocked: click to lock it/ }).first().click()
+  // Saved and locked, kept with the account: the next visit, and another browser, show the same.
+  await page.getByRole('button', { name: 'Save changes and lock' }).click()
   await page.reload()
   await expect(page.getByText('No sections on this screen.')).toBeVisible()
   await expect(page.getByRole('button', { name: /Layout locked/ })).toBeVisible()
+  const other = await browser.newContext()
+  const p2 = await other.newPage()
+  await signIn(p2)
+  await expect(p2.getByText('No sections on this screen.')).toBeVisible()
+  await other.close()
+  // Back to the full console, saved again.
   await page.getByRole('button', { name: 'Layout', exact: true }).click()
   await page.getByRole('dialog', { name: 'Layout' }).getByRole('button', { name: /Full console/ }).click()
   await expect(sec('units')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Save changes and lock' }).click()
+  await expect(page.getByRole('button', { name: /Layout locked/ })).toBeVisible()
   expect(errors).toEqual([])
 })

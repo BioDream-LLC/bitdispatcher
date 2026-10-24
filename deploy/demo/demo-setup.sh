@@ -156,5 +156,42 @@ if [ "$(api GET /admin/alerting | jq -r '.sender')" = "" ]; then
     {"name":"Resident anywhere (demo)","topic":"res-all"}]}' >/dev/null || true
   echo "seeded public alerts"
 fi
+# The operational updates, seeded once: the agencies the centre dispatches for (units given theirs), the
+# demo user's usual coverage, qualifications and credentials, a staffing minimum, the classic keys for the
+# police desk, and a BOLO in the inbox. All fictional demo data.
+if [ "$(api GET /agencies | jq '.agencies | length')" = "0" ]; then
+  ag() { api PUT "/admin/agencies/$1" "$2" >/dev/null || true; }
+  ag DISP '{"name":"Emergency communications centre (demo)","disciplines":["dispatch"]}'
+  ag RPD '{"name":"City police (demo)","disciplines":["police"]}'
+  ag RCPD '{"name":"County police (demo)","disciplines":["police"]}'
+  ag SPD '{"name":"Salem police (demo)","disciplines":["police"]}'
+  ag RFD '{"name":"City fire and EMS (demo)","disciplines":["fire","ems"]}'
+  ag RCFR '{"name":"County fire and rescue (demo)","disciplines":["fire","ems"]}'
+  ag SFD '{"name":"Salem fire and EMS (demo)","disciplines":["fire","ems"]}'
+  ag RPW '{"name":"Public works (demo)","disciplines":["other"]}'
+  api GET /state | jq -c '.settings.unitTypes as $t | .units[] | . as $u | ($t[] | select(.code == $u.type) | .discipline) as $d
+    | {id, name, type, station, capabilities, radioId, radioAlias, area, minStaff, agency: (if $d == "police" then "RPD" elif $d == "fire" or $d == "ems" then "RFD" else "" end)}' |
+  while read -r u; do api PUT "/admin/units/$(printf '%s' "$u" | jq -r .id)" "$u" >/dev/null || true; done
+  api PUT /admin/staff/demo '{"home":"DISP","covered":["RPD","RFD"],"monitor":["RCPD","RCFR"]}' >/dev/null || true
+  q() { api PUT "/admin/quals/$1" "$2" >/dev/null || true; }
+  q hazmat-ops '{"name":"HazMat operations","category":"credential","months":36}'
+  q hazmat-tech '{"name":"HazMat technician","category":"team","months":24,"renewDays":60,"prereqs":["hazmat-ops"],"verify":true,"levels":["Technician","Team Leader"]}'
+  q swift-water '{"name":"Swift water rescue","category":"team","months":12,"verify":true}'
+  q fto '{"name":"Field training officer","category":"training"}'
+  q evidence-tech '{"name":"Evidence technician","category":"specialty"}'
+  NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ); YAGO=$(date -u -d '-1 year' +%Y-%m-%dT%H:%M:%SZ); SOON=$(date -u -d '-23 months' +%Y-%m-%dT%H:%M:%SZ)
+  cr() { api PUT "/members/$1/credentials/$2" "$3" >/dev/null || true; }
+  cr 1106 hazmat-ops "{\"issued\":\"$YAGO\",\"verify\":true}"
+  cr 1106 hazmat-tech "{\"level\":\"Technician\",\"issued\":\"$YAGO\",\"issuer\":\"State fire programs (demo)\",\"verify\":true}"
+  cr 1103 hazmat-ops "{\"issued\":\"$YAGO\",\"verify\":true}"
+  cr 1103 hazmat-tech "{\"level\":\"Technician\",\"issued\":\"$SOON\",\"issuer\":\"State fire programs (demo)\",\"verify\":true}"
+  cr 1107 swift-water "{\"issued\":\"$YAGO\",\"verify\":false}"
+  S=$(api GET /state | jq -c '.settings | .staffing = {"short":"limited","dispatch":"warn","minimums":[{"qual":"hazmat-tech","count":2,"note":"Demo: two HazMat technicians on duty"}]}
+    | .commands = ((.commands // {}) | .keys = {"police":"classic"})')
+  api PUT /admin/settings "$S" >/dev/null || true
+  for m in 1101 1102 1103 1104 1105 1106 1107; do api POST "/members/$m/on" '{"kind":"regular","shift":"A"}' >/dev/null || true; done
+  api POST /comms '{"kind":"bolo","priority":"high","subject":"(demo) Stolen vehicle: silver Honda Civic","body":"Fictional demo BOLO: silver Honda Civic, VA plate DEMO123, taken from Market St this morning. Do not stop on this alone; confirm first.","plate":"DEMO123","plateState":"VA","vehicle":"silver Honda Civic","agency":"RPD"}' >/dev/null || true
+  echo "seeded agencies, qualifications, staffing and a BOLO"
+fi
 api POST /auth/logout '{}' >/dev/null || true
 echo "demo ready"

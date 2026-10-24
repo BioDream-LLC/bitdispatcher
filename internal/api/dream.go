@@ -30,6 +30,9 @@ type Extra struct {
 	// HookToken is what senders of transcripts, crash data, drone reports and radio words present
 	// (Authorization: Bearer). Empty: the hooks are off.
 	HookToken string `json:"hookToken"`
+	// ClamAV is a ClamAV daemon (host:port or a unix socket) that scans communication attachments; empty: not
+	// scanned (their type is still checked from their content).
+	ClamAV string `json:"clamav,omitempty"`
 	// DroneURL receives a launch request for an incident (POST, JSON); DroneToken is sent with it.
 	DroneURL   string `json:"droneUrl"`
 	DroneToken string `json:"droneToken"`

@@ -8,15 +8,15 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'messages', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
+    ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'working-agency', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'messages', 'inbox', 'search', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
     ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
   { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports, papers to serve and alerts to the public.',
-    ids: ['alarms', 'admin-personnel', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
+    ids: ['alarms', 'admin-personnel', 'staffing', 'admin-qualifications', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
-    ids: ['admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
+    ids: ['admin-agencies', 'admin-operations', 'admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
 
 export const manual: Article[] = [
@@ -59,6 +59,15 @@ Select an incident by clicking it, with \`[\` and \`]\`, or from the palette (\`
   {
     id: 'layout', title: 'Your own layout', keys: 'layout arrange drag drop snap sections palette lock unlock stock ready-made simple overwhelming new dispatcher getting started workspace',
     body: `The dispatcher screen shows only the sections you want, where you want them. Someone new can start with two and add more when ready.
+
+## Your saved preset for each duty
+Your layout is a **preset** kept with your account, one for each duty you work (call-taker, police, fire and EMS dispatcher, supervisor…). Sign in for a duty at any console and your preset for it opens by itself: nothing to rebuild at the start of a shift.
+
+- It is **locked** in normal work: nothing moves, resizes or disappears by accident.
+- To change it: the **lock** button (*Layout locked: edit it*), arrange, then **Save & lock**. Choosing a ready-made layout also starts editing. **Cancel** puts the saved one back. Each save is in the ledger with who saved it and when.
+- A **trainee** works the agency's assigned training preset; the layout controls are not shown. Someone with no preset of their own starts from the agency's preset for the duty.
+- An administrator can **save the layout as the agency's preset** for a duty (the building button while editing) and **protect** a person's preset so only administrators change it (Admin › Operations rules).
+- The screens spread over several monitors are the workstation's (see [Several screens](#screens)): each console remembers its own monitors, so a preset placed on a console with fewer or other monitors falls back to what fits there without changing what you saved.
 
 Open **Layout** at the top left of the status bar.
 
@@ -260,6 +269,18 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 > Looking a place up tells the provider where the incident is. Each provider is off until an administrator turns it on in [Integrations](#admin-integrations), and the pictures pass through this server, so keys never reach a browser.`,
   },
   {
+    id: 'working-agency', title: 'The agency you are working for', keys: 'agency agencies working covered monitored watched coverage mutual aid primary assisting home agency rpd rcpd',
+    body: `Where the centre dispatches for several agencies (Admin › Agencies), the status bar shows the agency you are **working** for: its rules apply to what you do (its incident numbers, call types, timers and response plans). Click it to see and change:
+
+- **Working**: one agency, always shown.
+- **Covered**: the agencies you dispatch for at this position.
+- **Watched**: agencies shown for awareness only.
+
+Your usual coverage loads by itself at sign-in, from your profile (Admin › Agencies › People) and the workstation's (Admin › Workstations). A change is recorded. You may only cover agencies you are authorised to work.
+
+An incident has a **primary** agency (from its call type, or your working agency) and may have **assisting** agencies. Every unit keeps its home agency: a unit of another agency sent to the incident shows it as assisting by itself. **Agencies…** under the units changes them (a new primary agency needs a reason).`,
+  },
+  {
     id: 'command', title: 'The command line', keys: 'command line verbs keyboard type d rec er os new mu ret help',
     body: `Type a letter anywhere on the dispatcher screen and the command line takes it (or press \`/\`). \`Tab\` completes, arrow keys recall earlier commands, results stay on screen. \`HELP\` lists every verb.
 
@@ -284,11 +305,25 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 | \`BM UC\` | Record a fire-ground benchmark (UC fire under control, PS primary search…) |
 | \`TOW\` · \`TOW heavy North / VA ABC-1234\` | Call the next tow company on the rotation. See [Tow rotation](#admin-tows) |
 | \`PAGE <group> / text\` | Page a responder group about the selected incident. See [Paging](#admin-paging) |
-| \`DIR water\` | Look up the contacts directory. See [Directory](#admin-directory) |`,
+| \`DIR water\` | Look up the contacts directory. See [Directory](#admin-directory) |
+| \`FI UNIT1.8TH/STEWART..ABC1234\` | Field initiate: a traffic stop (or other officer-initiated incident) in one line. With the classic keys, type the line and press \`F7\` |
+| \`US UNIT1.AS\` | Unit status in one line, by the agency's status codes. With the classic keys, the line then \`F11\` |
+
+## One-line field commands
+The identifiers are separated by the agency's delimiter (a full stop unless it chose another), in the agency's order; two delimiters together skip an optional field (Admin › Operations rules › Command line):
+
+- **Field initiate**: unit, location, type, plate, state, comment, plate type, status. \`UNIT1.8TH/STEWART..ABC1234\` is UNIT1 at 8th and Stewart, the type left to the agency's (a traffic stop), plate ABC1234. It creates the incident with the unit on scene, the plate on the incident, and the stop's own status-check timer, without another screen; it becomes a full incident by changing its type (\`T\`), keeping everything. In **two-pass** agencies it only marks the unit out on the stop. Where the agency asks, the plate is queried in NCIC at once.
+- **Unit status**: unit, status, disposition, location, type, comment. \`UNIT1.AS\` is UNIT1 arrived on scene of its incident. A unit alone (\`UNIT1\` then F11) opens the unit status form instead of guessing. A mark-out code works too: \`UNIT1.ADMIN..HQ ANNEX...paperwork\`.
+
+A retired or unknown code, or a command your duty may not give, is refused by the server and the attempt recorded; nothing changes.`,
   },
   {
     id: 'keys', title: 'Keyboard', keys: 'keyboard shortcuts keys hotkeys f2 ctrl k f7',
-    body: `| Key | Does |
+    body: `The keys follow the agency's **key profile** for your duty (Admin › Operations rules). **Ctrl /** shows the map for the screen you are on, with a search box. A key does exactly what the same command or button does; the server checks your right either way, and a trainee works the profile as set.
+
+The standard keys:
+
+| Key | Does |
 |---|---|
 | Any letter | Starts a command on the command line |
 | \`/\` | Focus the command line |
@@ -299,7 +334,25 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 | \`Esc\` | Clear the selection |
 | \`F7\` | Aerial photos on or off |
 | \`F9\` | NCIC inquiry, with the selected incident as the reason |
-| \`F1\`–\`F6\` (mobile terminal) | En route, on scene, transporting, at hospital, available, out of service |`,
+| \`F1\`–\`F6\` (mobile terminal) | En route, on scene, transporting, at hospital, available, out of service |
+
+## The classic CAD profile (PremierOne-style)
+An agency moving from PremierOne can choose this profile as a starting point and change it:
+
+| Key | Does | Shift + key |
+|---|---|---|
+| F1 | Home | Help |
+| F2 | Queries (NCIC) | Unit-to-unit message |
+| F3 | Update | Recall (search) |
+| F4 | Audit trail | Comments |
+| F5 | Clear | Premise information |
+| F6 | Messages and BOLOs | Refresh pending |
+| F7 | **Field initiate**: processes the command line | Previous incidents |
+| F8 | New incident | Next incident |
+| F9 | Dispatch the recommendation | Previous incident |
+| F10 | Process the command line | Premise and location |
+| F11 | **Unit status**: processes the command line | The 911 call |
+| F12 | Submit | Previous plates |`,
   },
   {
     id: 'files', title: 'Files and photos on an incident', keys: 'file attachment photo picture upload document pdf video audio evidence camera scene',
@@ -351,7 +404,42 @@ Press **Press to turn the sound on** once after the screen opens (browsers play 
 - **Command line**: \`MSG E1 M2 / Stage at the north lot\`, \`MSG ALL-EMS ! Carilion on diversion\`, \`MSG #26-000123 / Caller says the back door is open\`.
 - **From the crews**: messages to dispatch are bold until a dispatcher clicks them, and announced as they arrive. A message on an incident is also written on its timeline.
 - **Read**: the terminal marks a message read when it is shown (an urgent one when the crew presses Got it); the floor sees *read by E1*, or *not read yet* after two minutes.
-- Every message and every read is a ledger event. Crews write to dispatch or to units, never to everyone.`,
+- Every message and every read is a ledger event. Crews write to dispatch or to units, never to everyone.
+
+For messages with a subject, priority, attachments, expiry and versions, and for BOLOs and officer-safety notices, use [Messages and BOLOs](#inbox).`,
+  },
+  {
+    id: 'inbox', title: 'Messages and BOLOs: the inbox', keys: 'inbox messages bolo bolos officer safety administrative notice priority urgent high medium low acknowledge read receipt attachment photo pdf expire cancel update version email compose cc',
+    body: `An inbox like email inside CAD, for **messages**, **BOLOs**, **officer-safety** and **administrative** notices (the envelope in the status bar; the agency can add its own kinds).
+
+## Writing one
+**Compose**: the kind, the **priority**, a subject and the text (the essential warning goes in the text, never only in an attachment), **To** and **CC**, the owning agency, the incident and related incidents, and for a BOLO the plate, vehicle, person and description. Addresses can be units, \`ALL\`, \`ALL-FIRE\`, \`ALL-EMS\`, \`ALL-POLICE\`, \`DISPATCH\`, an agency (\`@agency:RPD\`: its CAD positions and its units' terminals), a role, a duty, a named person or a console. A BOLO with no one named goes to every position and terminal of the owning agency. **Attachments** (pictures, PDFs and the types the agency allows) are checked by their content, scanned where the agency runs a virus scanner, and kept with their hash. **Effective** and **expires** dates; *no expiration* where the agency allows it. **Save draft** keeps it under Drafts.
+
+## Priorities
+| Priority | Shows and sounds |
+|---|---|
+| **Urgent** | An interruptive banner and a repeating alarm until acknowledged; supervisors are told when no one acknowledges it in time |
+| **High** | A banner and a distinct tone; acknowledgement may be required, repeated and escalated |
+| **Medium** | Highlighted, one tone; unread until opened |
+| **Low** | An ordinary unread mark, a soft tick or silence |
+
+The agency sets each level's tone, repeat, acknowledgement and escalation (Admin › Operations rules). Every priority is shown in words and with an icon, never by colour alone; only levels the agency allows can be silenced.
+
+## Folders, receipts and versions
+**Inbox**, **Drafts**, **Sent**, **Active BOLOs** and **Archived** (expired, cancelled and replaced ones, labelled as such). Delivery, opening and acknowledgement are recorded for the person and the duty they were working, not just the screen. **Update** sends a new version and **Cancel** a cancellation; earlier versions are kept, shown in the history, and stay on the incident's timeline with the attachments (not uploaded twice). A person sees a communication only when it is for them, or as a supervisor or records staff of its agency. Everything is in the ledger.`,
+  },
+  {
+    id: 'search', title: 'Search: incidents, BOLOs, people, vehicles and units', keys: 'search recall find plate partial plate vin name alias phone address description clothing tattoo attachment unit incident number cross agency possible match',
+    body: `One search (the magnifier in the status bar, or Recall in the classic keys) across incidents (number, type, address, narrative and comments), messages and BOLOs (every version), people (names in any order, aliases, birth dates, phones, addresses, identifiers, descriptions), vehicles (plate, partial plate with \`?\` for a character you do not know, VIN, make, model, colour), attachments (file names and captions) and units (call sign, radio ID, who is aboard).
+
+- Results are grouped, with filters for the kinds, agency, dates and status.
+- Each says **why** it matched (same plate, partial VIN, shared phone, similar description) and how strongly: **exact**, **partial** or **similar** (similar spellings when asked).
+- **Possible matches** are marked as such: a search never links a person, vehicle or incident to anything.
+- Expired, updated and cancelled BOLOs say so in capitals; an old warning never looks current.
+- You search the agencies you cover and watch; **beyond my agencies** only where you may work them, and every result names its agency. Juvenile names and medical notes are withheld from people without the right, and nothing restricted is counted or shown.
+- Every search, and every record opened from it, is recorded in the ledger.
+
+**Unit recall** (from a unit in the results, or a unit's History): one unit over a period, in one timeline: its statuses and mark-outs, the incidents with their type and address, who staffed it and in what position, status checks, messages, and where it was by AVL or radio. Narrow it by responder, status or incident; download it as CSV.`,
   },
   {
     id: 'mdt', title: 'Mobile data terminal', route: '/mdt', keys: 'mdt mobile terminal field crew vehicle laptop tablet gps',
@@ -440,6 +528,29 @@ An incident script sees the number, type and its name, priority, status, address
 - **Verify** checks the whole chain and reports the first broken link, if any.
 - **Search** by type, person or text; events are newest first.
 - The current state is rebuilt from the ledger at every start, and reports are built from it.`,
+  },
+  {
+    id: 'admin-agencies', title: 'Agencies', route: '/admin/agencies', keys: 'agencies agency ori neris incident prefix numbering dispositions timers talkgroups records multi-agency people staff profile trainee configuration versions rollback publish staging',
+    body: `Every organisation the centre dispatches for is an **agency** (RPD, RCPD, SPD, RFD, RCFR, SFD, a public works department, and the centre itself): police, fire and EMS are disciplines, not agencies. A centre with no agencies works as one, with the centre-wide settings.
+
+- **An agency**: its code and name, disciplines, active or not, ORI, NERIS ID and other identifiers, its own incident-number prefix, dispositions, status-check timers, talkgroups and records rules.
+- **What belongs to it**: units, stations, call types and response plans name their agency (chosen from the list, not typed). An agency's response plan is only for its incidents; its timers only for its units.
+- **People**: the agencies each person may work, the one they usually work for, those covered and watched by default, whether they are a **trainee**, and their roster entry. A person limited to some agencies changes only those agencies' configuration and sees only their supervisory views.
+- **Workstations** can say which agencies they cover and watch (Admin › Workstations).
+
+## Change control
+Configuration changes can be drafted on the training board, tried there, and **published** to the live board with a reason, all at once or **for one agency** only: a publish for one agency never carries another's or the centre's changes. Each publish keeps the versions it replaced: **Roll back** puts the earlier approved version back, with a reason, and is itself recorded.`,
+  },
+  {
+    id: 'admin-operations', title: 'Operations rules', route: '/admin/operations', keys: 'operations rules supervisory views board reports ledger quality presets protected working calls limit priorities tones escalation communication kinds attachments staffing policy short override block command line grammar delimiter status codes retired key profile classic premierone f7 f11',
+    body: `The agency's rules for daily work (Admin › Operations rules; administrators).
+
+- **Supervisory views**: the supervisor board, the operations report, quality review and care, the ledger and staffing coverage belong to the agency. Without a rule, supervisors see them; with one, only the roles, people and agencies it names. Administrators always see them. A person without the right neither sees the view nor reaches it by a direct link: the server refuses, and records the attempt.
+- **Presets**: the agency's assigned preset for each duty (what trainees work and others start from), and protecting a person's preset so only administrators change it.
+- **Working calls**: on or off, how many by duty and for trainees, and after how long a working call left by someone signed out is offered to supervisors.
+- **Communications**: the kinds (who may send them, their default priority and expiry, whether they wait for people signed off), each priority's tone, repeat, acknowledgement and escalation (with a button to hear each tone), and the attachments allowed.
+- **Staffing**: what happens to a unit left short (warn, limited, out of service), whether short units may be sent (warn, a supervisor's override, block), and the minimum qualified people the centre wants on duty.
+- **Command line and keys**: the delimiter, the order of the identifiers for field initiate and unit status, the stop's call type, one or two passes, the automatic plate inquiry, several units at once, the status codes (and retired ones), and the **key profile** for each duty, standard or classic (PremierOne-style) or the agency's own copy. **Check** finds a key doing two things on one screen, a key the browser keeps for itself, or an unknown action; the settings are refused until it is fixed.`,
   },
   {
     id: 'admin-units', title: 'Units', route: '/admin/units', keys: 'units apparatus call sign type station capabilities radio id',
@@ -695,7 +806,7 @@ A **legal basis** is required, with an explanation, an optional effective window
   },
   {
     id: 'signin', title: 'Signing in: your duty, codes and the lock', keys: 'sign in login duty role call-taker dispatcher supervisor mfa one-time code authenticator totp lock unlock inactivity workstation position',
-    body: `Type your username and password. If you hold more than one duty, choose the one you are working: **Call-taker**, **Police**, **Fire** or **EMS dispatcher**, **Dispatcher (all disciplines)**, **Supervisor**, **Administrator** or **Records** (number keys choose). Your workspace opens for it, and what you may do follows it: the server enforces it, not only the screen.
+    body: `Type your username and password. If you hold more than one duty, choose the one you are working: **Call-taker**, **Police**, **Fire** or **EMS dispatcher**, **Dispatcher (all disciplines)**, **Supervisor**, **Administrator** or **Records** (number keys choose). Your workspace opens for it, with your saved preset for that duty ([Your own layout](#layout)) and your usual agencies ([The agency you are working for](#working-agency)), and what you may do follows it: the server enforces it, not only the screen.
 
 | Duty | Opens | May |
 |---|---|---|
@@ -717,6 +828,15 @@ A supervisor covering a position keeps supervisory rights. You are never asked w
   {
     id: 'taker', title: 'Call entry: the call-taker\u2019s workspace', route: '/taker', keys: 'call taker call entry tabs persons vehicles previous hazards search comments history resources submit f4 f2 rebid f6 modifiers duplicate',
     body: `A calm workspace for one call: the call list on the left, nine tabs across the top with only the chosen one shown, and the call (its location, transcript and what was heard) with the **narrative** always on the right.
+
+## Several working calls
+To the left of call entry, **Working calls** holds each call in progress in its own tab: up to the number the agency allows for the duty (three for a call-taker unless it says otherwise; a trainee gets the agency's number, locked). Each keeps its own caller, location, callback, type, people, vehicles, comments, searches and checks; moving between them changes nothing in the others.
+
+- **New working call** (or **Next call / F2** while one is under way and a tab is free) starts another without clearing the first. A call chosen from the list while one is being written opens in a new tab.
+- Each tab shows its number, the type or incident, the place, how long it has been open, **ACTIVE** for the one you are in, **SENT** once submitted, and **!** when it still needs a type or address. Keys and Submit act only on the active tab.
+- **Submit** turns only that tab into its incident; the others stay exactly as they were.
+- Closing a tab with information in it asks first and asks why; the ledger records each working call opened, moved, submitted or discarded.
+- They are kept on the server with you: after a reload, a lock or a lost connection they come back at any console you sign in to. A supervisor can see who holds which and give one left behind to someone else (with a reason), for the agencies they work.
 
 | Key | Does |
 |---|---|
@@ -980,6 +1100,38 @@ On any unit (the unit's panel › Crew › change) or from the crew's own termin
 > The interval is 20 minutes unless changed in Admin › Settings or on the call type.`,
   },
   {
+    id: 'staffing', title: 'Staffing: who is on duty and on each unit', route: '/staffing', keys: 'staffing duty roster sign on sign off crew position driver officer relief swap secondary detail overtime holdover availability minimum staffing out of service limited capability override shift change template correction',
+    body: `**Staffing** (the people button in the status bar) shows who is on duty, where, and who actually staffs each unit. A call sign alone is not enough: the crew follows the unit into incidents, recommendations, history and reports.
+
+## People on duty
+**Sign on** with the kind of duty (regular, overtime, holdover, a temporary detail and where, a call-back), the shift, until when and availability (available, assigned, unavailable, training, court, meal, station duty, administrative). **Sign off** clears the person from any unit. Search by name, qualification, agency, station, unit and availability.
+
+## Crews
+**Edit crew** names the people on a unit and their **positions** (driver, officer, firefighter, medic, partner, team leader, or the agency's). The kind of unit may require positions and a minimum (Admin › Settings › Unit types). A crew may sign itself on from the terminal; the agency decides per kind of unit whether that is allowed, needs a supervisor's approval (**Sign-ons waiting**) or is for dispatch only.
+
+- One person is on one active unit at a time. Putting them on another asks: **move them** (relief, a swap) or a **secondary assignment** with a reason.
+- Each change has a reason and an **effective** time, kept beside when it was entered.
+- A unit left short (below its minimum, a position empty) is **limited**, or put **out of service**, as the agency says, unless a supervisor records an **override** with a reason.
+- A lost connection signs no one off.
+
+## On incidents and later
+When a unit is assigned, the incident keeps who was aboard and what they were qualified for at that moment; later changes never rewrite it, and changes during the incident (who joined, who left, positions) are on its timeline. A supervisor can **correct** a crew record with a reason: the original stays beside the correction, with the entered and effective times. Unit recall and reports show the people as well as the call sign.
+
+Supervisors also see **saved crews** for a **shift change** in one step (each person and time still recorded), and **coverage**: the minimum qualified people the agency wants on duty, gaps, expiring credentials and each unit's capability (a supervisory view the agency controls).`,
+  },
+  {
+    id: 'admin-qualifications', title: 'Qualifications, special teams and credentials', route: '/admin/qualifications', keys: 'qualifications teams special swift water hazmat technical rescue dive k9 swat uas drone evidence technician fire investigator negotiator tactical dispatcher cto fto instructor evaluator preceptor emt paramedic credential certificate expiry renewal verify suspend equivalency mutual aid capability',
+    body: `Each agency keeps a controlled skills file (Admin › Qualifications & teams; supervisors).
+
+- **Qualifications**: special teams (Swift Water, HazMat, Technical Rescue, Dive, K-9, SWAT, UAS), specialties (evidence technician, fire investigator, crisis negotiator, tactical dispatcher), training roles (CTO, FTO, instructor, evaluator) and credentials (EMT, paramedic…), each with its levels, the agency that owns it, how many months it lasts, when renewal is due, its prerequisites, whether it must be **verified** before it counts, and the documents it needs.
+- **A person's credentials**: the level, state (trainee, qualified, instructor, evaluator, restricted, temporarily unavailable, suspended, expired), issuer, dates, restrictions and attached certificates. A supervisor marks one **verified**; an unverified self-entry never counts where verification is required. Every change is kept.
+- **Equivalencies**: another agency's qualification accepted as one of ours, with its scope and expiry, for mutual aid; the person's own record is never merged or overwritten.
+- **Reminders**: supervisors are told once when a credential's renewal comes due and when it expires.
+
+## Live capability
+A unit's capability comes from the apparatus and the people validly qualified aboard now: a HazMat unit without its required technicians is not HazMat-capable, and shows **LIMITED** with the reason (what each capability needs of a crew is set in Personnel). The recommendation uses the live capability; the agency decides whether sending a short unit is only warned, needs a supervisor's override, or is blocked. Dispatchers see the capability and the qualification names; credential details are for supervisors and the person.`,
+  },
+  {
     id: 'admin-paging', title: 'Paging responders', route: '/admin/paging', keys: 'paging page pager volunteer off duty sms text email push ntfy twilio iamresponding active911 responding groups',
     body: `Volunteer and off-duty firefighters and EMTs are called by **page**. A **paging group** says who is paged together and how:
 - **Members** from the roster ([Personnel](#admin-personnel)).
@@ -1031,7 +1183,9 @@ Every request and answer is on the incident's timeline and in the ledger, so the
   },
   {
     id: 'unit-history', title: "A unit's status history", keys: 'unit status history day utilisation timeline committed time csv',
-    body: `**History** on a unit's panel shows its day from the ledger: a bar of its statuses across the day, every status with when, how long, the incident and who changed it, its status checks, crew changes and move-ups, the incidents it worked, and the share of its known time spent on incidents. Pick another day with the date; **CSV** downloads the same.`,
+    body: `**History** on a unit's panel shows its day from the ledger: a bar of its statuses across the day, every status with when, how long, the incident and who changed it, its status checks, crew changes and move-ups, the incidents it worked, and the share of its known time spent on incidents. Pick another day with the date; **CSV** downloads the same.
+
+**Unit recall** ([Search](#search)) gives any period in one timeline for front-line use, with who staffed the unit, its messages and its locations.`,
   },
   {
     id: 'epcr', title: 'Patient-care reports (NEMSIS)', keys: 'epcr nemsis patient care report ems hand off times eTimes eDispatch imagetrend eso',

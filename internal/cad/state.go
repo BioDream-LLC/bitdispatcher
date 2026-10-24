@@ -84,6 +84,7 @@ type incidentCreated struct {
 	Caller      *Caller         `json:"caller,omitempty"`
 	Narrative   string          `json:"narrative,omitempty"`
 	Call        string          `json:"call,omitempty"`
+	Agency      string          `json:"agency,omitempty"`
 }
 
 type incidentChanged struct {
@@ -113,7 +114,8 @@ type statusData struct {
 	PrevIncident string          `json:"prevIncident,omitempty"`
 	Recommended  bool            `json:"recommended,omitempty"`
 	Reason       string          `json:"reason,omitempty"`
-	MarkOut      string          `json:"markOut,omitempty"` // the mark-out type, for markout
+	Override     string          `json:"override,omitempty"` // a supervisor's reason to send a short unit
+	MarkOut      string          `json:"markOut,omitempty"`  // the mark-out type, for markout
 	Location     *ng911.Location `json:"location,omitempty"`
 }
 
@@ -192,13 +194,38 @@ type State struct {
 	Papers       map[string]*Paper `json:"papers"`
 	paperCount   int
 	AlertLists   map[string]*AlertList `json:"alertLists"` // public alert subscriber lists
-	Alerts       []*PublicAlert        `json:"alerts"`
-	alertCount   int
-	premGrid     grid
-	premIDs      []string
-	premIdx      map[string]int
-	histGrid     grid
-	yearCount    map[string]int // incidents per site and year, for numbering
+	// The operational wishes: agencies, people's profiles and coverage, saved presets (agency.go,
+	// presets.go).
+	Agencies map[string]*Agency       `json:"agencies"`
+	Staff    map[string]*Staff        `json:"staff"`
+	Coverage map[string]*WorkCoverage `json:"coverage"`
+	Presets  map[string]*Preset       `json:"presets"` // user|duty, or @assigned|duty for the agency's
+	// Qualifications, equivalencies, saved crews and crews' own sign-ons waiting (quals.go, staffing.go).
+	Quals         map[string]*QualDef      `json:"quals"`
+	Equivalencies map[string]*Equivalency  `json:"equivalencies"`
+	CrewTemplates map[string]*CrewTemplate `json:"crewTemplates"`
+	CrewRequests  map[string]*CrewRequest  `json:"crewRequests"`
+	reminded      map[string]bool
+	// Communications: every version, drafts and attachments (comms.go).
+	Comms      []*Comm               `json:"comms"`
+	CommDrafts map[string]*CommDraft `json:"commDrafts"`
+	CommFiles  map[string]*CommFile  `json:"commFiles"`
+	commIdx    map[string]int
+	// Working calls (calldrafts.go).
+	CallDrafts map[string]*CallDraft `json:"callDrafts"`
+	draftSeq   int
+	commCount  int
+	draftCount int
+	clock      func() time.Time
+	lastAt     time.Time
+
+	Alerts     []*PublicAlert `json:"alerts"`
+	alertCount int
+	premGrid   grid
+	premIDs    []string
+	premIdx    map[string]int
+	histGrid   grid
+	yearCount  map[string]int // incidents per site and year, for numbering
 }
 
 func newState() *State {
@@ -228,6 +255,9 @@ func decode[T any](e ledger.Event) (T, error) {
 // an error, because the ledger was written by commands that validated it.
 func (s *State) apply(e ledger.Event) error {
 	s.Seq++ // events applied: the ledger's sequence on one site, the merged count on several
+	if e.At.After(s.lastAt) {
+		s.lastAt = e.At
+	}
 	if ok, err := s.applyRoadmap(e); ok {
 		if err == nil {
 			s.afterApply(e)
@@ -400,7 +430,7 @@ func (s *State) applyCore(e ledger.Event) error {
 		}
 		in := &Incident{Number: v.Number, Type: v.Type, Priority: v.Priority, Status: Pending, Location: v.Location,
 			Caller: v.Caller, Calls: []string{}, Units: []Assignment{}, Timeline: []Entry{}, Created: e.At, CreatedBy: e.Actor, Updated: e.At,
-			Modifiers: v.Modifiers, CallerAt: v.CallerAt, LocVerified: v.LocVerified}
+			Modifiers: v.Modifiers, CallerAt: v.CallerAt, LocVerified: v.LocVerified, Agency: v.Agency}
 		s.Incidents[v.Number] = in
 		s.yearCount[fmt.Sprintf("%s|%d", e.Site, e.At.UTC().Year())]++
 		text := "Created " + s.typeLabel(v.Type) + " P" + fmt.Sprint(v.Priority)
@@ -668,7 +698,7 @@ func (s *State) applyStatus(e ledger.Event, v statusData) {
 		}
 	}
 	if idx < 0 {
-		in.Units = append(in.Units, Assignment{Unit: u.ID, Dispatched: e.At, Recommended: v.Recommended})
+		in.Units = append(in.Units, Assignment{Unit: u.ID, Dispatched: e.At, Recommended: v.Recommended, Crew: s.crewSnapshot(u, e.At), Override: v.Override})
 		idx = len(in.Units) - 1
 	}
 	a := &in.Units[idx]

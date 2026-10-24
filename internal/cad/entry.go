@@ -254,6 +254,7 @@ type ResponsePlan struct {
 	To        string    `json:"to,omitempty"`
 	Order     []string  `json:"order"` // units in due order
 	Note      string    `json:"note,omitempty"`
+	Agency    string    `json:"agency,omitempty"` // the agency whose plan it is (agency.go); empty: the centre's
 	Updated   time.Time `json:"updated,omitzero"`
 }
 
@@ -840,8 +841,12 @@ func (e *Engine) SavePlan(a Actor, p ResponsePlan) (string, error) {
 			}
 		}
 	}
+	p.Agency = strings.ToUpper(strings.TrimSpace(p.Agency))
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if err := e.checkAgency("agency", p.Agency); err != nil {
+		return "", err
+	}
 	for _, u := range p.Order {
 		if _, ok := e.st.Units[u]; !ok {
 			return "", problem("order", "no unit %s", u)
@@ -1284,6 +1289,13 @@ func (s *State) PlanFor(in *Incident, now time.Time) *ResponsePlan {
 	for _, id := range ids {
 		p := s.Plans[id]
 		score := 0
+		// An agency's plan is only for its own incidents.
+		if p.Agency != "" {
+			if p.Agency != in.Agency {
+				continue
+			}
+			score++
+		}
 		if len(p.CallTypes) > 0 {
 			if !slices.Contains(p.CallTypes, in.Type) {
 				continue
@@ -1393,6 +1405,11 @@ type Workstation struct {
 	Name     string      `json:"name,omitempty"`
 	Duties   []string    `json:"duties,omitempty"` // the duties worked here, offered first
 	Enrolled []Enrolment `json:"enrolled,omitempty"`
+	// Agencies the position covers and those it watches (agency.go); empty: as each person's profile says.
+	Agencies []string `json:"agencies,omitempty"`
+	Monitor  []string `json:"monitor,omitempty"`
+	// Monitors are the screens the workstation has (count and size), for placing presets (presets.go).
+	Monitors []MonitorInfo `json:"monitors,omitempty"`
 }
 
 // Enrolment is one browser enrolled as a workstation, by a hash of its token (never the token).
@@ -1409,8 +1426,23 @@ func (e *Engine) SaveWorkstation(a Actor, w Workstation) error {
 	if w.ID == "" || len(w.ID) > 24 || strings.ContainsAny(w.ID, " /#") {
 		return problem("id", "a workstation is a short name without spaces: CT-3, FIRE-1")
 	}
+	for i, g := range w.Agencies {
+		w.Agencies[i] = strings.ToUpper(strings.TrimSpace(g))
+	}
+	for i, g := range w.Monitor {
+		w.Monitor[i] = strings.ToUpper(strings.TrimSpace(g))
+	}
+	w.Agencies, w.Monitor = cleanList(w.Agencies), cleanList(w.Monitor)
+	if len(w.Monitors) > 8 {
+		return problem("monitors", "up to 8 monitors")
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	for _, g := range slices.Concat(w.Agencies, w.Monitor) {
+		if err := e.checkAgency("agencies", g); err != nil {
+			return err
+		}
+	}
 	if old, ok := e.st.Workstations[w.ID]; ok {
 		w.Enrolled = old.Enrolled
 	} else {

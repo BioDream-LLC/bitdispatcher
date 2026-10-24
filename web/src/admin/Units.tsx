@@ -3,12 +3,14 @@ import { toast } from 'sonner'
 import { Plus, Trash2, Truck } from 'lucide-react'
 import { api, ApiError, errText } from '../api'
 import { Field, Modal, StatusChip } from '../ui'
+import { useAgencies } from '../console/Coverage'
 import type { UnitType, View } from '../types'
 import { Page, Table } from './Admin'
 
 type Draft = { id: string; name: string; type: string; station: string; capabilities: string; radioId: string; radioAlias: string; agency: string; area: string; minStaff: string; isNew: boolean }
 
 export default function Units({ view }: { view: View }) {
+  const agencies = useAgencies()?.agencies ?? []
   const [d, setD] = useState<Draft | null>(null)
   const [err, setErr] = useState<ApiError | null>(null)
   const open = (id?: string) => {
@@ -98,8 +100,15 @@ export default function Units({ view }: { view: View }) {
             <Field label="Extra capabilities" htmlFor="ucap" hint="Comma-separated, such as hazmat, water-rescue">
               <input id="ucap" className="input font-mono" value={d.capabilities} onChange={(e) => setD({ ...d, capabilities: e.target.value })} />
             </Field>
-            <Field label="Agency" htmlFor="uag" hint="For shared and mutual-aid systems">
-              <input id="uag" className="input" value={d.agency} onChange={(e) => setD({ ...d, agency: e.target.value })} />
+            <Field label="Agency" htmlFor="uag" hint="The agency that owns the unit (Admin › Agencies)">
+              {agencies.length > 0 ? (
+                <select id="uag" className="input" value={d.agency} onChange={(e) => setD({ ...d, agency: e.target.value })}>
+                  <option value="">No agency</option>
+                  {agencies.map((a) => <option key={a.code} value={a.code}>{a.code} — {a.name}</option>)}
+                </select>
+              ) : (
+                <input id="uag" className="input" value={d.agency} onChange={(e) => setD({ ...d, agency: e.target.value })} />
+              )}
             </Field>
             <Field label="Radio unit ID" htmlFor="urid" error={err?.field === 'radioId' ? err.message : undefined} hint="The P25 unit ID (decimal) BitVoice reports">
               <input id="urid" className="input font-mono" inputMode="numeric" value={d.radioId} onChange={(e) => setD({ ...d, radioId: e.target.value.replace(/\D/g, '') })} />

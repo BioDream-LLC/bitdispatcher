@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { KeyRound, MonitorSmartphone, Plus, Save, Trash2, X } from 'lucide-react'
 import { api, errText } from '../api'
 import { Field, Modal } from '../ui'
+import { useAgencies } from '../console/Coverage'
 import { ago, cx, useNow } from '../util'
 import type { Workstation } from '../types'
 import { Page } from './Admin'
@@ -23,6 +24,7 @@ const DUTIES: [string, string][] = [
  * is asked which console they are at. */
 export default function Workstations() {
   const now = useNow()
+  const agencies = useAgencies()?.agencies ?? []
   const [items, setItems] = useState<Workstation[]>([])
   const [d, setD] = useState<(Workstation & { isNew: boolean }) | null>(null)
   const [newId, setNewId] = useState('')
@@ -37,7 +39,7 @@ export default function Workstations() {
   const save = async () => {
     if (!d) return
     try {
-      await api.put(`/admin/workstations/${encodeURIComponent(d.id.trim())}`, { name: d.name ?? '', duties: d.duties ?? [] })
+      await api.put(`/admin/workstations/${encodeURIComponent(d.id.trim())}`, { name: d.name ?? '', duties: d.duties ?? [], agencies: d.agencies ?? [], monitor: d.monitor ?? [] })
       toast.success(`Workstation ${d.id} saved`)
       setD(null)
       load()
@@ -170,6 +172,32 @@ export default function Workstations() {
                 ))}
               </div>
             </div>
+            {agencies.length > 0 && (
+              <div>
+                <div className="label">Agencies covered here</div>
+                <div className="flex flex-wrap gap-2">
+                  {agencies.map((a) => (
+                    <label key={a.code} className="flex items-center gap-1 text-sm text-slate-300">
+                      <input type="checkbox" checked={(d.agencies ?? []).includes(a.code)} onChange={(e) => setD({ ...d, agencies: e.target.checked ? [...(d.agencies ?? []), a.code] : (d.agencies ?? []).filter((x) => x !== a.code) })} aria-label={`Cover ${a.code} — ${a.name}`} />
+                      {a.code}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {agencies.length > 0 && (
+              <div>
+                <div className="label">Agencies watched here</div>
+                <div className="flex flex-wrap gap-2">
+                  {agencies.map((a) => (
+                    <label key={a.code} className="flex items-center gap-1 text-sm text-slate-300">
+                      <input type="checkbox" checked={(d.monitor ?? []).includes(a.code)} onChange={(e) => setD({ ...d, monitor: e.target.checked ? [...(d.monitor ?? []), a.code] : (d.monitor ?? []).filter((x) => x !== a.code) })} aria-label={`Watch ${a.code} — ${a.name}`} />
+                      {a.code}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}

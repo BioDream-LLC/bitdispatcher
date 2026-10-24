@@ -99,7 +99,7 @@ export default function SettingsPage({ view }: { view: View }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="text-[10px] uppercase tracking-wider text-slate-500">
-                <tr><th className="py-1 text-left">Code</th><th className="text-left">Name</th><th className="text-left">Status check after (min)</th><th className="text-left">For</th><th className="text-left">Can be pulled</th><th /></tr>
+                <tr><th className="py-1 text-left">Code</th><th className="text-left">Name</th><th className="text-left">Status check after (min)</th><th className="text-left">For</th><th className="text-left">Can be pulled</th><th className="text-left">Retired</th><th className="text-left">Longest (min)</th><th /></tr>
               </thead>
               <tbody>
                 {(s.markOuts ?? []).map((m, i) => {
@@ -115,6 +115,8 @@ export default function SettingsPage({ view }: { view: View }) {
                         </select>
                       </td>
                       <td className="pr-2"><input type="checkbox" checked={!!m.interruptible} onChange={(e) => set({ interruptible: e.target.checked })} aria-label="Can be pulled for a call" /></td>
+                      <td className="pr-2"><input type="checkbox" checked={!!m.retired} onChange={(e) => set({ retired: e.target.checked })} aria-label="Retired: refused on the command line" /></td>
+                      <td className="pr-2"><input type="number" min={0} max={600} className="input h-7 w-24 py-0 font-mono" value={m.maxMinutes ?? 0} onChange={(e) => set({ maxMinutes: Number(e.target.value) })} aria-label="Longest (min)" /></td>
                       <td><button className="btn btn-ghost px-1" onClick={() => up({ markOuts: (s.markOuts ?? []).filter((_, j) => j !== i) })} aria-label={`Remove ${m.code}`}><X size={12} /></button></td>
                     </tr>
                   )
@@ -269,7 +271,7 @@ export default function SettingsPage({ view }: { view: View }) {
           <h2 className="font-semibold text-slate-100">Unit types</h2>
           <p className="text-xs text-slate-400">The kinds of unit and the capabilities each has. Run cards ask for capabilities; a unit can add its own. Kinds kept covered get move-up suggestions when a station has none available.</p>
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500"><th>Code</th><th>Name</th><th>Discipline</th><th>Capabilities</th><th title="Suggest move-ups when a station has none of this kind available">Keep covered</th><th title="How many aboard to be fully staffed, when crews are recorded">Minimum aboard</th><th /></tr></thead>
+            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500"><th>Code</th><th>Name</th><th>Discipline</th><th>Capabilities</th><th title="Suggest move-ups when a station has none of this kind available">Keep covered</th><th title="How many aboard to be fully staffed, when crews are recorded">Minimum aboard</th><th>Positions</th><th>Sign-on</th><th /></tr></thead>
             <tbody>
               {s.unitTypes.map((t, i) => (
                 <tr key={i}>
@@ -283,6 +285,15 @@ export default function SettingsPage({ view }: { view: View }) {
                   <td className="pr-2"><input aria-label="Capabilities" className="input font-mono" value={t.capabilities.join(', ')} onChange={(e) => upType(i, { capabilities: e.target.value.split(/[,\s]+/).filter(Boolean) })} /></td>
                   <td className="pr-2 text-center"><input type="checkbox" aria-label={`Keep ${t.name} covered`} checked={t.cover ?? COVER.includes(t.code)} onChange={(e) => upType(i, { cover: e.target.checked })} /></td>
                   <td className="pr-2"><input type="number" min={0} max={12} aria-label={`${t.name} minimum aboard`} className="input w-20 font-mono" value={t.minStaff ?? 0} onChange={(e) => upType(i, { minStaff: Number(e.target.value) || undefined })} /></td>
+                  <td className="pr-2"><input aria-label={`${t.name} required positions`} className="input font-mono" value={(t.positions ?? []).join(', ')} onChange={(e) => upType(i, { positions: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></td>
+                  <td className="pr-2">
+                    <select aria-label={`${t.name} sign-on`} className="input" value={t.signOn ?? ''} onChange={(e) => upType(i, { signOn: e.target.value as UnitType['signOn'] })}>
+                      <option value=""></option>
+                      <option value="self">Self (terminal)</option>
+                      <option value="approve">Supervisor approves</option>
+                      <option value="dispatch">Dispatch only</option>
+                    </select>
+                  </td>
                   <td><button className="btn btn-ghost px-1.5" aria-label={`Remove ${t.name}`} onClick={() => up({ unitTypes: s.unitTypes.filter((_, j) => j !== i) })}><X size={13} aria-hidden /></button></td>
                 </tr>
               ))}

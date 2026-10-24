@@ -362,7 +362,7 @@ func (s *Server) entryRoutes() {
 		sortBy(out, func(p *cad.ResponsePlan) string { return p.Name })
 		writeJSON(w, 200, out)
 	})
-	s.handle("PUT /api/admin/plans/{id}", auth.Admin, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+	s.handle("PUT /api/admin/plans/{id}", auth.Admin, s.agencyScoped("plans", func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		var p cad.ResponsePlan
 		if !readJSON(w, r, &p) {
 			return
@@ -376,8 +376,8 @@ func (s *Server) entryRoutes() {
 			return
 		}
 		writeJSON(w, 200, map[string]string{"id": id})
-	})
-	s.handle("DELETE /api/admin/plans/{id}", auth.Admin, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+	}))
+	s.handle("DELETE /api/admin/plans/{id}", auth.Admin, s.agencyScoped("plans", func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		ok(w, s.Eng.RemovePlan(a, r.PathValue("id")))
-	})
+	}))
 }

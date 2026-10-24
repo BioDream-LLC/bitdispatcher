@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -30,12 +30,17 @@ import PublicAlerts from './PublicAlerts'
 import Tows from './Tows'
 import Directory from './Directory'
 import Geofences from './Geofences'
+import { Agencies } from './Agencies'
+import { OperationsRules } from './OperationsRules'
+import { Qualifications } from './Qualifications'
+import { useViews, VIEW_OF_PAGE } from '../access'
 
 // Charts are large; they load when the report is opened.
 const Reports = lazy(() => import('./Reports'))
 const Quality = lazy(() => import('./Quality'))
 
 const PAGES = [
+  { to: 'agencies', label: 'Agencies', icon: Landmark, admin: true },
   { to: 'units', label: 'Units', icon: Truck, admin: true },
   { to: 'stations', label: 'Stations', icon: Building2, admin: true },
   { to: 'facilities', label: 'Facilities', icon: Hospital, admin: true },
@@ -48,7 +53,9 @@ const PAGES = [
   { to: 'users', label: 'Users & positions', icon: UsersIcon, admin: true },
   { to: 'workstations', label: 'Workstations', icon: MonitorSmartphone, admin: true },
   { to: 'sites', label: 'Sites', icon: Network, admin: true },
+  { to: 'operations', label: 'Operations rules', icon: SlidersHorizontal, admin: true },
   { to: 'personnel', label: 'Personnel & crews', icon: HardHat, admin: false },
+  { to: 'qualifications', label: 'Qualifications & teams', icon: BadgeCheck, admin: false },
   { to: 'paging', label: 'Paging groups', icon: BellRing, admin: false },
   { to: 'publicalerts', label: 'Public alerts', icon: Megaphone, admin: false },
   { to: 'tows', label: 'Tow rotation', icon: TowIcon, admin: false },
@@ -68,8 +75,10 @@ const PAGES = [
 export default function Admin() {
   const me = useStore((s) => s.me)
   const view = useStore((s) => s.view)
+  const views = useViews(me ? me.username + '|' + me.duty : undefined)
   if (!can.supervise(me)) return <Navigate to="/" replace />
-  const pages = PAGES.filter((p) => !p.admin || can.admin(me))
+  // Supervisory views the agency has not given this person are not offered (and the server refuses them).
+  const pages = PAGES.filter((p) => (!p.admin || can.admin(me)) && (!VIEW_OF_PAGE[p.to] || !views || views.has(VIEW_OF_PAGE[p.to])))
   return (
     <div className="flex h-full bg-slate-950">
       <nav className="flex w-56 shrink-0 flex-col border-r border-slate-800 bg-slate-900 p-2" aria-label="Administration">
@@ -96,6 +105,9 @@ export default function Admin() {
         ) : (
           <Routes>
             <Route index element={<Navigate to={pages[0].to} replace />} />
+            <Route path="agencies" element={<Agencies view={view} />} />
+            <Route path="operations" element={<OperationsRules view={view} />} />
+            <Route path="qualifications" element={<Qualifications view={view} />} />
             <Route path="units" element={<Units view={view} />} />
             <Route path="stations" element={<Stations view={view} />} />
             <Route path="facilities" element={<Facilities view={view} />} />
@@ -106,7 +118,7 @@ export default function Admin() {
             <Route path="integrations" element={<Integrations view={view} />} />
             <Route path="users" element={<Users />} />
             <Route path="workstations" element={<Workstations />} />
-            <Route path="ledger" element={<Ledger />} />
+            <Route path="ledger" element={views && !views.has('ledger') ? <NotGiven /> : <Ledger />} />
             <Route path="disclosure" element={<Disclosure view={view} />} />
             <Route path="advisory" element={<AdvisoryAdmin />} />
             <Route path="guidance" element={<GuidanceAdmin view={view} />} />
@@ -121,8 +133,8 @@ export default function Admin() {
             <Route path="directory" element={<Directory view={view} />} />
             <Route path="geofences" element={<Geofences view={view} />} />
             <Route path="migrate" element={<Migrate />} />
-            <Route path="quality" element={<Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Quality /></Suspense>} />
-            <Route path="reports" element={<Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Reports view={view} /></Suspense>} />
+            <Route path="quality" element={views && !views.has('quality') ? <NotGiven /> : <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Quality /></Suspense>} />
+            <Route path="reports" element={views && !views.has('operations') ? <NotGiven /> : <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Reports view={view} /></Suspense>} />
             <Route path="*" element={<Navigate to={pages[0].to} replace />} />
           </Routes>
         )}
@@ -161,4 +173,9 @@ export function Table({ head, children, empty }: { head: string[]; children: Rea
       {empty}
     </div>
   )
+}
+
+/** A supervisory view the agency has not given this person. */
+function NotGiven() {
+  return <p className="text-sm text-slate-400">The agency has not given you this view. An administrator decides who sees it (Admin › Operations rules).</p>
 }

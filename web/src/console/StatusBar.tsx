@@ -11,6 +11,11 @@ import { Logo, Tip } from '../ui'
 import { ago, cx, discipline, ms, useNow } from '../util'
 import type { View } from '../types'
 import { PublicAlertsButton } from './PublicAlerts'
+import { InboxButton } from './Inbox'
+import { SearchButton } from './Search'
+import { UnitRecallHost } from './UnitRecall'
+import { WorkingAgency } from './Coverage'
+import { Users2 } from 'lucide-react'
 
 const THEMES = ['midnight', 'dark', 'night', 'light'] as const
 
@@ -88,6 +93,7 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
           {me?.name || me?.username} · {me?.console || 'no position'} · {me?.role}
         </span>
       </div>
+      <WorkingAgency />
       {layout && <div className="flex shrink-0 items-center gap-0.5">{layout}</div>}
       {screen !== 'full' && (
         <span className="chip h-6 shrink-0 gap-1 whitespace-nowrap bg-sky-500/15 px-2 text-[11px] font-bold text-sky-200" title={screenDef(screen).hint}>
@@ -189,6 +195,10 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
         <BreakButton view={view} />
         <RoadmapButtons view={view} />
         <PublicAlertsButton view={view} />
+        <InboxButton view={view} />
+        <SearchButton view={view} />
+        <UnitRecallHost view={view} />
+        <Link to="/staffing" className="btn btn-ghost px-1.5" aria-label="Staffing: who is on duty and on each unit" title="Staffing: who is on duty and on each unit"><Users2 size={14} aria-hidden /></Link>
         {onScreens && (
           <button className="btn btn-ghost px-1.5" onClick={onScreens} aria-label="Screens: spread this position over monitors" title="Screens: spread this position over monitors (Ctrl+Shift+S)">
             <MonitorCheck size={14} aria-hidden />

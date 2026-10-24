@@ -56,7 +56,7 @@ func (s *State) applyRoadmap(e ledger.Event) (bool, error) {
 		}
 		return true, nil
 	}
-	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts, s.applyAgencies, s.applyPresets, s.applyQuals, s.applyStaffing, s.applyComms, s.applyDrafts} {
 		if ok, err := f(e); ok {
 			return true, err
 		}
@@ -76,4 +76,18 @@ func (s *State) initRoadmap() {
 	s.Scheduled, s.Directory, s.OnCall = map[string]*Scheduled{}, map[string]*DirEntry{}, map[string]*OnCallList{}
 	s.Geofences, s.Papers, s.inFence = map[string]*Geofence{}, map[string]*Paper{}, map[string][]string{}
 	s.AlertLists, s.Alerts = map[string]*AlertList{}, []*PublicAlert{}
+	s.Agencies, s.Staff, s.Coverage, s.Presets = map[string]*Agency{}, map[string]*Staff{}, map[string]*WorkCoverage{}, map[string]*Preset{}
+	s.Quals, s.Equivalencies, s.CrewTemplates, s.CrewRequests = map[string]*QualDef{}, map[string]*Equivalency{}, map[string]*CrewTemplate{}, map[string]*CrewRequest{}
+	s.reminded = map[string]bool{}
+	s.Comms, s.CommDrafts, s.CommFiles, s.commIdx = []*Comm{}, map[string]*CommDraft{}, map[string]*CommFile{}, map[string]int{}
+	s.CallDrafts = map[string]*CallDraft{}
+}
+
+// now is the time for what is computed rather than recorded (a credential's expiry): the engine's clock,
+// or the last event's time.
+func (s *State) now() time.Time {
+	if s.clock != nil {
+		return s.clock()
+	}
+	return s.lastAt
 }

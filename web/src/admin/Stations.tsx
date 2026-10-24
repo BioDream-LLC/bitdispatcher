@@ -4,23 +4,25 @@ import { Building2, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError, errText } from '../api'
 import AddressInput from '../AddressInput'
 import { Field, Modal } from '../ui'
+import { useAgencies } from '../console/Coverage'
 import type { View } from '../types'
 import { Page, Table } from './Admin'
 
-type Draft = { id: string; name: string; address: string; lat: string; lon: string; isNew: boolean }
+type Draft = { id: string; name: string; address: string; lat: string; lon: string; agency: string; isNew: boolean }
 
 export default function Stations({ view }: { view: View }) {
+  const agencies = useAgencies()?.agencies ?? []
   const [d, setD] = useState<Draft | null>(null)
   const [err, setErr] = useState<ApiError | null>(null)
   const open = (id?: string) => {
     const s = view.stations.find((x) => x.id === id)
     setErr(null)
-    setD(s ? { id: s.id, name: s.name, address: s.address ?? '', lat: String(s.lat), lon: String(s.lon), isNew: false } : { id: '', name: '', address: '', lat: '', lon: '', isNew: true })
+    setD(s ? { id: s.id, name: s.name, address: s.address ?? '', lat: String(s.lat), lon: String(s.lon), agency: s.agency ?? '', isNew: false } : { id: '', name: '', address: '', lat: '', lon: '', agency: '', isNew: true })
   }
   const save = async () => {
     if (!d) return
     try {
-      await api.put(`/admin/stations/${encodeURIComponent(d.id.trim().toUpperCase())}`, { name: d.name, address: d.address, lat: Number(d.lat), lon: Number(d.lon) })
+      await api.put(`/admin/stations/${encodeURIComponent(d.id.trim().toUpperCase())}`, { name: d.name, address: d.address, lat: Number(d.lat), lon: Number(d.lon), agency: d.agency || undefined })
       toast.success(`Station ${d.id.toUpperCase()} saved`)
       setD(null)
     } catch (e) {
@@ -72,6 +74,16 @@ export default function Stations({ view }: { view: View }) {
             <div className="sm:col-span-2"><Field label="Address" htmlFor="sa" hint="Pick it from the recorded map and the position fills in"><AddressInput id="sa" value={d.address} onChange={(v) => setD((x) => x && { ...x, address: v })} onPick={(r) => setD((x) => x && { ...x, lat: r.lat.toFixed(6), lon: r.lon.toFixed(6) })} placeholder="3401 Williamson Rd" /></Field></div>
             <Field label="Latitude" htmlFor="slat" error={err?.field === 'lat' ? err.message : undefined}><input id="slat" className="input font-mono" value={d.lat} onChange={(e) => setD({ ...d, lat: e.target.value })} /></Field>
             <Field label="Longitude" htmlFor="slon"><input id="slon" className="input font-mono" value={d.lon} onChange={(e) => setD({ ...d, lon: e.target.value })} /></Field>
+            <Field label="Agency" htmlFor="sag" hint="The agency that owns the unit (Admin › Agencies)">
+              {agencies.length > 0 ? (
+                <select id="sag" className="input" value={d.agency} onChange={(e) => setD({ ...d, agency: e.target.value })}>
+                  <option value="">No agency</option>
+                  {agencies.map((a) => <option key={a.code} value={a.code}>{a.code} — {a.name}</option>)}
+                </select>
+              ) : (
+                <input id="sag" className="input" value={d.agency} onChange={(e) => setD({ ...d, agency: e.target.value })} />
+              )}
+            </Field>
           </div>
         </Modal>
       )}

@@ -29,6 +29,7 @@ import (
 	"github.com/biodream-llc/bitdispatcher/internal/imagery"
 	"github.com/biodream-llc/bitdispatcher/internal/ledger"
 	"github.com/biodream-llc/bitdispatcher/internal/mapdata"
+	"github.com/biodream-llc/bitdispatcher/internal/ncic"
 	"github.com/biodream-llc/bitdispatcher/internal/neris"
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
 	"github.com/biodream-llc/bitdispatcher/internal/views"
@@ -334,7 +335,13 @@ func (s *Server) handle(pattern, role string, h handler) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			s.Auth.Touch(c.Value) // a change is input at the console
 		}
-		h(w, r.WithContext(bitvoice.OnBehalf(r.Context(), personOf(se))), se, actorOf(se))
+		a := actorOf(se)
+		a.Agency = s.workingAgency(se)
+		// Supervisory views are the agency's to give: a direct request without the right is refused.
+		if s.viewRefused(w, r, se, a) {
+			return
+		}
+		h(w, r.WithContext(bitvoice.OnBehalf(r.Context(), personOf(se))), se, a)
 	})
 }
 
@@ -371,6 +378,12 @@ func (s *Server) routes() {
 	s.recordsRoutes()
 	s.roadmapRoutes()
 	s.publicAlertRoutes()
+	s.agencyRoutes()
+	s.configVersionRoutes()
+	s.staffingRoutes()
+	s.commRoutes()
+	s.callDraftRoutes()
+	s.searchRoutes()
 	s.lockRoutes()
 	s.workstationRoutes()
 	m.HandleFunc("POST /api/auth/logout", s.logout)
@@ -439,12 +452,12 @@ func (s *Server) routes() {
 	s.handle("POST /api/emergencies/{key}/ack", auth.Dispatcher, s.ackEmergency)
 
 	s.handle("PUT /api/admin/settings", auth.Admin, s.saveSettings)
-	s.handle("PUT /api/admin/stations/{id}", auth.Admin, s.saveStation)
-	s.handle("DELETE /api/admin/stations/{id}", auth.Admin, s.removeStation)
-	s.handle("PUT /api/admin/units/{id}", auth.Admin, s.saveUnit)
-	s.handle("DELETE /api/admin/units/{id}", auth.Admin, s.removeUnit)
-	s.handle("PUT /api/admin/calltypes/{code}", auth.Admin, s.saveCallType)
-	s.handle("DELETE /api/admin/calltypes/{code}", auth.Admin, s.removeCallType)
+	s.handle("PUT /api/admin/stations/{id}", auth.Admin, s.agencyScoped("stations", s.saveStation))
+	s.handle("DELETE /api/admin/stations/{id}", auth.Admin, s.agencyScoped("stations", s.removeStation))
+	s.handle("PUT /api/admin/units/{id}", auth.Admin, s.agencyScoped("units", s.saveUnit))
+	s.handle("DELETE /api/admin/units/{id}", auth.Admin, s.agencyScoped("units", s.removeUnit))
+	s.handle("PUT /api/admin/calltypes/{code}", auth.Admin, s.agencyScoped("calltypes", s.saveCallType))
+	s.handle("DELETE /api/admin/calltypes/{code}", auth.Admin, s.agencyScoped("calltypes", s.removeCallType))
 	s.handle("GET /api/admin/users", auth.Admin, s.listUsers)
 	s.handle("PUT /api/admin/users/{name}", auth.Admin, s.saveUser)
 	s.handle("DELETE /api/admin/users/{name}", auth.Admin, s.removeUser)
@@ -588,7 +601,11 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 // UnitView is a unit with its full capability list.
 type UnitView struct {
 	*cad.Unit
-	Caps []string `json:"caps"`
+	Caps       []string           `json:"caps"`
+	Capability cad.UnitCapability `json:"capability"` // full, limited or unavailable, from who is aboard
+	// CheckMinutes is the unit's status-check timer now: its call type's safety timer, its agency's or the
+	// centre's for its status (0: none).
+	CheckMinutes int `json:"checkMinutes"`
 }
 
 // View is everything the dispatcher screen shows, in one document.
@@ -686,7 +703,7 @@ func (s *Server) view() ([]byte, error) {
 		}
 		sort.Slice(v.Stations, func(i, j int) bool { return v.Stations[i].ID < v.Stations[j].ID })
 		for _, u := range st.Units {
-			v.Units = append(v.Units, UnitView{Unit: u, Caps: st.Capabilities(u)})
+			v.Units = append(v.Units, UnitView{Unit: u, Caps: st.Capabilities(u), Capability: st.CapabilityOf(u), CheckMinutes: st.TimerForUnit(u)})
 		}
 		sort.Slice(v.Units, func(i, j int) bool { return unitLess(v.Units[i].ID, v.Units[j].ID) })
 		for _, c := range st.CallTypes {
@@ -997,8 +1014,9 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 	var b struct {
 		Units       []string `json:"units"`
 		Recommended []string `json:"recommended"`
-		Reason      string   `json:"reason"`  // why other units than recommended
-		Confirm     bool     `json:"confirm"` // the dispatcher confirmed the recommendation's warnings
+		Reason      string   `json:"reason"`   // why other units than recommended
+		Confirm     bool     `json:"confirm"`  // the dispatcher confirmed the recommendation's warnings
+		Override    string   `json:"override"` // a supervisor's reason to send a short-staffed unit
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -1016,7 +1034,7 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 		writeErr(w, err)
 		return
 	}
-	if err := s.Eng.DispatchWhy(a, n, b.Units, b.Recommended, b.Reason, rec.Plan); err != nil {
+	if err := s.Eng.DispatchOverride(a, n, b.Units, b.Recommended, b.Reason, rec.Plan, b.Override); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -1096,7 +1114,65 @@ func (s *Server) command(w http.ResponseWriter, r *http.Request, se *auth.Sessio
 	if !readJSON(w, r, &b) {
 		return
 	}
-	writeJSON(w, 200, s.Eng.Execute(a, b.Line, b.Incident))
+	res := s.Eng.Execute(a, b.Line, b.Incident)
+	if res.Refused {
+		// A command the person may not give (their duty, role, or a retired code): blocked and recorded.
+		s.Eng.Record(a, cad.EvCommandRefused, map[string]string{"line": b.Line, "why": res.Message, "key": r.URL.Query().Get("key")})
+	}
+	if res.OK && res.Plate != "" {
+		res.Message += s.autoPlateQuery(a, res)
+	}
+	writeJSON(w, 200, res)
+}
+
+// autoPlateQuery runs the agency's automatic plate inquiry for a field-initiated stop, when it asks for one
+// and NCIC is set up. It returns what to add to the command's message.
+func (s *Server) autoPlateQuery(a cad.Actor, res cad.CommandResult) string {
+	var on bool
+	var mode, ori, addr string
+	s.Eng.Read(func(st *cad.State) {
+		on, mode, ori, addr = st.Settings.Commands.AutoQuery, st.Settings.NCICMode, st.Settings.ORI, st.Settings.NCICAddr
+	})
+	if !on || res.PlateState == "" {
+		return ""
+	}
+	var sw ncic.Switch
+	switch mode {
+	case "sim":
+		sw = ncic.Sim{}
+	case "line":
+		if addr == "" {
+			return ""
+		}
+		sw = ncic.Line{Addr: addr}
+	default:
+		return ""
+	}
+	q := ncic.Query{Key: "QV", Fields: map[string]string{"LIC": res.Plate, "LIS": res.PlateState}, Purpose: "C", Reason: res.Incident}
+	if q.Check() != nil {
+		return ""
+	}
+	if ori == "" {
+		ori = "VA0000000"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	text, err := sw.Send(ctx, ncic.Format(q, ori))
+	result := "no record"
+	switch {
+	case err != nil:
+		result = "error"
+	case ncic.IsHit(text):
+		result = "hit"
+	}
+	s.Eng.Record(a, cad.EvJusticeQuery, map[string]any{"key": q.Key, "purpose": q.Purpose, "reason": q.Reason, "terms": ncic.Hash(q), "result": result, "simulated": mode == "sim", "auto": true})
+	switch result {
+	case "hit":
+		return "; NCIC plate inquiry: HIT, confirm before acting"
+	case "error":
+		return "; NCIC plate inquiry failed: " + err.Error()
+	}
+	return "; NCIC plate inquiry: no record"
 }
 
 // ---- calls and call handling ----
@@ -1718,6 +1794,8 @@ func (s *Server) Run(ctx context.Context) {
 	go s.stationAlerter(ctx)
 	go s.publicFeedPusher(ctx)
 	go s.autoDispatcher(ctx)
+	go s.credentialReminders(ctx)
+	go s.commWatcher(ctx)
 	go s.lisAuto(ctx)
 	go s.policyWatch(ctx)
 	go s.pager(ctx)

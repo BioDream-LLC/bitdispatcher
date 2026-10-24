@@ -130,7 +130,10 @@ func TestCrewsAndStaffing(t *testing.T) {
 	if !slices.Contains(caps("M1"), "als") {
 		t.Fatal("paramedic aboard, still no als")
 	}
-	must(t, e.SetCrew(dispatcher, "M2", []CrewSeat{{Member: "101"}}, ""))
+	if err := e.SetCrew(dispatcher, "M2", []CrewSeat{{Member: "101"}}, ""); err == nil {
+		t.Fatal("a member was put on a second unit without a move")
+	}
+	must(t, e.SetCrew(dispatcher, "M2", []CrewSeat{{Member: "101", Move: true}}, ""))
 	var m1, m2 Unit
 	var short []string
 	e.Read(func(s *State) { m1, m2 = *s.Units["M1"], *s.Units["M2"]; short = s.Staffing(s.Units["M2"]) })

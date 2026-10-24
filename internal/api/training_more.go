@@ -99,8 +99,9 @@ func (s *Server) trainingMoreRoutes() {
 			return
 		}
 		var b struct {
-			Parts []string `json:"parts"`
-			Why   string   `json:"why"`
+			Parts  []string `json:"parts"`
+			Why    string   `json:"why"`
+			Agency string   `json:"agency"` // publish only this agency's changes
 		}
 		if !readJSON(w, r, &b) {
 			return
@@ -109,7 +110,16 @@ func (s *Server) trainingMoreRoutes() {
 			fail(w, 422, "say why: the change is recorded on the live board")
 			return
 		}
-		n, err := publish(a, s.Eng, s.liveServer.Eng, b.Parts, b.Why)
+		b.Agency = strings.ToUpper(strings.TrimSpace(b.Agency))
+		var refuse bool
+		s.liveServer.Eng.Read(func(st *cad.State) {
+			refuse = !st.AllAgencies(se.Username) && (b.Agency == "" || !st.MayWork(se.Username, b.Agency))
+		})
+		if refuse {
+			fail(w, http.StatusForbidden, "publish the changes of an agency you work for: choose it")
+			return
+		}
+		n, err := publish(a, s.Eng, s.liveServer.Eng, b.Parts, b.Why, b.Agency)
 		if err != nil {
 			writeErr(w, err)
 			return
@@ -220,6 +230,11 @@ func stagedDiff(staged, live *cad.Engine) map[string][]string {
 	diffMap(out, "facilities", keys(a.Facilities), keys(b.Facilities), func(k string) bool {
 		return a.Facilities[k].Name == b.Facilities[k].Name && a.Facilities[k].Kind == b.Facilities[k].Kind && a.Facilities[k].Phone == b.Facilities[k].Phone
 	})
+	diffMap(out, "agencies", keys(a.Agencies), keys(b.Agencies), func(k string) bool {
+		x, y := *a.Agencies[k], *b.Agencies[k]
+		x.Updated, y.Updated, x.By, y.By = time.Time{}, time.Time{}, "", ""
+		return jsonEq(x, y)
+	})
 	if !jsonEq(a.Settings, b.Settings) {
 		out["settings"] = []string{"changed"}
 	}
@@ -266,16 +281,22 @@ func diffMap(out map[string][]string, part string, a, b []string, same func(stri
 }
 
 // publish copies parts of the staging board's configuration to the live board, as the publishing person.
-func publish(a cad.Actor, staged, live *cad.Engine, parts []string, why string) (int, error) {
+func publish(a cad.Actor, staged, live *cad.Engine, parts []string, why, agency string) (int, error) {
 	diff := stagedDiff(staged, live)
-	var src *cad.State
+	var src, dst *cad.State
 	staged.Read(func(st *cad.State) { src = snapshot(st) })
+	live.Read(func(st *cad.State) { dst = snapshot(st) })
+	if agency != "" {
+		diff = onlyAgency(diff, agency, src, dst)
+	}
+	before := configBefore(diff, dst)
 	n := 0
 	want := map[string]bool{}
 	for _, p := range parts {
 		want[p] = true
 	}
-	for part, lines := range diff {
+	for _, part := range configParts {
+		lines := diff[part]
 		if len(parts) > 0 && !want[part] {
 			continue
 		}
@@ -321,6 +342,12 @@ func publish(a cad.Actor, staged, live *cad.Engine, parts []string, why string) 
 				} else {
 					err = live.SaveFacility(a, *src.Facilities[k])
 				}
+			case "agencies":
+				if verb == "removed" {
+					err = live.RemoveAgency(a, k)
+				} else {
+					err = live.SaveAgency(a, *src.Agencies[k])
+				}
 			}
 			if err != nil {
 				return n, fmt.Errorf("%s %s: %w", part, k, err)
@@ -328,7 +355,7 @@ func publish(a cad.Actor, staged, live *cad.Engine, parts []string, why string) 
 			n++
 		}
 	}
-	live.Record(a, cad.EvConfigStaged, map[string]any{"parts": diff, "why": why, "changes": n})
+	live.Record(a, cad.EvConfigStaged, map[string]any{"parts": diff, "why": why, "changes": n, "agency": agency, "before": before})
 	return n, nil
 }
 

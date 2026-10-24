@@ -22,6 +22,7 @@ type Actor struct {
 	Session string
 	Console string
 	Duty    string // the work the person signed in to do: calltaker, police, fire, ems, dispatcher, supervisor, admin
+	Agency  string // the agency the person is working for (agency.go), when agencies are configured
 }
 
 // System actors.
@@ -91,6 +92,7 @@ func Open(path string) (*Engine, error) {
 		return nil, err
 	}
 	e := &Engine{led: led, path: path, st: newState(), now: time.Now, lastPos: map[string]Position{}, subs: map[chan Notice]struct{}{}}
+	e.st.clock = func() time.Time { return e.now() }
 	for _, ev := range events {
 		if err := e.st.apply(ev); err != nil {
 			led.Close()
@@ -143,7 +145,7 @@ func (e *Engine) write(a Actor, typ string, r refs, data any) (ledger.Event, err
 		}
 		raw = b
 	}
-	ev, err := e.led.Append(ledger.Event{Type: typ, Actor: a.User, Role: a.Role, Session: a.Session, Console: a.Console, Duty: a.Duty,
+	ev, err := e.led.Append(ledger.Event{Type: typ, Actor: a.User, Role: a.Role, Session: a.Session, Console: a.Console, Duty: a.Duty, Agency: a.Agency,
 		Incident: r.Incident, Unit: r.Unit, Call: r.Call, Parent: r.Parent, Data: raw, At: e.now(), Site: e.site})
 	if err != nil {
 		return ledger.Event{}, err
@@ -218,6 +220,16 @@ var reID = regexp.MustCompile(`^[A-Z0-9][A-Z0-9-]{0,15}$`)
 
 // SaveSettings replaces the settings.
 func (e *Engine) SaveSettings(a Actor, s Settings) error {
+	for _, p := range s.Commands.KeyProfiles {
+		if c := KeyConflicts(p); len(c) > 0 {
+			return problem("commands", "key profile %s: %s", firstNonEmpty(p.Name, p.ID), strings.Join(c, "; "))
+		}
+	}
+	for _, r := range s.PriorityRules {
+		if !slices.Contains(Priorities, r.Level) {
+			return problem("priorityRules", "a priority is urgent, high, medium or low")
+		}
+	}
 	if s.RoadFactor < 1 || s.RoadFactor > 3 {
 		return problem("roadFactor", "road factor is between 1 and 3 (1.4 suits most road networks)")
 	}
@@ -289,8 +301,12 @@ func (e *Engine) SaveStation(a Actor, s Station) error {
 	if s.Lat < -90 || s.Lat > 90 || s.Lon < -180 || s.Lon > 180 || (s.Lat == 0 && s.Lon == 0) {
 		return problem("lat", "place the station on the map")
 	}
+	s.Agency = strings.ToUpper(strings.TrimSpace(s.Agency))
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if err := e.checkAgency("agency", s.Agency); err != nil {
+		return err
+	}
 	_, err := e.write(a, EvStationSaved, refs{}, s)
 	return err
 }
@@ -321,6 +337,12 @@ func (e *Engine) SaveUnit(a Actor, u UnitDef) error {
 	defer e.mu.Unlock()
 	if e.unitType(u.Type) == nil {
 		return problem("type", "choose a unit type")
+	}
+	if len(e.st.Agencies) > 0 {
+		u.Agency = strings.ToUpper(strings.TrimSpace(u.Agency))
+		if err := e.checkAgency("agency", u.Agency); err != nil {
+			return err
+		}
 	}
 	if u.Station != "" {
 		if _, ok := e.st.Stations[u.Station]; !ok {
@@ -380,8 +402,17 @@ func (e *Engine) SaveCallType(a Actor, c CallType) error {
 	if c.PARMinutes < 0 || c.PARMinutes > 60 {
 		return problem("parMinutes", "a roll-call interval is 0 (the setting) to 60 minutes")
 	}
+	for i, g := range c.Agencies {
+		c.Agencies[i] = strings.ToUpper(strings.TrimSpace(g))
+	}
+	c.Agencies = cleanList(c.Agencies)
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	for _, g := range c.Agencies {
+		if err := e.checkAgency("agencies", g); err != nil {
+			return err
+		}
+	}
 	_, err := e.write(a, EvCallTypeSaved, refs{}, c)
 	return err
 }
@@ -403,7 +434,8 @@ func (e *Engine) Record(a Actor, typ string, data any) error {
 	case EvUserSaved, EvUserRemoved, EvIntegration, EvSignIn, EvSignInFailed, EvSignOut, EvMapRecording, EvMapRecorded, EvMapFailed,
 		EvPhotosRecording, EvPhotosRecorded, EvPhotosFailed,
 		EvAdvisorySuggested, EvAdvisoryDecided, EvAdvisoryWithdrawn, EvGISImporting, EvGISImported, EvGISFailed, EvJusticeQuery, EvIBRExported,
-		EvLocked, EvUnlocked, EvReviewExported, EvConfigStaged, EvWorkstationCode, EvUserDuties, EvUserMFAReset, EvRecordsViewed, EvTrainingInject:
+		EvLocked, EvUnlocked, EvReviewExported, EvConfigStaged, EvWorkstationCode, EvUserDuties, EvUserMFAReset, EvRecordsViewed, EvTrainingInject,
+		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused:
 	default:
 		return fmt.Errorf("cad: %s is not a record event", typ)
 	}
@@ -581,7 +613,8 @@ type NewIncident struct {
 	Location    *ng911.Location `json:"location,omitempty"`
 	Caller      *Caller         `json:"caller,omitempty"`
 	Narrative   string          `json:"narrative,omitempty"`
-	Call        string          `json:"call,omitempty"` // create from this call
+	Call        string          `json:"call,omitempty"`   // create from this call
+	Agency      string          `json:"agency,omitempty"` // the primary agency (empty: decided by agency.go)
 }
 
 // CreateIncident creates an incident. From a call, it takes the call's location and caller unless given.
@@ -622,17 +655,25 @@ func (e *Engine) CreateIncident(a Actor, n NewIncident) (string, error) {
 		n.Location.Source = "dispatcher"
 	}
 	now := e.now()
+	agency, err := e.incidentAgency(a, n)
+	if err != nil {
+		return "", err
+	}
+	if ct := e.st.CallTypes[n.Type]; ct != nil && agency != "" && !ct.For(agency) {
+		return "", problem("type", "%s is not a call type of %s", n.Type, agency)
+	}
 	// With several sites, each numbers its own incidents under its own prefix, so two sites never give
-	// the same number.
+	// the same number; an agency with its own prefix numbers its incidents under it.
+	prefix := e.st.incidentPrefix(agency)
 	seqNo := e.st.yearCount[fmt.Sprintf("%s|%d", e.site, now.UTC().Year())] + 1
-	number := fmt.Sprintf("%s%s%02d-%06d", e.st.Settings.IncidentPrefix, e.sitePrefix, now.UTC().Year()%100, seqNo)
+	number := fmt.Sprintf("%s%s%02d-%06d", prefix, e.sitePrefix, now.UTC().Year()%100, seqNo)
 	for e.st.Incidents[number] != nil { // a prefix change or clock change could repeat a number
 		seqNo++
-		number = fmt.Sprintf("%s%s%02d-%06d", e.st.Settings.IncidentPrefix, e.sitePrefix, now.UTC().Year()%100, seqNo)
+		number = fmt.Sprintf("%s%s%02d-%06d", prefix, e.sitePrefix, now.UTC().Year()%100, seqNo)
 	}
-	_, err := e.write(a, EvIncCreated, refs{Incident: number, Call: n.Call}, incidentCreated{Number: number, Type: n.Type, Priority: n.Priority,
+	_, err = e.write(a, EvIncCreated, refs{Incident: number, Call: n.Call}, incidentCreated{Number: number, Type: n.Type, Priority: n.Priority,
 		Location: n.Location, Caller: n.Caller, Narrative: strings.TrimSpace(n.Narrative), Call: n.Call,
-		Modifiers: n.Modifiers, CallerAt: n.CallerAt, LocVerified: n.LocVerified})
+		Modifiers: n.Modifiers, CallerAt: n.CallerAt, LocVerified: n.LocVerified, Agency: agency})
 	if err == nil && n.Call != "" {
 		if c := e.st.Calls[n.Call]; c != nil && c.State == "data" {
 			_, err = e.write(a, EvCallEnded, refs{Call: n.Call}, nil) // a crash notification, now on an incident
@@ -729,6 +770,12 @@ func (e *Engine) Dispatch(a Actor, number string, units, recommended []string) e
 // DispatchWhy dispatches units, recording why they differ from the recommendation and the response plan it
 // followed. The duty the dispatcher signed in to do limits which units they may send.
 func (e *Engine) DispatchWhy(a Actor, number string, units, recommended []string, reason, plan string) error {
+	return e.DispatchOverride(a, number, units, recommended, reason, plan, "")
+}
+
+// DispatchOverride dispatches as DispatchWhy, with a supervisor's reason (override) for sending units short
+// of their staffing where the agency asks for one (StaffingRules.Dispatch).
+func (e *Engine) DispatchOverride(a Actor, number string, units, recommended []string, reason, plan, override string) error {
 	if len(units) == 0 {
 		return problem("units", "choose at least one unit")
 	}
@@ -750,10 +797,21 @@ func (e *Engine) DispatchWhy(a Actor, number string, units, recommended []string
 		if err := e.st.mayCommand(a, u); err != nil {
 			return err
 		}
+		if short := e.st.Staffing(u); len(short) > 0 && u.StaffOverride == "" {
+			switch e.st.Settings.Staffing.Dispatch {
+			case "block":
+				return problem("units", "%s is short-staffed (%s): the agency does not send short units", id, strings.Join(short, "; "))
+			case "override":
+				if strings.TrimSpace(override) == "" || a.Role != "supervisor" && a.Role != "admin" {
+					return problem("override", "%s is short-staffed (%s): a supervisor's override and reason are needed to send it", id, strings.Join(short, "; "))
+				}
+			}
+		}
 		if !slices.Contains(ids, id) {
 			ids = append(ids, id)
 		}
 	}
+	override = strings.TrimSpace(override)
 	parent, err := e.write(a, EvIncDispatch, refs{Incident: number}, dispatchData{Units: ids, Recommended: recommended, Reason: strings.TrimSpace(reason), Plan: plan})
 	if err != nil {
 		return err
@@ -763,6 +821,10 @@ func (e *Engine) DispatchWhy(a Actor, number string, units, recommended []string
 		d := statusData{Status: Dispatched, Prev: u.Status, Incident: number, PrevIncident: u.Incident, Recommended: slices.Contains(recommended, id)}
 		if u.Status == OutOfService {
 			d.Reason = "was out of service"
+		}
+		if short := e.st.Staffing(u); len(short) > 0 && override != "" {
+			d.Override = override
+			d.Reason = strings.TrimSpace(d.Reason + " sent short-staffed (" + strings.Join(short, "; ") + ") by override: " + override)
 		}
 		if _, err := e.write(a, EvUnitStatus, refs{Incident: number, Unit: id, Parent: parent.ID}, d); err != nil {
 			return err
@@ -830,6 +892,12 @@ func (e *Engine) MarkOutUnit(a Actor, unit, code string, loc *ng911.Location, no
 			codes = append(codes, x.Code)
 		}
 		return problem("markOut", "no mark-out %s; the agency's are %s (Admin › Settings)", strings.ToUpper(code), strings.Join(codes, " "))
+	}
+	if t.Retired {
+		return problem("retired", "%s (%s) is a retired mark-out code", t.Code, t.Name)
+	}
+	if len(t.Roles) > 0 && !slices.Contains(t.Roles, a.Role) && a.Role != "admin" {
+		return problem("role", "your role (%s) may not use the %s mark-out", a.Role, t.Code)
 	}
 	if t.Discipline != "" {
 		if d := e.st.Discipline(u); d != t.Discipline {

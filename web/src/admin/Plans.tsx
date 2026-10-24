@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { ArrowDown, ArrowUp, Plus, Route, Trash2, X } from 'lucide-react'
 import { api, errText } from '../api'
 import { Field, Modal } from '../ui'
+import { useAgencies } from '../console/Coverage'
 import { cx } from '../util'
 import type { ResponsePlan, View } from '../types'
 import { Page, Table } from './Admin'
@@ -11,6 +12,7 @@ const blank = (): ResponsePlan => ({ id: '', name: '', callTypes: [], modifiers:
 
 /** Response plans: run orders. The recommendation follows a plan's due order when one applies. */
 export default function Plans({ view }: { view: View }) {
+  const agencies = useAgencies()?.agencies ?? []
   const [items, setItems] = useState<ResponsePlan[]>([])
   const [d, setD] = useState<(ResponsePlan & { isNew: boolean }) | null>(null)
   const [addUnit, setAddUnit] = useState('')
@@ -27,7 +29,7 @@ export default function Plans({ view }: { view: View }) {
     if (!d) return
     const body: Omit<ResponsePlan, 'updated'> = {
       id: d.id, name: d.name, callTypes: d.callTypes, modifiers: d.modifiers, area: d.area,
-      addresses: (d.addresses ?? []).map((a) => a.trim()).filter(Boolean), from: d.from, to: d.to, order: d.order, note: d.note,
+      addresses: (d.addresses ?? []).map((a) => a.trim()).filter(Boolean), from: d.from, to: d.to, order: d.order, note: d.note, agency: d.agency || undefined,
     }
     try {
       await api.put<{ id: string }>(d.isNew ? '/admin/plans/new' : `/admin/plans/${encodeURIComponent(d.id)}`, body)
@@ -93,6 +95,14 @@ export default function Plans({ view }: { view: View }) {
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2"><Field label="Name" htmlFor="pln"><input id="pln" className="input" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="Structure fire, downtown" /></Field></div>
+            {agencies.length > 0 && (
+              <div className="sm:col-span-2"><Field label="Agency" htmlFor="plag" hint="An agency's plan applies only to its incidents">
+                <select id="plag" className="input" value={d.agency ?? ''} onChange={(e) => setD({ ...d, agency: e.target.value })}>
+                  <option value="">The centre's</option>
+                  {agencies.map((a) => <option key={a.code} value={a.code}>{a.code} — {a.name}</option>)}
+                </select>
+              </Field></div>
+            )}
             <div className="sm:col-span-2">
               <div className="label">Call types</div>
               <p className="mb-1 text-xs text-slate-500">Empty means every type.</p>

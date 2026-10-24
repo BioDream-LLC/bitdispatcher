@@ -10,6 +10,16 @@ import Admin from './admin/Admin'
 import Mdt from './mdt/Mdt'
 import { Help } from './Help'
 import Rms from './rms/Rms'
+import { useViews } from './access'
+
+/** A supervisory screen only for people the agency gave it; a direct link shows why not. */
+function Given({ id, children }: { id: string; children: React.ReactNode }) {
+  const me = useStore((s) => s.me)
+  const views = useViews(me ? me.username + '|' + me.duty : undefined)
+  if (!views) return <div className="grid h-full place-items-center text-sm text-slate-500">Checking…</div>
+  if (!views.has(id)) return <div className="grid h-full place-items-center p-6 text-center text-sm text-slate-400">The agency has not given you this view.<br />An administrator decides who sees it (Admin › Operations rules).</div>
+  return <>{children}</>
+}
 
 const Board = lazy(() => import('./console/Board'))
 const Review = lazy(() => import('./records/Review'))
@@ -18,6 +28,7 @@ const Taker = lazy(() => import('./taker/Taker'))
 const Station = lazy(() => import('./Station'))
 const Papers = lazy(() => import('./records/Papers'))
 const PageReply = lazy(() => import('./PageReply'))
+const Staffing = lazy(() => import('./console/Staffing'))
 
 const wait = (what: string) => <div className="grid h-full place-items-center text-sm text-slate-500">Loading {what}…</div>
 
@@ -76,7 +87,8 @@ export default function App() {
           <Route path="/screen/police" element={<Console key="police" screen="police" />} />
           <Route path="/screen/map" element={<Console key="map" screen="map" />} />
           <Route path="/screen/incident" element={<Console key="incident" screen="incident" />} />
-          <Route path="/board" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading the board…</div>}><Board /></Suspense>} />
+          <Route path="/board" element={<Given id="board"><Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading the board…</div>}><Board /></Suspense></Given>} />
+          <Route path="/staffing" element={<Suspense fallback={wait('staffing')}><Staffing /></Suspense>} />
           <Route path="/review/:number" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading the review…</div>}><Review /></Suspense>} />
           <Route path="/records" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />
           <Route path="/records/:id" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />

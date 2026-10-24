@@ -1,11 +1,13 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { ChevronRight, Terminal } from 'lucide-react'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
-import { cx } from '../util'
-import type { View } from '../types'
+import { cx, statusMeta } from '../util'
+import { lastKey } from '../keys'
+import { Modal } from '../ui'
+import type { CommandResult, View } from '../types'
 
-type Result = { ok: boolean; message: string; incident?: string; line?: string }
+type Result = CommandResult & { line?: string }
 
 export type CommandLineHandle = { focus: (prefill?: string) => void }
 
@@ -36,17 +38,22 @@ const CommandLine = forwardRef<CommandLineHandle, { view: View }>(function Comma
   else if (['CL', 'CLOSE'].includes(verb)) options = view.settings.dispositions.map((d) => d.toUpperCase()).filter((d) => d.startsWith(last1))
   else if (v && !['N', 'NOTE', 'PN', 'NEW', 'I', 'P', 'PRI', 'RO', 'REOPEN', 'ACK', 'HELP'].includes(verb)) options = view.units.map((u) => u.id).filter((id) => id.startsWith(last1) && !words.slice(1, -1).includes(id))
   options = options.slice(0, 12)
-  const run = async () => {
-    const text = line.trim()
+  const [form, setForm] = useState<{ unit: string } | null>(null)
+  const run = async (prefix = '') => {
+    let text = line.trim()
+    // A function key supplies the command (F7 field initiate, F11 unit status) and processes the line.
+    if (prefix && !text.toUpperCase().startsWith(prefix.trim() + ' ')) text = (prefix + text).trim()
     if (!text) return
     setBusy(true)
+    const key = lastKey
     try {
-      const r = await api.post<Result>('/command', { line: text, incident: selected ?? '' })
-      setLast({ ...r, line: text })
+      const r = await api.post<Result>('/command' + (key ? '?key=' + encodeURIComponent(key) : ''), { line: text, incident: selected ?? '' })
+      setLast({ ...r, line: line.trim() })
       if (r.ok) {
         setLine('')
         if (r.incident !== undefined && r.incident !== selected) store.select(r.incident || null)
       }
+      if (r.form === 'unit-status' && r.unit) setForm({ unit: r.unit })
       const h = [text, ...hist.filter((x) => x !== text)].slice(0, 50)
       setHist(h)
       sessionStorage.setItem('bd-hist', JSON.stringify(h))
@@ -57,6 +64,13 @@ const CommandLine = forwardRef<CommandLineHandle, { view: View }>(function Comma
       setBusy(false)
     }
   }
+  const runRef = useRef(run)
+  runRef.current = run
+  useEffect(() => {
+    const on = (e: Event) => runRef.current((e as CustomEvent<string>).detail ?? '')
+    window.addEventListener('bd:cmd-run', on)
+    return () => window.removeEventListener('bd:cmd-run', on)
+  }, [])
   if (!can.dispatch(me)) {
     return <div className="flex h-8 shrink-0 items-center border-t border-slate-800 bg-slate-950 px-3 text-[11px] text-slate-500">Viewing only: your role cannot change incidents.</div>
   }
@@ -124,8 +138,40 @@ const CommandLine = forwardRef<CommandLineHandle, { view: View }>(function Comma
           </span>
         ) : null}
       </div>
+      {form && <UnitStatusForm view={view} unit={form.unit} onClose={() => setForm(null)} />}
     </div>
   )
 })
+
+/** The unit status details form: a unit alone on the line opens it, so no status is guessed. */
+function UnitStatusForm({ view, unit, onClose }: { view: View; unit: string; onClose: () => void }) {
+  const codes = view.settings.commands?.statusCodes?.filter((c) => !c.retired) ?? [
+    { code: 'ER', status: 'enroute' }, { code: 'AS', status: 'onscene' }, { code: 'TR', status: 'transporting' }, { code: 'AD', status: 'atdest' }, { code: 'AV', status: 'available' }, { code: 'OOS', status: 'oos' },
+  ]
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState('')
+  const delim = view.settings.commands?.delim || '.'
+  const go = async (code: string) => {
+    try {
+      const r = await api.post<CommandResult>('/command', { line: `US ${unit}${delim}${code}${note ? delim + delim + delim + delim + note : ''}` })
+      if (!r.ok) return setErr(r.message)
+      onClose()
+    } catch (e) {
+      setErr(errText(e))
+    }
+  }
+  const u = view.units.find((x) => x.id === unit)
+  return (
+    <Modal open onClose={onClose} title={`Unit status: ${unit}`}>
+      <p className="mb-2 text-xs text-slate-400">{u ? `${unit} is ${statusMeta(u.status).label}${u.incident ? ' on ' + u.incident : ''}.` : ''} Choose its new status.</p>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Statuses">
+        {codes.map((c) => <button key={c.code} className="btn h-8" onClick={() => go(c.code)}>{c.code} · {statusMeta(c.status).label}</button>)}
+        {view.settings.markOuts?.filter((m) => !m.retired).map((m) => <button key={m.code} className="btn h-8" onClick={() => go(m.code)} title={m.name}>{m.code}</button>)}
+      </div>
+      <input className="input mt-2" placeholder="Comment (optional)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Comment" />
+      {err && <p role="alert" className="mt-2 text-sm text-rose-300">{err}</p>}
+    </Modal>
+  )
+}
 
 export default CommandLine

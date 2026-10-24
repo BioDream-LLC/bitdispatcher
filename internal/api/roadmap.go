@@ -83,6 +83,12 @@ type MemberBrief struct {
 	Volunteer bool     `json:"volunteer,omitempty"`
 	Inactive  bool     `json:"inactive,omitempty"`
 	Riding    string   `json:"riding,omitempty"`
+	// On duty: the period's kind and the person's availability (staffing.go); Quals above are the
+	// qualifications valid now, without the credential details.
+	Agency       string `json:"agency,omitempty"`
+	OnDuty       bool   `json:"onDuty,omitempty"`
+	DutyKind     string `json:"dutyKind,omitempty"`
+	Availability string `json:"availability,omitempty"`
 }
 
 // GatewayBrief is a paging gateway without its settings.
@@ -166,7 +172,11 @@ func (s *Server) roadmapView(st *cad.State, now time.Time, open []*cad.Incident)
 		v.Upcoming = []cad.UpcomingItem{}
 	}
 	for _, m := range st.Roster() {
-		v.Members = append(v.Members, MemberBrief{ID: m.ID, Name: m.Name, Rank: m.Rank, Quals: m.Quals, Station: m.Station, Volunteer: m.Volunteer, Inactive: m.Inactive, Riding: st.RidingOn(m.ID)})
+		mb := MemberBrief{ID: m.ID, Name: m.Name, Rank: m.Rank, Quals: st.ValidQuals(m, now), Station: m.Station, Volunteer: m.Volunteer, Inactive: m.Inactive, Riding: st.RidingOn(m.ID), Agency: m.Agency}
+		if m.Duty != nil {
+			mb.OnDuty, mb.DutyKind, mb.Availability = true, m.Duty.Kind, m.Duty.Availability
+		}
+		v.Members = append(v.Members, mb)
 	}
 	for _, g := range st.PageGroups {
 		v.PageGroups = append(v.PageGroups, g)
@@ -415,14 +425,11 @@ func (s *Server) roadmapRoutes() {
 		writeJSON(w, 200, map[string]any{"saved": n, "problems": problems})
 	})
 	s.handle("PUT /api/units/{id}/crew", auth.Dispatcher, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
-		var b struct {
-			Crew []cad.CrewSeat `json:"crew"`
-			Note string         `json:"note"`
-		}
+		var b cad.CrewChange
 		if !readJSON(w, r, &b) {
 			return
 		}
-		if err := s.Eng.SetCrew(a, r.PathValue("id"), b.Crew, b.Note); err != nil {
+		if err := s.Eng.SetCrewChange(a, r.PathValue("id"), b); err != nil {
 			writeErr(w, err)
 			return
 		}
@@ -433,14 +440,18 @@ func (s *Server) roadmapRoutes() {
 		if !ok {
 			return
 		}
-		var b struct {
-			Crew []cad.CrewSeat `json:"crew"`
-		}
+		var b cad.CrewChange
 		if !readJSON(w, r, &b) {
 			return
 		}
-		if err := s.Eng.SetCrew(a, unit, b.Crew, "from the terminal"); err != nil {
+		b.Note = firstNonEmpty(b.Note, "from the terminal")
+		id, err := s.Eng.RequestCrew(a, unit, b)
+		if err != nil {
 			writeErr(w, err)
+			return
+		}
+		if id != "" {
+			writeJSON(w, http.StatusAccepted, map[string]string{"request": id, "message": "Sent for a supervisor's approval"})
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

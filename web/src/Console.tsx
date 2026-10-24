@@ -31,8 +31,11 @@ import { applyLens, parseLens } from './lens'
 import { screenDef, type ScreenKind } from './screens'
 import { loadLayout, rememberBounds, screensChannel } from './layout'
 import { MonitorCheck, X } from 'lucide-react'
-import WorkspaceView, { LayoutMenu, LockButton } from './console/Workspace'
-import { useWorkspace, type SectionId } from './workspace'
+import WorkspaceView, { LayoutMenu } from './console/Workspace'
+import { type SectionId } from './workspace'
+import { PresetControls, usePresetWorkspace } from './presets'
+import { KeyMapHost } from './keys'
+import { load } from './store'
 
 // slotOf is the layout slot this window was opened as, if it is one of the position's screens.
 const slotOf = () => new URLSearchParams(location.hash.split('?')[1] ?? '').get('slot')
@@ -67,7 +70,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   const position = me?.console || me?.username || ''
   const [offer, setOffer] = useState(() => screen === 'full' && !slotOf() && !sessionStorage.getItem('bd.screens.offered'))
   const layout = loadLayout(position)
-  const [ws, setWs] = useWorkspace(me?.username ?? '', me?.duty ?? '')
+  const [ws, setWs, preset] = usePresetWorkspace(me?.username ?? '', me?.duty ?? '')
   const def = screenDef(screen)
 
   // A screen opened without a lens in its address starts with its own (police for the police board).
@@ -165,6 +168,37 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [me, view, dispatchPicked])
 
+  // The actions a key profile can give the console's keys (keys.tsx); the server checks each as usual.
+  const consoleKeys = (): Record<string, () => void> => {
+    const sel = store.get().selected
+    const inc = view?.incidents.find((i) => i.number === sel)
+    const cmdRun = (prefix: string) => window.dispatchEvent(new CustomEvent('bd:cmd-run', { detail: prefix }))
+    const search = (q = '') => window.dispatchEvent(new CustomEvent('bd:search', { detail: q }))
+    const step = (dir: 1 | -1) => {
+      const open = (view?.incidents ?? []).filter((i) => i.status !== 'closed').sort((a, b) => a.priority - b.priority || a.number.localeCompare(b.number))
+      if (!open.length) return
+      const i = open.findIndex((x) => x.number === sel)
+      store.select(open[(i + dir + open.length) % open.length].number)
+    }
+    const k: Record<string, () => void> = {
+      home: () => nav('/'), help: () => nav('/help?a=keys'), palette: () => setPalette((p) => !p),
+      search: () => search(), recall: () => search(), previous: () => search(inc?.location?.address ?? ''), premiseMenu: () => search(inc?.location?.address ?? ''),
+      premise: () => search(inc?.location?.address ?? ''), plates: () => search(inc?.vehicles?.find((v) => v.plate)?.plate ?? ''),
+      email: () => window.dispatchEvent(new CustomEvent('bd:open-comm', { detail: '' })), atm: () => window.dispatchEvent(new CustomEvent('bd:compose', { detail: { kind: 'message' } })),
+      pending: () => { load() }, nextPage: () => step(1), prevPage: () => step(-1),
+      audit: () => sel && nav(`/review/${sel}?view=audit`), comments: () => cmd.current?.focus('N '), update: () => cmd.current?.focus(),
+      clear: () => { store.select(null); store.selectUnit(null); store.selectCall(null) },
+      display911: () => { const c = view?.calls.find((x) => x.state !== 'ended'); if (c) store.selectCall(c.id) },
+      fieldInitiate: () => cmdRun('FI '), unitStatus: () => cmdRun('US '), command: () => cmdRun(''), submit: () => dispatchPicked(),
+      dispatch: () => cmdRun('REC'), markout: () => cmd.current?.focus('MO '),
+    }
+    if (can.dispatch(me)) {
+      k.initiate = () => setSeed({})
+      k.queries = k.ncic = () => { api.get<Meta>('/rms/meta').then((m) => { setRmsMeta(m); setNcic(true) }).catch((err) => toast.error(errText(err))) }
+    }
+    return k
+  }
+
   if (!view) {
     return <div className="grid h-full place-items-center text-sm text-slate-500">{loadError ? `Cannot load: ${loadError}` : 'Loading the dispatch picture…'}</div>
   }
@@ -185,7 +219,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   return (
     <div className="flex h-full min-h-[600px] flex-col overflow-hidden bg-slate-950">
       <Boundary name="status"><StatusBar view={view} screen={screen} onScreens={() => setScreens(true)}
-        layout={screen === 'full' ? <><LayoutMenu ws={ws} onChange={setWs} duty={me?.duty} /><LockButton ws={ws} onChange={setWs} /></> : undefined} /></Boundary>
+        layout={screen === 'full' ? (preset.trainee ? <span className="chip h-6 bg-slate-800 px-2 text-[10px] text-slate-300" title="A trainee works the agency's assigned preset">Training preset</span> : <><LayoutMenu ws={ws} onChange={setWs} duty={me?.duty} /><PresetControls meta={preset} /></>) : undefined} /></Boundary>
       <Boundary name="training"><TrainingBar view={raw!} /></Boundary>
       <Boundary name="offline"><OfflineBar view={raw!} /></Boundary>
       <Boundary name="emergency"><EmergencyBanner view={raw!} /></Boundary>
@@ -230,6 +264,7 @@ export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
       <ScreensDialog open={screens} onClose={() => setScreens(false)} />
       <MarkOutDialog />
       <AskHost />
+      <KeyMapHost screen="console" handlers={consoleKeys()} />
       <NewIncident view={view} seed={seed} onClose={() => setSeed(null)} />
       {rmsMeta && <NcicPanel open={ncic} onOpenChange={setNcic} meta={rmsMeta} reason={selected ?? ''} />}
       <Command.Dialog

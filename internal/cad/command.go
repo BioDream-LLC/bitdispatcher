@@ -14,6 +14,14 @@ type CommandResult struct {
 	OK       bool   `json:"ok"`
 	Message  string `json:"message"`
 	Incident string `json:"incident,omitempty"` // the incident to select afterwards
+	// Refused: the person may not do this (their duty or role, or a retired code); it is recorded.
+	Refused bool `json:"refused,omitempty"`
+	// Form asks the screen to open a form for what the line left out (unit-status, field-initiate).
+	Form string `json:"form,omitempty"`
+	Unit string `json:"unit,omitempty"`
+	// The plate a field-initiated stop recorded, for the automatic inquiry.
+	Plate      string `json:"plate,omitempty"`
+	PlateState string `json:"plateState,omitempty"`
 }
 
 // Verb is one command-line verb, for the help and completion.
@@ -56,6 +64,8 @@ var Verbs = []Verb{
 	{[]string{"MU", "COVER"}, "MU <unit> <station>", "Move a unit up to cover another station"},
 	{[]string{"RET", "HOME"}, "RET <units…>", "Send covering units back to their own station"},
 	{[]string{"ATTACH"}, "ATTACH <call> [#incident]", "Attach a 911 call to the selected (or named) incident"},
+	{[]string{"FI"}, "FI unit.location.type.plate.state.comment (or the line then F7)", "Field initiate: a traffic stop or other officer-initiated incident in one line"},
+	{[]string{"US"}, "US unit.status.disposition.location.type.comment (or the line then F11)", "Unit status in one line, by the agency's status codes: UNIT1.AS"},
 }
 
 // Execute runs one command line. selected is the incident the dispatcher has selected.
@@ -66,7 +76,7 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 	}
 	verb := strings.ToUpper(f[0])
 	args := f[1:]
-	fail := func(err error) CommandResult { return CommandResult{Message: err.Error()} }
+	fail := func(err error) CommandResult { return CommandResult{Message: err.Error(), Refused: isDuty(err)} }
 	// A trailing or leading #incident picks the incident.
 	pickInc := func() (string, []string, error) {
 		var rest []string
@@ -103,6 +113,10 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 	}
 	status := statusWords
 	switch verb {
+	case "FI":
+		return e.fieldInitiate(a, strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), f[0])))
+	case "US":
+		return e.unitStatus(a, strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), f[0])))
 	case "HELP", "?":
 		var b strings.Builder
 		for _, v := range Verbs {

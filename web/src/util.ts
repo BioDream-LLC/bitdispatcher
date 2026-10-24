@@ -106,6 +106,8 @@ export function markOutsFor(view: View, u: Unit): MarkOutType[] {
 // or its status's; 0 for none.
 export function timerMinutes(view: View, u: Unit): number {
   if (u.status === 'available' || u.status === 'oos') return 0
+  // The server's figure: the call type's safety timer, the unit's agency's or the centre's.
+  if (u.checkMinutes !== undefined) return u.checkMinutes
   if (u.status === 'markout') {
     const t = markOutType(view, u.markOut?.code)
     if (t) return t.minutes

@@ -3,10 +3,11 @@ import { toast } from 'sonner'
 import { ClipboardList, Plus, Trash2, X } from 'lucide-react'
 import { api, ApiError, errText } from '../api'
 import { Field, Modal, Priority } from '../ui'
+import { useAgencies } from '../console/Coverage'
 import type { AlarmLevel, Requirement, View } from '../types'
 import { Page, Table } from './Admin'
 
-type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string; alarms?: AlarmLevel[]; par?: boolean; parMinutes?: number; nemsis?: string; isNew: boolean }
+type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string; alarms?: AlarmLevel[]; par?: boolean; parMinutes?: number; nemsis?: string; agencies?: string[]; checkMinutes?: number; isNew: boolean }
 
 // importCSV reads call types from a spreadsheet: code, name, priority, discipline, group, run card
 // ("2 engine; 1 ladder"), notify ("Fire marshal; Animal control"). A header row is skipped.
@@ -21,6 +22,7 @@ export function parseCallTypes(text: string) {
 }
 
 export default function CallTypes({ view }: { view: View }) {
+  const agencies = useAgencies()?.agencies ?? []
   const [d, setD] = useState<Draft | null>(null)
   const [err, setErr] = useState<ApiError | null>(null)
   const caps = [...new Set(view.settings.unitTypes.flatMap((t) => t.capabilities).concat(view.units.flatMap((u) => u.caps)))].sort()
@@ -32,7 +34,7 @@ export default function CallTypes({ view }: { view: View }) {
   const save = async () => {
     if (!d) return
     try {
-      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, autoDispatch: !!d.autoDispatch && d.priority >= 3, notify: d.notify, group: d.group, alarms: (d.alarms ?? []).filter((a) => a.runCard.length), par: !!d.par, parMinutes: d.parMinutes || 0, nemsis: d.nemsis || undefined })
+      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, autoDispatch: !!d.autoDispatch && d.priority >= 3, notify: d.notify, group: d.group, alarms: (d.alarms ?? []).filter((a) => a.runCard.length), par: !!d.par, parMinutes: d.parMinutes || 0, nemsis: d.nemsis || undefined, agencies: (d.agencies ?? []).length ? d.agencies : undefined, checkMinutes: d.checkMinutes || 0 })
       toast.success(`Call type ${d.code.toUpperCase()} saved`)
       setD(null)
     } catch (e) {
@@ -166,6 +168,21 @@ export default function CallTypes({ view }: { view: View }) {
             </label>
             <Field label="Roll call every (minutes)" htmlFor="cpm" hint="0: the setting (20 unless changed)"><input id="cpm" type="number" min={0} max={60} className="input w-24 font-mono" value={d.parMinutes ?? 0} onChange={(e) => setD({ ...d, parMinutes: Number(e.target.value) })} /></Field>
             <Field label="NEMSIS dispatch reason" htmlFor="cnem" hint="For EMS patient-care reports (eDispatch.01); empty: suggested from the name"><input id="cnem" className="input font-mono" placeholder="2301…" value={d.nemsis ?? ''} onChange={(e) => setD({ ...d, nemsis: e.target.value.trim() })} /></Field>
+            <Field label="Safety timer (minutes)" htmlFor="cck" hint="Status check for units on scene of this type, e.g. a traffic stop"><input id="cck" type="number" min={0} max={600} className="input w-24 font-mono" value={d.checkMinutes ?? 0} onChange={(e) => setD({ ...d, checkMinutes: Number(e.target.value) })} /></Field>
+            {agencies.length > 0 && (
+              <div className="sm:col-span-4">
+                <span className="label">Agencies</span>
+                <p className="mb-1 text-xs text-slate-500">None ticked means every agency.</p>
+                <div className="flex flex-wrap gap-2">
+                  {agencies.map((a) => (
+                    <label key={a.code} className="flex items-center gap-1 text-sm text-slate-300">
+                      <input type="checkbox" checked={(d.agencies ?? []).includes(a.code)} onChange={(e) => setD({ ...d, agencies: e.target.checked ? [...(d.agencies ?? []), a.code] : (d.agencies ?? []).filter((x) => x !== a.code) })} aria-label={`${a.code} — ${a.name}`} />
+                      {a.code}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}

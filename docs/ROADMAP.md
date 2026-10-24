@@ -17,6 +17,15 @@ What large CAD systems commonly have, in the order it was built. All eleven were
 | 10 | Patient reports (NEMSIS) | Yes: the incident's times and details sent to the ambulance crews' patient-care reports |
 | 11 | Warrants and civil process | Yes: warrants and papers to serve, with the address and the person |
 
+## Operational updates (October 2026)
+
+Built after the eleven, from a working dispatcher's list: saved and locked duty presets with supervisory
+views the agency controls; true agency-specific configuration (agencies, coverage, per-agency publish and
+rollback); several working calls in tabs; a messages and BOLO inbox with four priorities; one search with
+match reasons and a unit recall view; responder duty and unit staffing; qualifications and special teams
+with live capability; key profiles (including a PremierOne-style layout) and one-line F7 and F11 commands.
+See the manual's chapters on each.
+
 ## Still to do
 
 Not only code: licensed medical-dispatch protocols (bitdispatcher has its own protocol engine; the scripts

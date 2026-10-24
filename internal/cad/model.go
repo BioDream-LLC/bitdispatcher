@@ -55,6 +55,7 @@ type Station struct {
 	Address string  `json:"address,omitempty"`
 	Lat     float64 `json:"lat"`
 	Lon     float64 `json:"lon"`
+	Agency  string  `json:"agency,omitempty"` // the agency that runs it (agency.go)
 }
 
 // UnitType is a kind of unit, with the capabilities a unit of that kind has unless it says otherwise.
@@ -68,6 +69,10 @@ type UnitType struct {
 	Cover *bool `json:"cover,omitempty"`
 	// MinStaff is how many a unit of this kind needs aboard to be fully staffed (0: no minimum).
 	MinStaff int `json:"minStaff,omitempty"`
+	// Positions are the crew positions that must be filled (driver, officer…); SignOn is how its crew
+	// signs on: self (from the terminal), approve (a supervisor approves) or dispatch (staffing.go).
+	Positions []string `json:"positions,omitempty"`
+	SignOn    string   `json:"signOn,omitempty"`
 }
 
 var defaultCover = map[string]bool{"engine": true, "ladder": true, "medic": true, "ambulance": true, "patrol": true}
@@ -124,6 +129,9 @@ type Unit struct {
 	CheckedBy string    `json:"checkedBy,omitempty"`
 	// Crew is who rides the unit this shift (crew.go); empty when staffing is not recorded.
 	Crew []CrewSeat `json:"crew,omitempty"`
+	// StaffOverride is a supervisor's reason for keeping the unit in service short-staffed.
+	StaffOverride string `json:"staffOverride,omitempty"`
+	crewKnown     bool   // its crew has been recorded
 }
 
 // MarkOut is a unit's own activity: its kind (a mark-out type's code), where, and a note.
@@ -141,6 +149,13 @@ type MarkOutType struct {
 	Discipline string `json:"discipline,omitempty"` // only for units of this discipline; empty for any
 	// Interruptible units are offered by the recommendation when no available unit can fill a line.
 	Interruptible bool `json:"interruptible,omitempty"`
+	// Retired codes are refused (and the attempt recorded); kept so old records still read.
+	Retired bool `json:"retired,omitempty"`
+	// Roles that may use it (empty: everyone who may change units); MaxMinutes is the longest it may last
+	// before a supervisor is told (0: no limit); Staffing: the unit counts as unavailable for coverage.
+	Roles      []string `json:"roles,omitempty"`
+	MaxMinutes int      `json:"maxMinutes,omitempty"`
+	Staffing   bool     `json:"staffing,omitempty"`
 }
 
 // Requirement is one line of a run card: this many units with this capability.
@@ -177,6 +192,10 @@ type CallType struct {
 	// NEMSIS is the national EMS dispatch reason (eDispatch.01) the type is sent as to patient-care
 	// reports; empty: suggested from the name.
 	NEMSIS string `json:"nemsis,omitempty"`
+	// Agencies that use the type (agency.go); empty: every agency.
+	Agencies []string `json:"agencies,omitempty"`
+	// CheckMinutes is the status-check (safety) timer for units on scene of this type (0: the status's).
+	CheckMinutes int `json:"checkMinutes,omitempty"`
 }
 
 // Caller is who reported an incident.
@@ -199,6 +218,12 @@ type Assignment struct {
 	AckedBy string    `json:"ackedBy,omitempty"`
 	AtDest  time.Time `json:"atDest,omitzero"`
 	Cleared time.Time `json:"cleared,omitzero"`
+	// Crew is who was aboard when the unit was assigned, with what they were qualified for then
+	// (staffing.go); CrewCorrected marks a supervisor's correction (the original is in the timeline).
+	Crew          []CrewSeat `json:"crew,omitempty"`
+	CrewCorrected bool       `json:"crewCorrected,omitempty"`
+	// Override is a supervisor's reason for sending it short of what the call needs.
+	Override string `json:"override,omitempty"`
 }
 
 // Entry is one line of an incident's timeline.
@@ -249,6 +274,10 @@ type Incident struct {
 	Fireground  *Fireground     `json:"fireground,omitempty"`
 	// ePCR is what each EMS unit's patient-care report system last said (nemsis), by unit.
 	EPCR map[string]*EPCRRecord `json:"epcr,omitempty"`
+	// Agency is the primary agency (agency.go); Assisting the agencies named as assisting (every unit
+	// also keeps its own home agency).
+	Agency    string   `json:"agency,omitempty"`
+	Assisting []string `json:"assisting,omitempty"`
 }
 
 // TextLine is one line of a text conversation with a caller.
@@ -428,6 +457,19 @@ type Settings struct {
 	// Tow rotation: the classes of tow and the rotation zones (empty: light, medium, heavy and one zone).
 	TowClasses []string `json:"towClasses,omitempty"`
 	TowZones   []string `json:"towZones,omitempty"`
+	// Views says who may see each supervisory view (presets.go); a view with no rule is for supervisors.
+	Views []ViewRule `json:"views,omitempty"`
+	// Staffing is the agency's staffing policy (staffing.go).
+	Staffing StaffingRules `json:"staffing,omitzero"`
+	// Communications (comms.go): the kinds, how each priority is presented, and attachments allowed.
+	CommKinds     []CommKind     `json:"commKinds,omitempty"`
+	PriorityRules []PriorityRule `json:"priorityRules,omitempty"`
+	CommFileTypes []string       `json:"commFileTypes,omitempty"` // MIME types allowed (empty: pictures, PDF, text, audio, video)
+	CommFileMB    int            `json:"commFileMB,omitempty"`    // largest attachment (0: 25 MB)
+	// MultiCall is how many working calls people may keep (calldrafts.go).
+	MultiCall MultiCall `json:"multiCall,omitzero"`
+	// Commands are the command-line grammar, status codes and key profiles (fieldcmd.go).
+	Commands CommandRules `json:"commands,omitzero"`
 }
 
 // MarkOutType finds a mark-out type by its code, in any case.

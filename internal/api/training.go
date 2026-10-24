@@ -191,8 +191,20 @@ func copyConfig(from, to *cad.Engine) error {
 	var types []cad.CallType
 	var prem []cad.Premise
 	var users []cad.UserInfo
+	var agencies []cad.Agency
+	var staff []cad.Staff
+	var presets []cad.Preset
 	from.Read(func(s *cad.State) {
 		st = s.Settings
+		for _, x := range s.AgencyList() {
+			agencies = append(agencies, *x)
+		}
+		for _, x := range s.Staff {
+			staff = append(staff, *x)
+		}
+		for _, x := range s.Presets {
+			presets = append(presets, *x)
+		}
 		for _, x := range s.Stations {
 			stations = append(stations, *x)
 		}
@@ -212,6 +224,11 @@ func copyConfig(from, to *cad.Engine) error {
 	a := cad.Actor{User: "training"}
 	if err := to.SaveSettings(a, st); err != nil {
 		return err
+	}
+	for _, x := range agencies {
+		if err := to.SaveAgency(a, x); err != nil {
+			return err
+		}
 	}
 	for _, x := range stations {
 		if err := to.SaveStation(a, x); err != nil {
@@ -241,6 +258,16 @@ func copyConfig(from, to *cad.Engine) error {
 	}
 	for _, u := range users {
 		to.Record(a, cad.EvUserSaved, u)
+	}
+	// People's profiles and presets go with them to training (a member link is dropped: the roster is not
+	// copied).
+	for _, x := range staff {
+		x.Member = ""
+		to.SaveStaff(a, x)
+	}
+	admin := cad.Actor{User: "training", Role: "admin"}
+	for _, x := range presets {
+		to.SavePreset(admin, x)
 	}
 	return nil
 }
