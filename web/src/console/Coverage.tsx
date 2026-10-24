@@ -55,12 +55,13 @@ function CoverageDialog({ v, onClose }: { v: AgencyView; onClose: () => void }) 
   const [working, setWorking] = useState(v.coverage.working)
   const [covered, setCovered] = useState<string[]>(v.coverage.covered)
   const [watched, setWatched] = useState<string[]>(v.coverage.monitored)
+  const [scope, setScope] = useState(v.coverage.scope ?? '')
   const [busy, setBusy] = useState(false)
   const toggle = (list: string[], set: (x: string[]) => void, code: string) => set(list.includes(code) ? list.filter((x) => x !== code) : [...list, code])
   const save = async () => {
     setBusy(true)
     try {
-      const c = await api.put<AgencyView['coverage']>('/me/coverage', { working, covered, monitored: watched })
+      const c = await api.put<AgencyView['coverage']>('/me/coverage', { working, covered, monitored: watched, scope })
       publish({ ...v, coverage: c })
       toast.success(`Working for ${c.working}`)
       onClose()
@@ -91,10 +92,16 @@ function CoverageDialog({ v, onClose }: { v: AgencyView; onClose: () => void }) 
       <fieldset className="mt-3">
         <legend className="label">Watched</legend>
         <div className="flex flex-wrap gap-2">
-          {v.agencies.filter((g) => !covered.includes(g.code)).map((g) => (
+          {v.agencies.filter((g) => !covered.includes(g.code) && (v.mayWatch ?? v.agencies.map((x) => x.code)).includes(g.code)).map((g) => (
             <label key={g.code} className="flex items-center gap-1 text-sm"><input type="checkbox" checked={watched.includes(g.code)} onChange={() => toggle(watched, setWatched, g.code)} /> {g.code}</label>
           ))}
         </div>
+      </fieldset>
+      <fieldset className="mt-3">
+        <legend className="label">The board shows</legend>
+        <label className="flex items-center gap-1.5 text-sm"><input type="radio" name="cov-scope" checked={scope === ''} onChange={() => setScope('')} /> Every agency I may see</label>
+        <label className="flex items-center gap-1.5 text-sm"><input type="radio" name="cov-scope" checked={scope === 'coverage'} onChange={() => setScope('coverage')} /> Only the agencies covered and watched here</label>
+        <p className="mt-1 text-xs text-slate-400">Incidents without an agency, and units of other agencies on your incidents, are always shown.</p>
       </fieldset>
     </Modal>
   )

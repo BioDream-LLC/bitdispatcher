@@ -236,15 +236,8 @@ func (s *Server) commRoutes() {
 			fail(w, 415, "that kind of file is not allowed by the agency")
 			return
 		}
-		if addr := s.extra().ClamAV; addr != "" {
-			if verdict, err := clamScan(r.Context(), addr, body); err != nil {
-				fail(w, 503, "the file could not be scanned: "+err.Error())
-				return
-			} else if verdict != "" {
-				s.Eng.Record(a, cad.EvAccessRefused, map[string]string{"file": r.URL.Query().Get("name"), "why": "virus scan: " + verdict})
-				fail(w, 422, "the file was refused by the virus scan: "+verdict)
-				return
-			}
+		if !s.scanned(w, r, a, body) {
+			return
 		}
 		sum := sha256.Sum256(body)
 		f := cad.CommFile{ID: auth.RandomToken(9), Name: r.URL.Query().Get("name"), Type: typ, Size: int64(len(body)), SHA256: hex.EncodeToString(sum[:])}
@@ -262,6 +255,7 @@ func (s *Server) commRoutes() {
 			writeErr(w, err)
 			return
 		}
+		go s.indexFile(path, typ, body)
 		writeJSON(w, 200, f)
 	})
 	s.handle("GET /api/comms/files/{id}", auth.Viewer, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {

@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // FindQuery is what is searched for.
@@ -32,6 +33,9 @@ type FindQuery struct {
 	// AllAgencies searches beyond the person's covered and watched agencies, where they may.
 	AllAgencies bool `json:"allAgencies,omitempty"`
 	Fuzzy       bool `json:"fuzzy,omitempty"` // include similar spellings (default on when the text is a name)
+	// FileText gives the words inside an incident's file (incident set) or a communication's attachment,
+	// read when it was stored (the api's textract); nil: names and captions only.
+	FileText func(incident, id string) string `json:"-"`
 }
 
 // Found is one result.
@@ -367,6 +371,12 @@ func (s *State) Find(q FindQuery, r Reader, now time.Time) FindResults {
 					f := base
 					f.Group, f.Field, f.Strength, f.Why, f.Title, f.Detail = "attachments", "file", how, "file name or caption", x.Name, in.Number+" "+x.Caption
 					add(f)
+				} else if txt := fileText(q, in.Number, x.ID); txt != "" {
+					if how := partialOnly(m.inText(txt)); how != "" {
+						f := base
+						f.Group, f.Field, f.Strength, f.Why, f.Title, f.Detail = "attachments", "content", how, "in the file's text", x.Name, in.Number+": …"+snippet(txt, m.words)+"…"
+						add(f)
+					}
 				}
 			}
 		}
@@ -425,6 +435,12 @@ func (s *State) Find(q FindQuery, r Reader, now time.Time) FindResults {
 						f := base
 						f.Group, f.Field, f.Strength, f.Why, f.Title = "attachments", "file", how, "an attachment's name", x.Name
 						add(f)
+					} else if txt := fileText(q, "", x.ID); txt != "" {
+						if how := partialOnly(m.inText(txt)); how != "" {
+							f := base
+							f.Group, f.Field, f.Strength, f.Why, f.Title, f.Detail = "attachments", "content", how, "in the attachment's text", x.Name, "…"+snippet(txt, m.words)+"…"
+							add(f)
+						}
 					}
 				}
 			}
@@ -517,4 +533,56 @@ func itoa(n int) string {
 		b = append([]byte{'-'}, b...)
 	}
 	return string(b)
+}
+
+func fileText(q FindQuery, incident, id string) string {
+	if q.FileText == nil {
+		return ""
+	}
+	return q.FileText(incident, id)
+}
+
+// inText matches the words in a long text (an attachment's): every word present is partial; similar
+// spellings only when asked, word by word.
+func (m matcher) inText(txt string) string {
+	if len(m.words) == 0 {
+		return ""
+	}
+	u := norm(strings.ToUpper(txt))
+	all := true
+	for _, w := range m.words {
+		if !strings.Contains(u, w) {
+			all = false
+			break
+		}
+	}
+	if all {
+		return "partial"
+	}
+	if !m.fuzzy || len(txt) > 32<<10 {
+		return ""
+	}
+	return m.text(txt)
+}
+
+// snippet is the text around the first word found, for the result's detail.
+func snippet(txt string, words []string) string {
+	u := strings.ToUpper(txt)
+	at := -1
+	for _, w := range words {
+		if i := strings.Index(u, w); i >= 0 && (at < 0 || i < at) {
+			at = i
+		}
+	}
+	if at < 0 {
+		return clip(txt, 120)
+	}
+	from, to := max(0, at-50), min(len(txt), at+90)
+	for from > 0 && !utf8.RuneStart(txt[from]) {
+		from--
+	}
+	for to < len(txt) && !utf8.RuneStart(txt[to]) {
+		to++
+	}
+	return strings.TrimSpace(txt[from:to])
 }

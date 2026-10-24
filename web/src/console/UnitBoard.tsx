@@ -4,7 +4,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
-import { activity, avl, clock, cx, discipline, ms, overdue, statusMeta, timerMinutes, useNow } from '../util'
+import { activity, avl, clock, cx, discipline, markOutOver, ms, overdue, statusMeta, timerMinutes, useNow } from '../util'
 import { openMarkOut } from './MarkOut'
 import type { Unit, View } from '../types'
 
@@ -97,7 +97,7 @@ export function Tile({ u, view, now, size = 'md' }: { u: Unit; view: View; now: 
       <div className={cx('flex items-center gap-1 font-mono leading-none', size === 'lg' ? 'text-[11px]' : 'text-[10px]')}>
         <span className={cx('tnum', over > 0 ? 'font-bold text-amber-300' : 'text-slate-300')}>{u.status === 'available' || u.status === 'oos' ? '' : clock(Math.max(ms(u.statusAt), ms(u.checked)), now)}</span>
         {u.incident && <span className="truncate text-sky-300">{u.incident.slice(-4)}</span>}
-        {mo && <span className="truncate font-bold text-teal-200">{u.markOut?.code}</span>}
+        {mo && <span className={cx('truncate font-bold', markOutOver(view, u, now) ? 'text-amber-300' : 'text-teal-200')}>{u.markOut?.code}{markOutOver(view, u, now) ? ' OVER' : ''}</span>}
         <span className="ml-auto flex items-center gap-0.5">
           {heard && <Radio size={9} className="text-emerald-300 live-dot" aria-label="talking on the radio" />}
           <span className={cx('h-1.5 w-1.5 rounded-full', a === 'fresh' ? 'bg-emerald-400' : a === 'stale' ? 'bg-amber-400' : 'bg-slate-600')} aria-label={`AVL ${a}`} />

@@ -140,7 +140,7 @@ A screen limited to some disciplines shows their units, and the incidents that n
 - \`MO 2A12 MEAL 315 Church Ave\`: mark out, with where. Without a place the unit's AVL position is kept. Add a note after a slash: \`MO 2A15 COURT 315 Church Ave / Courtroom 2\`. \`MO\` alone lists the agency's kinds.
 - \`SC 2A12\`: status check, all right. Several units at once: \`SC 2A12 2A13\`.
 
-Mark-outs are also on every unit's right-click menu and in the unit details, and a crew marks itself out from the mobile terminal (**F7**). A mark-out that can be pulled (a meal, a report) is offered by the recommendation when no available unit can fill a line: it is never sent without a dispatcher choosing it. The kinds, their times and which can be pulled are set in Admin › Settings.`,
+Mark-outs are also on every unit's right-click menu and in the unit details, and a crew marks itself out from the mobile terminal (**F7**). A mark-out that can be pulled (a meal, a report) is offered by the recommendation when no available unit can fill a line: it is never sent without a dispatcher choosing it. The kinds, their times and which can be pulled are set in Admin › Settings, with the **longest** each may last: a unit out past it shows **OVER** on the unit board and the supervisor board, and the supervisors get a high-priority message once.`,
   },
   {
     id: 'screen-units', title: 'Unit status screen', route: '/screen/units', keys: 'unit status board large',
@@ -276,7 +276,10 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 - **Covered**: the agencies you dispatch for at this position.
 - **Watched**: agencies shown for awareness only.
 
-Your usual coverage loads by itself at sign-in, from your profile (Admin › Agencies › People) and the workstation's (Admin › Workstations). A change is recorded. You may only cover agencies you are authorised to work.
+Your usual coverage loads by itself at sign-in, from your profile (Admin › Agencies › People) and the workstation's (Admin › Workstations). A change is recorded. You may only cover agencies you are authorised to work, and watch those, or those an administrator gave you or the workstation to watch.
+
+## What the board shows
+Someone limited to some agencies sees only their part of the shared board: those agencies' incidents and units, incidents with no agency yet, units of other agencies sent to their incidents, and 911 calls until they become another agency's incident. The server enforces it: another agency's incident or unit is refused by a direct link or on the command line, and the attempt recorded. Someone who works every agency sees everything, and can choose **The board shows › Only the agencies covered and watched here** to narrow their own board without losing access.
 
 An incident has a **primary** agency (from its call type, or your working agency) and may have **assisting** agencies. Every unit keeps its home agency: a unit of another agency sent to the incident shows it as assisting by itself. **Agencies…** under the units changes them (a new primary agency needs a reason).`,
   },
@@ -423,17 +426,19 @@ For messages with a subject, priority, attachments, expiry and versions, and for
 | **Medium** | Highlighted, one tone; unread until opened |
 | **Low** | An ordinary unread mark, a soft tick or silence |
 
-The agency sets each level's tone, repeat, acknowledgement and escalation (Admin › Operations rules). Every priority is shown in words and with an icon, never by colour alone; only levels the agency allows can be silenced.
+The agency sets each level's tone, repeat, acknowledgement and escalation (Admin › Operations rules, where **Play** lets you hear each one). The tones differ by rhythm and loudness, not only pitch: the alarm is five quick pulses, the alert three, the chime two soft notes, the tick one quiet pulse, each with harmonics so it carries over a room and through a headset. Several arriving together sound once, with the highest one's tone. Every priority is shown in words and with an icon, never by colour alone; only levels the agency allows can be silenced.
+
+Browsers keep a page silent until someone has used it. After a reload, the first key or click turns sound on; until then an urgent banner says **the browser is keeping this console silent** with a button to turn the sounds on.
 
 ## Folders, receipts and versions
 **Inbox**, **Drafts**, **Sent**, **Active BOLOs** and **Archived** (expired, cancelled and replaced ones, labelled as such). Delivery, opening and acknowledgement are recorded for the person and the duty they were working, not just the screen. **Update** sends a new version and **Cancel** a cancellation; earlier versions are kept, shown in the history, and stay on the incident's timeline with the attachments (not uploaded twice). A person sees a communication only when it is for them, or as a supervisor or records staff of its agency. Everything is in the ledger.`,
   },
   {
     id: 'search', title: 'Search: incidents, BOLOs, people, vehicles and units', keys: 'search recall find plate partial plate vin name alias phone address description clothing tattoo attachment unit incident number cross agency possible match',
-    body: `One search (the magnifier in the status bar, or Recall in the classic keys) across incidents (number, type, address, narrative and comments), messages and BOLOs (every version), people (names in any order, aliases, birth dates, phones, addresses, identifiers, descriptions), vehicles (plate, partial plate with \`?\` for a character you do not know, VIN, make, model, colour), attachments (file names and captions) and units (call sign, radio ID, who is aboard).
+    body: `One search (the magnifier in the status bar, or Recall in the classic keys) across incidents (number, type, address, narrative and comments), messages and BOLOs (every version), people (names in any order, aliases, birth dates, phones, addresses, identifiers, descriptions), vehicles (plate, partial plate with \`?\` for a character you do not know, VIN, make, model, colour), attachments (file names, captions, and the words inside them: plain-text files, the text of PDFs, and the words in pictures where the server reads them) and units (call sign, radio ID, who is aboard).
 
 - Results are grouped, with filters for the kinds, agency, dates and status.
-- Each says **why** it matched (same plate, partial VIN, shared phone, similar description) and how strongly: **exact**, **partial** or **similar** (similar spellings when asked).
+- Each says **why** it matched (same plate, partial VIN, shared phone, similar description, *in the file's text* with the words around it) and how strongly: **exact**, **partial** or **similar** (similar spellings when asked).
 - **Possible matches** are marked as such: a search never links a person, vehicle or incident to anything.
 - Expired, updated and cancelled BOLOs say so in capitals; an old warning never looks current.
 - You search the agencies you cover and watch; **beyond my agencies** only where you may work them, and every result names its agency. Juvenile names and medical notes are withheld from people without the right, and nothing restricted is counted or shown.
@@ -606,7 +611,7 @@ Search results from county data are marked as such. ArcGIS layers are read with 
     id: 'admin-settings', title: 'Settings', route: '/admin/settings', keys: 'settings agency timers stale road factor speed tiles shifts unit types mark-outs markout sign-in notice banner cjis auto-dispatch',
     body: `- **Agency** name and incident number prefix.
 - **Status timers**: minutes in each status before the dispatcher is prompted for a status check.
-- **Mark-outs**: the kinds a unit can be marked out for (code, name, status-check minutes, which units, whether it can be pulled for a call). See Police status and mark-outs.
+- **Mark-outs**: the kinds a unit can be marked out for (code, name, status-check minutes, which units, whether it can be pulled for a call, whether it is retired, and the longest it may last before supervisors are told). See Police status and mark-outs.
 - **Stale** ages for AVL and caller locations.
 - **Shift changes** (\`07:00 19:00\`) for the operations report's shift periods.
 - **Travel estimates** outside the recorded map: road factor and average speed.
@@ -622,6 +627,8 @@ Search results from county data are marked as such. ArcGIS layers are read with 
   {
     id: 'admin-integrations', title: 'Integrations', route: '/admin/integrations', keys: 'integrations bitvoice ali eido radio webhook token certificate views eagleview panoramax mapillary neris nfirs fire reporting public feed pulsepoint cpr neighbouring rapidsos held lis supplemental location',
     body: `How bitdispatcher connects to call handling and radio. Each integration shows its live state and a checklist of the hooks in use.
+
+- **Attachments** (under Connections): a **ClamAV daemon** (clamd, \`host:port\` or its socket) scans incident files and message attachments before they are kept; a file it reports is refused and recorded, and if clamd cannot be reached the upload is refused rather than kept unscanned. **Test** checks a clean file passes and the standard anti-virus test file is caught. **Read the words in pictures** uses the Tesseract program on the server for search (pictures never leave it); plain text and PDFs are read without it.
 
 - **BitVoice**: its address and API token, and its certificate pinned with Read it. See [BitVoice](#bitvoice).
 - **More BitVoice systems**: Add a BitVoice follows another one too, such as a neighbouring PSAP's: its name, address, API token, and its own EIDO token and radio secret (New makes them). Its calls show its name in the call queue, and what you do with one of them (text, rebid, video, photos) goes back to that BitVoice.

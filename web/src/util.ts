@@ -130,8 +130,20 @@ export function overdue(view: View, u: Unit, now: number): number {
 }
 
 // activity is what a unit is doing, in words: its incident, or its mark-out.
+/** Minutes a unit's mark-out has run past the longest its type allows (0: within it, or no limit). */
+export function markOutOver(view: View, u: Unit, now = Date.now()): number {
+  if (u.status !== 'markout') return 0
+  const max = markOutType(view, u.markOut?.code)?.maxMinutes ?? 0
+  if (!max) return 0
+  const mins = Math.floor((now - ms(u.statusAt)) / 60000)
+  return mins >= max ? mins - max + 1 : 0
+}
+
 export function activity(view: View, u: Unit): string {
-  if (u.status === 'markout') return markOutType(view, u.markOut?.code)?.name ?? u.markOut?.code ?? 'Marked out'
+  if (u.status === 'markout') {
+    const name = markOutType(view, u.markOut?.code)?.name ?? u.markOut?.code ?? 'Marked out'
+    return markOutOver(view, u) ? `${name} · OVER ${markOutType(view, u.markOut?.code)?.maxMinutes} MIN` : name
+  }
   if (u.incident) {
     const i = view.incidents.find((x) => x.number === u.incident)
     return i ? `${u.incident} ${typeName(view, i.type)}` : u.incident

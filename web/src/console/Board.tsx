@@ -10,7 +10,7 @@ import { Activity, AlarmClock, ArrowLeft, Clock3, House, Maximize2, Phone, Shiel
 import { api } from '../api'
 import { store, useStore } from '../store'
 import { Logo } from '../ui'
-import { checkDue, clock, cx, discipline, hasPoint, markOutType, ms, prio, statusMeta, typeName, useNow } from '../util'
+import { checkDue, clock, cx, discipline, hasPoint, markOutOver, markOutType, ms, prio, statusMeta, typeName, useNow } from '../util'
 import { applyLens, DISCIPLINES, lensName, parseLens } from '../lens'
 import type { Incident, Unit, View } from '../types'
 import Chart, { base, type ChartOption } from '../admin/Chart'
@@ -392,8 +392,8 @@ export default function Board() {
         <Kpi icon={<Activity size={13} aria-hidden />} label="Active incidents" value={active.length} tone="orange" sub={`${committed.length} unit${committed.length === 1 ? '' : 's'} committed`} />
         <Kpi icon={<Truck size={13} aria-hidden />} label="Units available" value={<>{avail.length}<span className="text-2xl text-slate-500">/{inService.length}</span></>} tone={avail.length === 0 ? 'rose' : avail.length <= 2 ? 'amber' : 'emerald'} alarm={avail.length === 0 && inService.length > 0}
           sub={`${Math.round((avail.length / Math.max(1, inService.length)) * 100)}% of units in service`} />
-        <Kpi icon={<Timer size={13} aria-hidden />} label="Marked out" value={marked.length} tone="teal"
-          sub={moKinds.size ? <span className="flex flex-wrap gap-1">{[...moKinds].map(([k, n]) => {
+        <Kpi icon={<Timer size={13} aria-hidden />} label="Marked out" value={marked.length} tone={marked.some((u) => markOutOver(view, u, now)) ? 'amber' : 'teal'}
+          sub={moKinds.size ? <span className="flex flex-wrap gap-1">{marked.filter((u) => markOutOver(view, u, now)).length > 0 && <span className="font-mono text-[11px] font-bold text-amber-200">OVER LIMIT {marked.filter((u) => markOutOver(view, u, now)).map((u) => u.id).join(' ')} ·</span>}{[...moKinds].map(([k, n]) => {
             const Icon = markOutIcon(k)
             return <span key={k} className="inline-flex items-center gap-0.5 font-mono text-[11px] text-teal-200" title={markOutType(view, k)?.name}><Icon size={11} aria-hidden />{k} {n}</span>
           })}</span> : 'none'} />

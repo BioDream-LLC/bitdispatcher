@@ -33,6 +33,8 @@ type Extra struct {
 	// ClamAV is a ClamAV daemon (host:port or a unix socket) that scans communication attachments; empty: not
 	// scanned (their type is still checked from their content).
 	ClamAV string `json:"clamav,omitempty"`
+	// OCR reads the words in pictures for search with the tesseract program on this server (textract).
+	OCR bool `json:"ocr,omitempty"`
 	// DroneURL receives a launch request for an incident (POST, JSON); DroneToken is sent with it.
 	DroneURL   string `json:"droneUrl"`
 	DroneToken string `json:"droneToken"`
@@ -76,6 +78,8 @@ type ExtraView struct {
 	Stations   bool   `json:"stationAlerts"`
 	GatewayURL string `json:"stationGatewayUrl"`
 	GatewayTok bool   `json:"stationGatewayTokenSet"`
+	ClamAV     string `json:"clamav"`
+	OCR        bool   `json:"ocr"`
 }
 
 var hookActor = cad.Actor{User: "hook"}
@@ -900,7 +904,7 @@ func (s *Server) extraView() ExtraView {
 	return ExtraView{HookToken: x.HookToken != "", DroneURL: x.DroneURL, DroneToken: x.DroneToken != "", DroneAuto: x.DroneAuto,
 		ModelURL: x.ModelURL, ModelKey: x.ModelKey != "", ModelName: x.ModelName, ModelOn: x.ModelOn, FOIAModel: x.FOIAModel,
 		AlertURL: x.AlertAnswerURL, AlertToken: x.AlertAnswerToken != "",
-		Stations: x.StationAlerts, GatewayURL: x.StationGatewayURL, GatewayTok: x.StationGatewayToken != ""}
+		Stations: x.StationAlerts, GatewayURL: x.StationGatewayURL, GatewayTok: x.StationGatewayToken != "", ClamAV: x.ClamAV, OCR: x.OCR}
 }
 
 func (s *Server) getExtra(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -910,22 +914,28 @@ func (s *Server) getExtra(w http.ResponseWriter, r *http.Request, se *auth.Sessi
 // saveExtra changes the connections. A secret left empty keeps the current one; "-" clears it.
 func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 	var b struct {
-		HookToken  string `json:"hookToken"`
-		DroneURL   string `json:"droneUrl"`
-		DroneToken string `json:"droneToken"`
-		DroneAuto  bool   `json:"droneAuto"`
-		ModelURL   string `json:"modelUrl"`
-		ModelKey   string `json:"modelKey"`
-		ModelName  string `json:"modelName"`
-		ModelOn    bool   `json:"modelOn"`
-		FOIAModel  bool   `json:"foiaModel"`
-		AlertURL   string `json:"alertAnswerUrl"`
-		AlertToken string `json:"alertAnswerToken"`
-		Stations   bool   `json:"stationAlerts"`
-		GatewayURL string `json:"stationGatewayUrl"`
-		GatewayTok string `json:"stationGatewayToken"`
+		HookToken  string  `json:"hookToken"`
+		DroneURL   string  `json:"droneUrl"`
+		DroneToken string  `json:"droneToken"`
+		DroneAuto  bool    `json:"droneAuto"`
+		ModelURL   string  `json:"modelUrl"`
+		ModelKey   string  `json:"modelKey"`
+		ModelName  string  `json:"modelName"`
+		ModelOn    bool    `json:"modelOn"`
+		FOIAModel  bool    `json:"foiaModel"`
+		AlertURL   string  `json:"alertAnswerUrl"`
+		AlertToken string  `json:"alertAnswerToken"`
+		Stations   bool    `json:"stationAlerts"`
+		GatewayURL string  `json:"stationGatewayUrl"`
+		GatewayTok string  `json:"stationGatewayToken"`
+		ClamAV     *string `json:"clamav"`
+		OCR        *bool   `json:"ocr"`
 	}
 	if !readJSON(w, r, &b) {
+		return
+	}
+	if b.ClamAV != nil && !validClamAV(strings.TrimSpace(*b.ClamAV)) {
+		fail(w, 422, "clamd's address is host:port, or the path of its socket")
 		return
 	}
 	for _, u := range []string{b.DroneURL, b.ModelURL, b.AlertURL, b.GatewayURL} {
@@ -959,6 +969,15 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 	n.Extra.DroneURL, n.Extra.DroneAuto = strings.TrimSpace(b.DroneURL), b.DroneAuto
 	n.Extra.ModelURL, n.Extra.ModelName, n.Extra.ModelOn = strings.TrimRight(strings.TrimSpace(b.ModelURL), "/"), strings.TrimSpace(b.ModelName), b.ModelOn
 	n.Extra.FOIAModel = b.FOIAModel
+	// Left out of the request: kept (older pages do not send them).
+	if b.ClamAV != nil {
+		n.Extra.ClamAV = strings.TrimSpace(*b.ClamAV)
+	}
+	ocrOn := false
+	if b.OCR != nil {
+		ocrOn = *b.OCR && !n.Extra.OCR
+		n.Extra.OCR = *b.OCR
+	}
 	data, _ := json.MarshalIndent(n, "", "  ")
 	tmp := s.integrationsPath() + ".tmp"
 	err := os.WriteFile(tmp, data, 0o600)
@@ -974,6 +993,10 @@ func (s *Server) saveExtra(w http.ResponseWriter, r *http.Request, se *auth.Sess
 		return
 	}
 	s.Eng.Record(a, cad.EvIntegration, map[string]any{"connections": true, "hooks": n.Extra.HookToken != "", "droneUrl": n.Extra.DroneURL,
-		"droneAuto": n.Extra.DroneAuto, "modelUrl": n.Extra.ModelURL, "modelName": n.Extra.ModelName, "modelOn": n.Extra.ModelOn, "foiaModel": n.Extra.FOIAModel})
+		"droneAuto": n.Extra.DroneAuto, "modelUrl": n.Extra.ModelURL, "modelName": n.Extra.ModelName, "modelOn": n.Extra.ModelOn, "foiaModel": n.Extra.FOIAModel,
+		"clamav": n.Extra.ClamAV, "ocr": n.Extra.OCR})
+	if ocrOn {
+		go s.backfillText(context.Background())
+	}
 	writeJSON(w, 200, s.extraView())
 }

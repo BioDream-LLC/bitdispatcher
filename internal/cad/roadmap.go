@@ -56,7 +56,7 @@ func (s *State) applyRoadmap(e ledger.Event) (bool, error) {
 		}
 		return true, nil
 	}
-	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts, s.applyAgencies, s.applyPresets, s.applyQuals, s.applyStaffing, s.applyComms, s.applyDrafts} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts, s.applyAgencies, s.applyPresets, s.applyQuals, s.applyStaffing, s.applyComms, s.applyDrafts, s.applyScope} {
 		if ok, err := f(e); ok {
 			return true, err
 		}

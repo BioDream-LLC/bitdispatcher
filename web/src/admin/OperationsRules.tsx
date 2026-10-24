@@ -8,6 +8,7 @@ import type {
   Settings, StaffMinimum, StaffingRules, StatusCode, View, ViewDef, ViewRule,
 } from '../types'
 import { Page, Table } from './Admin'
+import { playTone } from '../tones'
 
 // The duties the console serves, for per-duty settings (max working calls, key profiles).
 const DUTIES = ['calltaker', 'police', 'fire', 'ems', 'dispatcher', 'supervisor'] as const
@@ -44,37 +45,6 @@ const DISPATCH_HELP: Record<string, string> = {
   warn: 'warn — note it on dispatch',
   override: 'override — allow it with a reason',
   block: 'block — refuse the dispatch',
-}
-
-// A small WebAudio beep so an administrator can hear a tone. Kept inline; nothing is loaded.
-function playTone(tone: PriorityRule['tone']) {
-  if (tone === 'none') return
-  type WithWebkit = typeof window & { webkitAudioContext?: typeof AudioContext }
-  const Ctx = window.AudioContext ?? (window as WithWebkit).webkitAudioContext
-  if (!Ctx) return
-  const ctx = new Ctx()
-  const shape: Record<string, { freq: number; dur: number; type: OscillatorType; beeps: number }> = {
-    alarm: { freq: 880, dur: 0.18, type: 'square', beeps: 3 },
-    alert: { freq: 660, dur: 0.16, type: 'sawtooth', beeps: 2 },
-    chime: { freq: 520, dur: 0.22, type: 'sine', beeps: 1 },
-    tick: { freq: 420, dur: 0.06, type: 'sine', beeps: 1 },
-  }
-  const s = shape[tone] ?? shape.chime
-  let t = ctx.currentTime
-  for (let i = 0; i < s.beeps; i++) {
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = s.type
-    osc.frequency.value = s.freq
-    gain.gain.setValueAtTime(0.0001, t)
-    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.01)
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + s.dur)
-    osc.connect(gain).connect(ctx.destination)
-    osc.start(t)
-    osc.stop(t + s.dur)
-    t += s.dur + 0.08
-  }
-  window.setTimeout(() => ctx.close().catch(() => {}), (t - ctx.currentTime) * 1000 + 200)
 }
 
 const parseList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
@@ -363,7 +333,7 @@ function CommsSection({ s, up }: { s: Settings; up: (p: Partial<Settings>) => vo
                     {TONES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </td>
-                <td className="px-3"><button className="btn" aria-label={`Play the ${r.tone} tone for ${level}`} onClick={() => playTone(r.tone)}><Volume2 size={12} aria-hidden /> Play</button></td>
+                <td className="px-3"><button className="btn" aria-label={`Play the ${r.tone} tone for ${level}`} onClick={() => playTone(r.tone, 1, true)}><Volume2 size={12} aria-hidden /> Play</button></td>
                 <td className="px-3"><input type="number" min={0} className="input h-7 w-20 font-mono text-xs" aria-label={`Repeat seconds for ${level}`} value={r.repeat ?? ''} onChange={(e) => setRule(level, { repeat: asNum(e.target.value) })} /></td>
                 <td className="px-3 text-center"><input type="checkbox" aria-label={`Acknowledge ${level}`} checked={!!r.ack} onChange={(e) => setRule(level, { ack: e.target.checked })} /></td>
                 <td className="px-3"><input type="number" min={0} className="input h-7 w-20 font-mono text-xs" aria-label={`Escalate minutes for ${level}`} value={r.escalate ?? ''} onChange={(e) => setRule(level, { escalate: asNum(e.target.value) })} /></td>

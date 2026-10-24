@@ -9,6 +9,7 @@ import { can, store, useStore } from '../store'
 import { Field, Modal } from '../ui'
 import { ago, cx, hhmm, useNow } from '../util'
 import type { AgencyView, Comm, CommDraft, CommFile, CommKind, CommList, CommPriority, CommView, PriorityRule, Receipt, Session, View } from '../types'
+import { playTone, soundReady, unlockSound } from '../tones'
 
 // ---------- priorities: label and look (colour is never the only signal) ----------
 
@@ -29,56 +30,6 @@ function PriorityTag({ p }: { p: CommPriority }) {
 const stateLabel: Record<string, string> = { active: 'active', updated: 'updated', expired: 'expired', cancelled: 'cancelled', scheduled: 'scheduled' }
 
 const ruleFor = (rules: PriorityRule[], p: CommPriority): PriorityRule | undefined => rules.find((r) => r.level === p)
-
-// ---------- the tones, synthesized with WebAudio (no audio files) ----------
-
-let actx: AudioContext | null = null
-function ctx(): AudioContext | null {
-  try {
-    if (!actx) actx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-    if (actx.state === 'suspended') void actx.resume()
-    return actx
-  } catch {
-    return null
-  }
-}
-
-// beep plays one tone of a frequency for a duration (seconds), at a start time, softly.
-function beep(c: AudioContext, freq: number, start: number, dur: number, gain = 0.14) {
-  const osc = c.createOscillator()
-  const g = c.createGain()
-  osc.type = 'sine'
-  osc.frequency.value = freq
-  g.gain.setValueAtTime(0, start)
-  g.gain.linearRampToValueAtTime(gain, start + 0.008)
-  g.gain.setValueAtTime(gain, start + dur - 0.01)
-  g.gain.linearRampToValueAtTime(0, start + dur)
-  osc.connect(g).connect(c.destination)
-  osc.start(start)
-  osc.stop(start + dur + 0.02)
-}
-
-// playTone sounds a priority's tone once.
-//   alarm = fast alternating two-tone, 3 pulses; alert = two beeps; chime = soft single tone; tick = short click.
-function playTone(tone: PriorityRule['tone']) {
-  if (tone === 'none') return
-  const c = ctx()
-  if (!c) return
-  const t = c.currentTime + 0.02
-  if (tone === 'alarm') {
-    for (let i = 0; i < 3; i++) {
-      beep(c, 880, t + i * 0.34, 0.14, 0.18)
-      beep(c, 660, t + i * 0.34 + 0.16, 0.14, 0.18)
-    }
-  } else if (tone === 'alert') {
-    beep(c, 760, t, 0.16)
-    beep(c, 760, t + 0.24, 0.16)
-  } else if (tone === 'chime') {
-    beep(c, 640, t, 0.4, 0.1)
-  } else if (tone === 'tick') {
-    beep(c, 1200, t, 0.03, 0.12)
-  }
-}
 
 // ---------- recipient tokens (To / CC) ----------
 
@@ -169,15 +120,17 @@ export function InboxButton({ view }: { view: View }) {
         delete timers.current[id]
       }
     }
+    // New items sound once together: the tone of the highest priority among them, not one over another.
+    const order: CommPriority[] = ['urgent', 'high', 'medium', 'low']
+    let first: PriorityRule | undefined
     for (const it of items) {
       const rule = ruleFor(rules, it.priority)
       if (!rule || rule.tone === 'none') continue
       const needs = (it.needsAck && !it.ackedByMe) || (!it.openedByMe && it.state !== 'cancelled' && it.state !== 'expired')
       const quiet = rule.silenceable && silenced.has(it.priority)
-      // New item: sound once (unless already silenced).
       if (needs && !seen.current.has(it.id)) {
         seen.current.add(it.id)
-        if (!quiet) playTone(rule.tone)
+        if (!quiet && (!first || order.indexOf(rule.level) < order.indexOf(first.level))) first = rule
       }
       // Repeat until acknowledged, when the rule asks for it.
       const wantRepeat = needs && (rule.repeat ?? 0) > 0 && !quiet
@@ -189,7 +142,18 @@ export function InboxButton({ view }: { view: View }) {
         delete timers.current[it.id]
       }
     }
+    if (first) playTone(first.tone)
   }, [items, rules, silenced])
+
+  // Browsers keep a page silent until a person has used it: sound starts on the first key or click.
+  useEffect(() => unlockSound(), [])
+  const [soundOn, setSoundOn] = useState(soundReady())
+  useEffect(() => {
+    const on = () => setSoundOn(soundReady())
+    window.addEventListener('bd:sound', on)
+    const t = window.setInterval(on, 2000)
+    return () => { window.removeEventListener('bd:sound', on); window.clearInterval(t) }
+  }, [])
 
   // Stop every repeat timer on unmount.
   useEffect(() => () => { for (const id of Object.keys(timers.current)) window.clearInterval(timers.current[id]) }, [])
@@ -230,7 +194,7 @@ export function InboxButton({ view }: { view: View }) {
       </button>
 
       {interrupting.length > 0 && (
-        <UrgentBanner items={interrupting} rules={rules} silenced={silenced} onSilence={(p) => setSilenced((s) => new Set(s).add(p))} onOpen={openItem} onAck={ack} />
+        <UrgentBanner items={interrupting} rules={rules} silenced={silenced} soundOn={soundOn} onSilence={(p) => setSilenced((s) => new Set(s).add(p))} onOpen={openItem} onAck={ack} />
       )}
 
       {open && (
@@ -246,11 +210,16 @@ export function InboxButton({ view }: { view: View }) {
 }
 
 // An interruptive banner for urgent/high communications that still need acknowledging.
-function UrgentBanner({ items, rules, silenced, onSilence, onOpen, onAck }: {
-  items: CommView[]; rules: PriorityRule[]; silenced: Set<CommPriority>; onSilence: (p: CommPriority) => void; onOpen: (id: string) => void; onAck: (id: string) => void
+function UrgentBanner({ items, rules, silenced, soundOn, onSilence, onOpen, onAck }: {
+  items: CommView[]; rules: PriorityRule[]; silenced: Set<CommPriority>; soundOn: boolean; onSilence: (p: CommPriority) => void; onOpen: (id: string) => void; onAck: (id: string) => void
 }) {
   return (
     <div role="alert" aria-label="Urgent communication" className="fixed inset-x-0 top-10 z-[60] mx-auto w-[min(96vw,56rem)] space-y-1 px-2">
+      {!soundOn && items.some((it) => ruleFor(rules, it.priority)?.tone !== 'none') && (
+        <button className="btn w-full justify-center border-amber-400 bg-amber-500/20 text-xs font-bold text-amber-100" onClick={() => playTone('tick')}>
+          <VolumeX size={13} aria-hidden /> The browser is keeping this console silent: click here to turn the alert sounds on
+        </button>
+      )}
       {items.map((it) => {
         const rule = ruleFor(rules, it.priority)
         return (

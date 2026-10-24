@@ -33,6 +33,7 @@ func (s *Server) searchRoutes() {
 		}
 		now := s.Eng.Now()
 		var res cad.FindResults
+		q.FileText = s.fileText
 		s.Eng.Read(func(st *cad.State) { res = st.Find(q, s.readerOf(st, se), now) })
 		s.Eng.Record(a, cad.EvSearched, map[string]any{"q": q.Text, "types": q.Types, "agency": q.Agency, "from": q.From, "to": q.To, "status": q.Status,
 			"allAgencies": q.AllAgencies, "counts": res.Counts, "scope": res.Scope})

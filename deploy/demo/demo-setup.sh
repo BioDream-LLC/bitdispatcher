@@ -193,5 +193,10 @@ if [ "$(api GET /agencies | jq '.agencies | length')" = "0" ]; then
   api POST /comms '{"kind":"bolo","priority":"high","subject":"(demo) Stolen vehicle: silver Honda Civic","body":"Fictional demo BOLO: silver Honda Civic, VA plate DEMO123, taken from Market St this morning. Do not stop on this alone; confirm first.","plate":"DEMO123","plateState":"VA","vehicle":"silver Honda Civic","agency":"RPD"}' >/dev/null || true
   echo "seeded agencies, qualifications, staffing and a BOLO"
 fi
+# Mark-outs with a longest time, so a long one is shown OVER and told to supervisors (once).
+if [ "$(api GET /state | jq '[.settings.markOuts[] | select(.maxMinutes)] | length')" = "0" ]; then
+  S=$(api GET /state | jq -c '.settings | .markOuts = [.markOuts[] | if .code == "MEAL" then .maxMinutes = 45 elif .code == "FUEL" then .maxMinutes = 20 else . end]')
+  api PUT /admin/settings "$S" >/dev/null || true
+fi
 api POST /auth/logout '{}' >/dev/null || true
 echo "demo ready"

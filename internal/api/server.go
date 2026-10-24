@@ -54,6 +54,8 @@ type Integrations struct {
 // Server is the API.
 type Server struct {
 	enrol          enrolCodes // one-time workstation enrolment codes
+	texts          *fileTextIndex
+	textsOnce      sync.Once
 	neris          *neris.Client
 	Eng            *cad.Engine
 	Auth           *auth.Store
@@ -338,7 +340,7 @@ func (s *Server) handle(pattern, role string, h handler) {
 		a := actorOf(se)
 		a.Agency = s.workingAgency(se)
 		// Supervisory views are the agency's to give: a direct request without the right is refused.
-		if s.viewRefused(w, r, se, a) {
+		if s.viewRefused(w, r, se, a) || s.scopeRefused(w, r, se, a) {
 			return
 		}
 		h(w, r.WithContext(bitvoice.OnBehalf(r.Context(), personOf(se))), se, a)
@@ -379,6 +381,7 @@ func (s *Server) routes() {
 	s.roadmapRoutes()
 	s.publicAlertRoutes()
 	s.agencyRoutes()
+	s.attachmentRoutes()
 	s.configVersionRoutes()
 	s.staffingRoutes()
 	s.commRoutes()
@@ -606,6 +609,9 @@ type UnitView struct {
 	// CheckMinutes is the unit's status-check timer now: its call type's safety timer, its agency's or the
 	// centre's for its status (0: none).
 	CheckMinutes int `json:"checkMinutes"`
+	// Overdue is the minutes a unit has been on a mark-out that allows fewer (0: not over its limit).
+	Overdue    int `json:"overdue,omitempty"`
+	OverdueMax int `json:"overdueMax,omitempty"`
 }
 
 // View is everything the dispatcher screen shows, in one document.
@@ -687,7 +693,11 @@ func (s *Server) health() HealthView {
 		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig())}
 }
 
-func (s *Server) view() ([]byte, error) {
+func (s *Server) view() ([]byte, error) { return s.viewFor(nil) }
+
+// viewFor is the board for one person's scope (scope.go): only the incidents, units and what hangs off them
+// that are theirs to see. A nil scope is the whole board.
+func (s *Server) viewFor(sc cad.Scope) ([]byte, error) {
 	vc := s.Views.Config()
 	now := s.Eng.Now()
 	h := s.health()
@@ -699,11 +709,20 @@ func (s *Server) view() ([]byte, error) {
 		v.Messages = floorMessages(st, now)
 		v.StationAlerts = stationAlertsView(st, now)
 		for _, x := range st.Stations {
-			v.Stations = append(v.Stations, x)
+			if sc == nil || x.Agency == "" || sc[x.Agency] {
+				v.Stations = append(v.Stations, x)
+			}
 		}
 		sort.Slice(v.Stations, func(i, j int) bool { return v.Stations[i].ID < v.Stations[j].ID })
 		for _, u := range st.Units {
-			v.Units = append(v.Units, UnitView{Unit: u, Caps: st.Capabilities(u), Capability: st.CapabilityOf(u), CheckMinutes: st.TimerForUnit(u)})
+			if !st.UnitIn(sc, u) {
+				continue
+			}
+			uv := UnitView{Unit: u, Caps: st.Capabilities(u), Capability: st.CapabilityOf(u), CheckMinutes: st.TimerForUnit(u)}
+			if m, t := st.MarkOutOverdue(u, now); m > 0 {
+				uv.Overdue, uv.OverdueMax = m, t.MaxMinutes
+			}
+			v.Units = append(v.Units, uv)
 		}
 		sort.Slice(v.Units, func(i, j int) bool { return unitLess(v.Units[i].ID, v.Units[j].ID) })
 		for _, c := range st.CallTypes {
@@ -711,7 +730,7 @@ func (s *Server) view() ([]byte, error) {
 		}
 		sort.Slice(v.CallTypes, func(i, j int) bool { return v.CallTypes[i].Name < v.CallTypes[j].Name })
 		for _, in := range st.Incidents {
-			if in.Status != cad.Closed || now.Sub(in.Closed) < 12*time.Hour {
+			if (in.Status != cad.Closed || now.Sub(in.Closed) < 12*time.Hour) && st.IncidentIn(sc, in) {
 				v.Incidents = append(v.Incidents, in)
 			}
 		}
@@ -729,6 +748,11 @@ func (s *Server) view() ([]byte, error) {
 			}
 		}
 		for _, c := range st.Calls {
+			// A 911 call comes to the centre before anyone knows the agency: it is hidden only once it is part of
+			// an incident outside the scope.
+			if c.Incident != "" && !st.IncidentIn(sc, st.Incidents[c.Incident]) {
+				continue
+			}
 			if c.State != "ended" || now.Sub(c.End) < time.Hour {
 				v.Calls = append(v.Calls, c)
 			}
@@ -744,6 +768,9 @@ func (s *Server) view() ([]byte, error) {
 			}
 		}
 		for _, d := range st.Drones {
+			if d.Incident != "" && !st.IncidentIn(sc, st.Incidents[d.Incident]) {
+				continue
+			}
 			if now.Sub(d.Updated) < 12*time.Hour {
 				v.Drones = append(v.Drones, d)
 			}
@@ -751,17 +778,33 @@ func (s *Server) view() ([]byte, error) {
 		sort.Slice(v.Drones, func(i, j int) bool { return v.Drones[i].ID < v.Drones[j].ID })
 		v.Radio = st.Radio[max(0, len(st.Radio)-60):]
 		for _, cc := range st.Care {
+			if cc.Incident != "" && !st.IncidentIn(sc, st.Incidents[cc.Incident]) {
+				continue
+			}
 			if cc.Status != "closed" || now.Sub(cc.At) < 24*time.Hour {
 				v.Care = append(v.Care, cc)
 			}
 		}
 		sort.Slice(v.Care, func(i, j int) bool { return v.Care[i].At.After(v.Care[j].At) })
 		for _, e := range st.Emergencies {
+			// An emergency button is everyone's to see until it is known to be another agency's unit.
+			if e.Unit != "" && !st.UnitIn(sc, st.Units[e.Unit]) {
+				continue
+			}
 			if e.AckedAt.IsZero() || now.Sub(e.AckedAt) < time.Hour {
 				v.Emergencies = append(v.Emergencies, e)
 			}
 		}
 		sort.Slice(v.Emergencies, func(i, j int) bool { return v.Emergencies[i].Raised.After(v.Emergencies[j].Raised) })
+		if sc != nil {
+			v.Messages = slices.DeleteFunc(v.Messages, func(m *cad.Message) bool {
+				return (m.Incident != "" && !st.IncidentIn(sc, st.Incidents[m.Incident])) || (m.FromUnit && !st.UnitIn(sc, st.Units[m.From]))
+			})
+			v.StationAlerts = slices.DeleteFunc(v.StationAlerts, func(a *cad.StationAlert) bool {
+				x := st.Stations[a.Station]
+				return x != nil && x.Agency != "" && !sc[x.Agency]
+			})
+		}
 		out, err = json.Marshal(v)
 	})
 	return out, err
@@ -787,7 +830,9 @@ func splitNum(s string) (string, int) {
 }
 
 func (s *Server) state(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
-	b, err := s.view()
+	var sc cad.Scope
+	s.Eng.Read(func(st *cad.State) { sc = st.BoardScope(se.Username, se.Console, se.Duty) })
+	b, err := s.viewFor(sc)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -822,13 +867,13 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, se *auth.Session
 		case <-s.quit:
 			return
 		case n := <-ch:
-			b, _ := json.Marshal(n)
+			b, _ := json.Marshal(s.noticeFor(se, n))
 			fmt.Fprintf(w, "event: change\ndata: %s\n\n", b)
 			// Coalesce a burst (a dispatch writes several events) into the frames already queued.
 			for drain := true; drain; {
 				select {
 				case n := <-ch:
-					b, _ := json.Marshal(n)
+					b, _ := json.Marshal(s.noticeFor(se, n))
 					fmt.Fprintf(w, "event: change\ndata: %s\n\n", b)
 				default:
 					drain = false
@@ -1112,6 +1157,12 @@ func (s *Server) command(w http.ResponseWriter, r *http.Request, se *auth.Sessio
 		Incident string `json:"incident"`
 	}
 	if !readJSON(w, r, &b) {
+		return
+	}
+	if what := s.outOfScope(se, b.Incident, b.Line); what != "" {
+		res := cad.CommandResult{Message: what + " is not one of your agencies'", Refused: true}
+		s.Eng.Record(a, cad.EvAccessRefused, map[string]string{"line": b.Line, "what": what})
+		writeJSON(w, 200, res)
 		return
 	}
 	res := s.Eng.Execute(a, b.Line, b.Incident)
@@ -1795,6 +1846,8 @@ func (s *Server) Run(ctx context.Context) {
 	go s.publicFeedPusher(ctx)
 	go s.autoDispatcher(ctx)
 	go s.credentialReminders(ctx)
+	go s.markOutWarnings(ctx)
+	go s.backfillText(ctx)
 	go s.commWatcher(ctx)
 	go s.lisAuto(ctx)
 	go s.policyWatch(ctx)

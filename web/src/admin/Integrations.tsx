@@ -288,7 +288,7 @@ function MoreBitVoice({ view, list, reload }: { view: View; list: MV[]; reload: 
   )
 }
 
-type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean; foiaModel?: boolean; alertAnswerUrl?: string; alertAnswerTokenSet?: boolean; stationAlerts?: boolean; stationGatewayUrl?: string; stationGatewayTokenSet?: boolean }
+type XV = { hookTokenSet: boolean; droneUrl: string; droneTokenSet: boolean; droneAuto: boolean; modelUrl: string; modelKeySet: boolean; modelName: string; modelOn: boolean; foiaModel?: boolean; alertAnswerUrl?: string; alertAnswerTokenSet?: boolean; stationAlerts?: boolean; stationGatewayUrl?: string; stationGatewayTokenSet?: boolean; clamav?: string; ocr?: boolean }
 
 // Connections are the wishlist's: the hooks other systems send to (transcripts, crash data, drones, radio
 // words), the drone system, and the optional language model for translation.
@@ -308,7 +308,13 @@ function Connections({ view }: { view: View }) {
   const [stations, setStations] = useState(false)
   const [gwUrl, setGwUrl] = useState('')
   const [gwToken, setGwToken] = useState('')
+  const [clam, setClam] = useState('')
+  const [ocr, setOcr] = useState(false)
+  const [ocrInfo, setOcrInfo] = useState<{ installed: boolean; version: string } | null>(null)
+  const [clamTest, setClamTest] = useState<{ ok?: boolean; version?: string; testFile?: string; clean?: boolean; error?: string } | null>(null)
   const fill = (v: XV) => {
+    setClam(v.clamav ?? '')
+    setOcr(!!v.ocr)
     setX(v)
     setDroneUrl(v.droneUrl)
     setDroneAuto(v.droneAuto)
@@ -322,10 +328,19 @@ function Connections({ view }: { view: View }) {
   }
   useEffect(() => {
     api.get<XV>('/admin/connections').then(fill).catch((e) => toast.error(errText(e)))
+    api.get<{ installed: boolean; version: string }>('/admin/connections/ocr').then(setOcrInfo).catch(() => {})
   }, [])
+  const testClam = async () => {
+    setClamTest(null)
+    try {
+      setClamTest(await api.post('/admin/connections/clamav/test', { address: clam }))
+    } catch (e) {
+      setClamTest({ error: errText(e) })
+    }
+  }
   const save = async () => {
     try {
-      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn, foiaModel, alertAnswerUrl: answerUrl, alertAnswerToken: answerToken, stationAlerts: stations, stationGatewayUrl: gwUrl, stationGatewayToken: gwToken }))
+      fill(await api.put<XV>('/admin/connections', { hookToken: hook, droneUrl, droneToken, droneAuto, modelUrl, modelKey, modelName, modelOn, foiaModel, alertAnswerUrl: answerUrl, alertAnswerToken: answerToken, stationAlerts: stations, stationGatewayUrl: gwUrl, stationGatewayToken: gwToken, clamav: clam, ocr }))
       setAnswerToken('')
       setGwToken('')
       setHook('')
@@ -376,6 +391,25 @@ function Connections({ view }: { view: View }) {
         <Field label={`Token sent with it ${x.droneTokenSet ? '(set)' : ''}`} htmlFor="dt"><input id="dt" className="input font-mono" value={droneToken} onChange={(e) => setDroneToken(e.target.value)} placeholder={x.droneTokenSet ? '••••••••' : ''} /></Field>
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={droneAuto} onChange={(e) => setDroneAuto(e.target.checked)} /> Launch rule: ask for a drone for call types marked for one</label>
         <p className="text-xs text-slate-500">{view.health.drone ? 'A drone system is configured: incidents show Send a drone.' : 'No drone system configured.'}</p>
+      </section>
+      <section className="panel space-y-3 rounded-lg p-4 lg:col-span-2">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Server size={15} aria-hidden /> Attachments: virus scan and the words inside</h2>
+        <p className="text-xs text-slate-400">Every file is checked by its content and kept with its hash. With a ClamAV daemon (clamd) on this server or your network, incident files and message attachments are also scanned before they are kept, and a file it reports is refused and the attempt recorded. If clamd cannot be reached, uploads are refused rather than kept unscanned.</p>
+        <div className="flex items-end gap-2">
+          <Field label="ClamAV daemon (clamd)" htmlFor="clam" hint="host:port (such as 127.0.0.1:3310) or the path of its socket; empty: not scanned">
+            <input id="clam" className="input font-mono" value={clam} onChange={(e) => setClam(e.target.value)} placeholder="127.0.0.1:3310" />
+          </Field>
+          <button type="button" className="btn mb-5" onClick={testClam} disabled={!clam && !x.clamav}>Test</button>
+        </div>
+        {clamTest && (
+          <p role="status" className={clamTest.ok ? 'text-xs text-emerald-300' : 'text-xs text-rose-300'}>
+            {clamTest.ok ? `${clamTest.version}: a clean file passed and the standard test file was caught (${clamTest.testFile}).` : clamTest.error || `clamd answered (${clamTest.version ?? '?'}) but did not catch the standard test file: check its signatures are loaded.`}
+          </p>
+        )}
+        <p className="text-xs text-slate-400">Search reads the words in plain-text files and in PDFs' text by itself. Words in pictures (a photo of a plate, a scanned page) need optical character recognition by the Tesseract program installed on this server; pictures are read on this server only.</p>
+        <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={ocr} onChange={(e) => setOcr(e.target.checked)} disabled={!ocrInfo?.installed && !ocr} /> Read the words in pictures for search</label>
+        <p className="text-xs text-slate-500">{ocrInfo?.installed ? `Installed: ${ocrInfo.version}. Turning it on also reads the pictures already stored.` : 'Tesseract is not installed on this server (on Debian or Ubuntu: apt install tesseract-ocr).'}</p>
+        <div className="flex justify-end"><button className="btn btn-go" onClick={save}><Save size={14} aria-hidden /> Save connections</button></div>
       </section>
       <section className="panel space-y-3 rounded-lg p-4 lg:col-span-2">
         <h2 className="flex items-center gap-2 font-semibold text-slate-100"><PlugZap size={15} aria-hidden /> Translation by a language model (optional)</h2>

@@ -366,8 +366,8 @@ export type AlertingSettings = {
 export type Agency = { code: string; name: string; disciplines: string[]; inactive?: boolean; ori?: string; neris?: string; ids?: Record<string, string>
   incidentPrefix?: string; dispositions?: string[]; timers?: Record<string, number>; talkgroups?: string[]; records?: string; note?: string; updated?: string; by?: string }
 export type Staff = { username: string; agencies?: string[]; home?: string; covered?: string[]; monitor?: string[]; trainee?: boolean; member?: string; note?: string; updated?: string; by?: string }
-export type WorkCoverage = { username: string; working: string; covered: string[]; monitored: string[]; console?: string; duty?: string; at?: string }
-export type AgencyView = { agencies: Agency[]; coverage: WorkCoverage; staff: Staff; may: string[] }
+export type WorkCoverage = { username: string; working: string; covered: string[]; monitored: string[]; console?: string; duty?: string; scope?: '' | 'coverage'; at?: string }
+export type AgencyView = { agencies: Agency[]; coverage: WorkCoverage; staff: Staff; may: string[]; mayWatch?: string[] }
 export type Preset = { user: string; duty: string; workspace?: unknown; screens?: unknown; monitors?: MonitorInfo[]; protected?: boolean; version: number; updated: string; by: string; console?: string; reason?: string }
 export type PresetOut = { preset: Preset | null; source: '' | 'own' | 'assigned'; mayEdit: boolean; why?: string; trainee: boolean }
 export type ViewDef = { id: string; name: string; route: string }

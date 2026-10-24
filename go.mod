@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/dop251/goja v0.0.0-20261019115134-f7f3edb84bee
+	github.com/ledongthuc/pdf v0.0.0-20261020125853-5e46805f718e
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/yuin/gopher-lua v1.1.1
 	modernc.org/sqlite v1.56.0

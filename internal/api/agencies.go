@@ -124,17 +124,21 @@ type AgencyView struct {
 	Agencies []*cad.Agency    `json:"agencies"`
 	Coverage cad.WorkCoverage `json:"coverage"`
 	Staff    cad.Staff        `json:"staff"`
-	May      []string         `json:"may"` // the agencies the person may work
+	May      []string         `json:"may"`      // the agencies the person may work
+	MayWatch []string         `json:"mayWatch"` // and those they may watch (scope.go)
 }
 
 func (s *Server) agencyRoutes() {
 	s.handle("GET /api/agencies", auth.Viewer, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		var v AgencyView
 		s.Eng.Read(func(st *cad.State) {
-			v = AgencyView{Agencies: st.AgencyList(), Coverage: st.CoverageOf(se.Username, se.Console, se.Duty), Staff: st.StaffOf(se.Username), May: []string{}}
+			v = AgencyView{Agencies: st.AgencyList(), Coverage: st.CoverageOf(se.Username, se.Console, se.Duty), Staff: st.StaffOf(se.Username), May: []string{}, MayWatch: []string{}}
 			for _, g := range v.Agencies {
 				if !g.Inactive && st.MayWork(se.Username, g.Code) {
 					v.May = append(v.May, g.Code)
+				}
+				if st.MayWatch(se.Username, se.Console, g.Code) {
+					v.MayWatch = append(v.MayWatch, g.Code)
 				}
 			}
 		})

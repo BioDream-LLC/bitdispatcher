@@ -102,6 +102,9 @@ func (s *Server) addIncidentFile(w http.ResponseWriter, r *http.Request, se *aut
 		fail(w, 415, "send a picture (JPEG, PNG, WebP, GIF), a PDF, plain text, or an audio or video clip (MP3, WAV, MP4, WebM)")
 		return
 	}
+	if !s.scanned(w, r, a, body) {
+		return
+	}
 	sum := sha256.Sum256(body)
 	f := cad.IncidentFile{ID: auth.RandomToken(9), Name: r.URL.Query().Get("name"), Caption: r.URL.Query().Get("caption"), Type: typ,
 		SHA256: hex.EncodeToString(sum[:]), Size: int64(len(body)), Unit: unit}
@@ -120,6 +123,7 @@ func (s *Server) addIncidentFile(w http.ResponseWriter, r *http.Request, se *aut
 		writeErr(w, err)
 		return
 	}
+	go s.indexFile(path, typ, body)
 	writeJSON(w, 200, map[string]string{"id": f.ID})
 }
 

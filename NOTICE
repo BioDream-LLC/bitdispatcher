@@ -19,6 +19,9 @@ github.com/pierrec/lz4 (BSD-3-Clause), github.com/twpayne/go-geom (BSD-2-Clause)
 google.golang.org/protobuf (BSD-3-Clause).
 Scripts run in github.com/dop251/goja (MIT, with github.com/dlclark/regexp2 (MIT) and
 github.com/go-sourcemap/sourcemap (BSD-2-Clause)) and github.com/yuin/gopher-lua (MIT).
+The text of PDF attachments is read, for search, with github.com/ledongthuc/pdf (BSD-3-Clause).
+Words in pictures are read, when an administrator turns it on, by the Tesseract program installed
+separately on the server (Apache-2.0); it is not part of bitdispatcher.
 Overture Maps address data is published under its sources' open licences (see each release's
 attribution); bitdispatcher records which source each address point came from.
 It embeds Noto Sans glyphs (SIL Open Font License 1.1, internal/mapdata/fonts/OFL.txt) prepared by

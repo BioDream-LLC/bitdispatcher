@@ -76,13 +76,16 @@ type Staff struct {
 // WorkCoverage is what a person is working now: the working agency (whose rules apply), the agencies covered
 // and those watched.
 type WorkCoverage struct {
-	Username  string    `json:"username"`
-	Working   string    `json:"working"`
-	Covered   []string  `json:"covered"`
-	Monitored []string  `json:"monitored"`
-	Console   string    `json:"console,omitempty"`
-	Duty      string    `json:"duty,omitempty"`
-	At        time.Time `json:"at"`
+	Username  string   `json:"username"`
+	Working   string   `json:"working"`
+	Covered   []string `json:"covered"`
+	Monitored []string `json:"monitored"`
+	Console   string   `json:"console,omitempty"`
+	Duty      string   `json:"duty,omitempty"`
+	// Scope narrows the shared board: "" shows everything the person may see, "coverage" only the agencies
+	// covered and watched (scope.go).
+	Scope string    `json:"scope,omitempty"`
+	At    time.Time `json:"at"`
 }
 
 var reAgency = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,7}$`)
@@ -372,6 +375,14 @@ func (e *Engine) SetCoverage(a Actor, c WorkCoverage) error {
 		if e.st.Agencies[x] == nil {
 			return problem("monitored", "no agency %s", x)
 		}
+		// Watching shows another agency's incidents and units: only those the person may work, or that an
+		// administrator gave them or the workstation to watch.
+		if !e.st.MayWatch(a.User, a.Console, x) {
+			return problem("monitored", "you have not been given %s to watch", x)
+		}
+	}
+	if c.Scope != ScopeAll && c.Scope != ScopeCoverage {
+		return problem("scope", "the board shows everything or the agencies covered and watched")
 	}
 	c.Monitored = slices.DeleteFunc(c.Monitored, func(x string) bool { return slices.Contains(c.Covered, x) })
 	if c.Working == "" && len(c.Covered) > 0 {

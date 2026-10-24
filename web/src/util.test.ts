@@ -23,3 +23,18 @@ describe('formatting', () => {
     expect(km(1500)).toBe('1.5 km')
   })
 })
+
+describe('mark-outs over their limit', () => {
+  it('counts the minutes past the longest a mark-out may last', async () => {
+    const { markOutOver, activity } = await import('./util')
+    const t = Date.UTC(2026, 9, 24, 12, 0, 0)
+    const view = { settings: { markOuts: [{ code: 'MEAL', name: 'Meal', minutes: 30, maxMinutes: 45 }, { code: 'COURT', name: 'Court', minutes: 0 }] }, incidents: [] } as never
+    const u = (code: string, mins: number) => ({ id: 'P1', type: 'patrol', status: 'markout', statusAt: new Date(t - mins * 60000).toISOString(), markOut: { code }, caps: [] }) as never
+    expect(markOutOver(view, u('MEAL', 44), t)).toBe(0)
+    expect(markOutOver(view, u('MEAL', 46), t)).toBe(2)
+    expect(markOutOver(view, u('COURT', 600), t)).toBe(0)
+    const now = (code: string, mins: number) => ({ id: 'P1', type: 'patrol', status: 'markout', statusAt: new Date(Date.now() - mins * 60000).toISOString(), markOut: { code }, caps: [] }) as never
+    expect(activity(view, now('MEAL', 1))).toBe('Meal')
+    expect(activity(view, now('MEAL', 50))).toBe('Meal · OVER 45 MIN')
+  })
+})

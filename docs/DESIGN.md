@@ -15,7 +15,10 @@ through published standards.
 
 1. **Own the code.** Go standard library only for the Go code. Any exception needs a written reason; the
    exceptions so far are the two script engines (section 5.1) and `modernc.org/sqlite` (BSD-3-Clause, pure
-   Go, no cgo) for the recorded map (section 3.5), the same driver Perfuse and BitVoice use. The event
+   Go, no cgo) for the recorded map (section 3.5), the same driver Perfuse and BitVoice use, and
+   `github.com/ledongthuc/pdf` (BSD-3-Clause, pure Go, pinned) to read the text of PDF attachments for
+   search: a reader of real PDFs (fonts' Unicode maps, compressed object streams) is too large to own
+   well, and it runs on uploaded files only in its own goroutine, bounded in time and output. The event
    ledger stays a standard-library file.
 2. **Never our own crypto primitives.** TLS, encryption at rest and signatures use the standard library.
 3. **911 reliability.** No single point of failure; a site that is cut off keeps working.
