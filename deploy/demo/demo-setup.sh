@@ -68,6 +68,27 @@ if [ "$(api GET /state | jq '[.incidents[] | select(.status != "closed")] | leng
   cmd 'NEW DOM 4333 Old Cave Spring Rd #B' >/dev/null
   echo "seeded the demonstration incidents"
 fi
+# Call types and settings the roadmap features use, for a board started before they existed (a new board
+# has them from the defaults): further alarms and roll calls on structure fires, the scheduled, tow and
+# paper types, and minimum staffing on unit types.
+CT=$(api GET /state | jq -c '.callTypes')
+if [ "$(printf '%s' "$CT" | jq '[.[] | select(.code == "SF" and ((.alarms // []) | length) > 0)] | length')" = "0" ]; then
+  api PUT /admin/calltypes/SF "$(printf '%s' "$CT" | jq -c '.[] | select(.code == "SF") | .par = true | .alarms = [{"name":"2nd alarm","runCard":[{"capability":"engine","count":2},{"capability":"ladder","count":1},{"capability":"command","count":1},{"capability":"als","count":1}]},{"name":"3rd alarm","runCard":[{"capability":"engine","count":2},{"capability":"ladder","count":1},{"capability":"water","count":1}]}]')" >/dev/null || true
+  api PUT /admin/calltypes/HAZ "$(printf '%s' "$CT" | jq -c '.[] | select(.code == "HAZ") | .par = true')" >/dev/null || true
+fi
+for t in 'EVENT|Special event / standby|5|other|[]' 'TRANSFER|Scheduled transport|4|ems|[{"capability":"transport","count":1}]' 'TOW|Tow request / disabled vehicle|4|police|[{"capability":"police","count":1}]' 'PAPER|Paper service / warrant service|4|police|[{"capability":"police","count":1}]'; do
+  IFS='|' read -r code name pri disc rc <<EOF3
+$t
+EOF3
+  if [ "$(printf '%s' "$CT" | jq --arg c "$code" '[.[] | select(.code == $c)] | length')" = "0" ]; then
+    api PUT "/admin/calltypes/$code" "{\"name\":\"$name\",\"priority\":$pri,\"discipline\":\"$disc\",\"runCard\":$rc}" >/dev/null || true
+  fi
+done
+S=$(api GET /state | jq -c '.settings')
+if [ "$(printf '%s' "$S" | jq '[.unitTypes[] | select(.minStaff)] | length')" = "0" ]; then
+  api PUT /admin/settings "$(printf '%s' "$S" | jq -c '.unitTypes |= map(if .code == "engine" or .code == "ladder" then .minStaff = 3 elif .code == "medic" or .code == "ambulance" then .minStaff = 2 else . end)')" >/dev/null || true
+fi
+
 # The roadmap features, seeded once per board (the nightly reset empties it): a roster with crews, a
 # simulated pager (bvsim's, on this computer: its responders answer pages), tow companies, the contacts
 # directory and an on-call list, two areas, papers to serve and the schedule. Every name is invented.
@@ -113,11 +134,14 @@ if [ "$(api GET /roster | jq '.members | length')" = "0" ]; then
   p '{"kind":"arrest","number":"GD26-0042 (demo)","court":"General District Court (demo)","subject":{"name":"Casey Q Example","dob":"1991-03-14","sex":"M","description":"Fictional person for the demonstration"},"location":{"address":"4333 Old Cave Spring Rd"},"charge":"Failure to appear (demo)","caution":"known to resist (demo)"}'
   p '{"kind":"protective-order","number":"JD26-0107 (demo)","court":"Juvenile and Domestic Relations Court (demo)","subject":{"name":"Robin Z Sample","sex":"F"},"location":{"address":"526 Orange Ave NE"},"charge":"Serve the respondent (demo)"}'
   p '{"kind":"summons","number":"CV26-0310 (demo)","court":"Circuit Court (demo)","subject":{"name":"Taylor X Placeholder"},"location":{"address":"1906 Belleview Ave SE"},"charge":"Civil summons (demo)"}'
-  TOMORROW=$(date -u -d 'tomorrow 14:00' +%Y-%m-%dT%H:%M:%SZ)
-  TODAY10=$(date -u -d 'today 14:00' +%Y-%m-%dT%H:%M:%SZ)
-  api PUT /schedule "{\"kind\":\"call\",\"title\":\"Dialysis transport (demo)\",\"type\":\"TRANSFER\",\"location\":{\"address\":\"1906 Belleview Ave SE\"},\"start\":\"$TOMORROW\",\"lead\":15,\"repeat\":\"weekdays\",\"notes\":\"Wheelchair; to the dialysis centre (demo)\"}" >/dev/null || true
-  api PUT /schedule "{\"kind\":\"event\",\"title\":\"City market festival (demo)\",\"type\":\"EVENT\",\"location\":{\"address\":\"Market Square, Roanoke\"},\"start\":\"$TODAY10\",\"minutes\":480,\"repeat\":\"daily\",\"notes\":\"Street closures on Market St and Campbell Ave (demo)\"}" >/dev/null || true
   echo "seeded the roster, paging, tows, directory, areas, papers and schedule"
+fi
+if [ "$(api GET /schedule | jq '.items | length')" = "0" ]; then
+  TOMORROW=$(date -u -d '+2 hour' +%Y-%m-%dT%H:00:00Z)
+  TODAY10=$(date -u -d 'today 14:00' +%Y-%m-%dT%H:%M:%SZ)
+  api PUT /schedule "{\"kind\":\"call\",\"title\":\"Dialysis transport (demo)\",\"type\":\"TRANSFER\",\"location\":{\"address\":\"1906 Belleview Ave SE\"},\"start\":\"$TOMORROW\",\"lead\":15,\"repeat\":\"daily\",\"notes\":\"Wheelchair; to the dialysis centre (demo)\"}" >/dev/null || true
+  api PUT /schedule "{\"kind\":\"event\",\"title\":\"City market festival (demo)\",\"type\":\"EVENT\",\"location\":{\"address\":\"Market Square, Roanoke\"},\"start\":\"$TODAY10\",\"minutes\":480,\"repeat\":\"daily\",\"notes\":\"Street closures on Market St and Campbell Ave (demo)\"}" >/dev/null || true
+  echo "seeded the schedule"
 fi
 api POST /auth/logout '{}' >/dev/null || true
 echo "demo ready"
