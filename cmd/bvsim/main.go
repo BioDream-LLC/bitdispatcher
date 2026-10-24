@@ -485,7 +485,12 @@ func main() {
 	crashEvery := flag.Int("crash-every", 7, "every this many calls, a vehicle crash notification instead (0: none)")
 	droneAddr := flag.String("drone-addr", "", "serve a simulated drone system here (plain HTTP on this host:port; POST /launch)")
 	droneToken := flag.String("drone-token", "", "bearer token the drone system expects")
+	pagerAddr := flag.String("pager-addr", "", "serve a simulated pager here (plain HTTP on this host:port, ntfy-style); its responders answer pages")
+	pagerCAD := flag.String("pager-cad", "https://127.0.0.1:9443", "bitdispatcher's address the simulated responders answer at")
 	flag.Parse()
+	if *pagerAddr != "" {
+		go runPager(*pagerAddr, *pagerCAD)
+	}
 	cert, fp := selfSigned()
 	s := &sim{calls: map[string]*call{}, subs: map[chan string]struct{}{}, token: *token, agency: "psap.sim.invalid", base: "https://" + *addr,
 		story: map[string]story{}, addr: map[string]string{}, droneToken: *droneToken, media: map[string][]photo{}, held: map[string]bool{}}

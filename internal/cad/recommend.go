@@ -125,10 +125,13 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 	if tf != nil {
 		r.Estimate = label
 	}
-	ct, ok := s.CallTypes[in.Type]
-	if !ok || len(ct.RunCard) == 0 {
+	runCard := s.RunCardFor(in)
+	if len(runCard) == 0 {
 		r.Notes = append(r.Notes, "This call type has no run card: choose units by hand")
 		return r, nil
+	}
+	if in.AlarmLevel() > 1 {
+		r.Notes = append(r.Notes, "At the "+s.AlarmName(in)+": the run card includes each further alarm's units")
 	}
 	hasPoint := in.Location.HasPoint()
 	if !hasPoint {
@@ -176,10 +179,10 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 	}
 	used := map[string]bool{}
 	// Scarce capabilities are filled first, so a multi-role unit is not spent on a line others could fill.
-	lines := make([]Line, len(ct.RunCard))
-	order := make([]int, len(ct.RunCard))
+	lines := make([]Line, len(runCard))
+	order := make([]int, len(runCard))
 	avail := map[string]int{}
-	for i, req := range ct.RunCard {
+	for i, req := range runCard {
 		lines[i] = Line{Capability: req.Capability, Count: req.Count, Covered: []string{}, Units: []Candidate{}, Next: []Candidate{}}
 		order[i] = i
 		for _, u := range s.Units {
@@ -189,7 +192,7 @@ func (s *State) recommend(number string, now time.Time, tf TravelFunc, label str
 		}
 	}
 	sort.SliceStable(order, func(a, b int) bool {
-		return avail[ct.RunCard[order[a]].Capability] < avail[ct.RunCard[order[b]].Capability]
+		return avail[runCard[order[a]].Capability] < avail[runCard[order[b]].Capability]
 	})
 	for _, i := range order {
 		l := &lines[i]
@@ -349,6 +352,9 @@ func (s *State) candidate(u *Unit, in *Incident, capability string, now time.Tim
 			}
 			c.Reasons = append(c.Reasons, fmt.Sprintf("%.1f mi, about %s %s", est.Metres/1609.344, mins(est.Seconds), note))
 		}
+	}
+	if short := s.Staffing(u); len(short) > 0 {
+		c.Reasons = append(c.Reasons, "Short-staffed: "+strings.Join(short, ", "))
 	}
 	if !u.LastHeard.IsZero() && now.Sub(u.LastHeard) < 10*time.Minute {
 		c.Reasons = append(c.Reasons, "On the radio "+ago(now.Sub(u.LastHeard)))

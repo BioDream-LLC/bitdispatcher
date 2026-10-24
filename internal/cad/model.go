@@ -66,6 +66,8 @@ type UnitType struct {
 	// Cover asks for move-up suggestions when a station has none of this kind available. Unset means the
 	// usual: front-line engines, ladders, medics, ambulances and patrol cars, not chiefs or specialty units.
 	Cover *bool `json:"cover,omitempty"`
+	// MinStaff is how many a unit of this kind needs aboard to be fully staffed (0: no minimum).
+	MinStaff int `json:"minStaff,omitempty"`
 }
 
 var defaultCover = map[string]bool{"engine": true, "ladder": true, "medic": true, "ambulance": true, "patrol": true}
@@ -90,6 +92,8 @@ type UnitDef struct {
 	Agency       string   `json:"agency,omitempty"`
 	// Area is the unit's own beat, sector or district, for police backup and response plans.
 	Area string `json:"area,omitempty"`
+	// MinStaff overrides the unit type's minimum staffing (0: the type's).
+	MinStaff int `json:"minStaff,omitempty"`
 }
 
 // Position is where a unit is, by AVL or radio.
@@ -118,6 +122,8 @@ type Unit struct {
 	// Checked is the last status check: a dispatcher confirmed the unit is all right, restarting its timer.
 	Checked   time.Time `json:"checked,omitzero"`
 	CheckedBy string    `json:"checkedBy,omitempty"`
+	// Crew is who rides the unit this shift (crew.go); empty when staffing is not recorded.
+	Crew []CrewSeat `json:"crew,omitempty"`
 }
 
 // MarkOut is a unit's own activity: its kind (a mark-out type's code), where, and a note.
@@ -162,6 +168,15 @@ type CallType struct {
 	// AutoDispatch sends the recommended units by itself when no dispatcher has within
 	// Settings.AutoDispatchSeconds: only for priority 3 to 5, and only a complete recommendation without warnings.
 	AutoDispatch bool `json:"autoDispatch,omitempty"`
+	// Alarms are the further alarms (2nd, 3rd…), each adding units to the run card (alarm.go).
+	Alarms []AlarmLevel `json:"alarms,omitempty"`
+	// PAR starts the fire-ground accountability clock when the first unit arrives: roll calls every
+	// PARMinutes (0: Settings.PARMinutes) and the incident's elapsed time (fireground.go).
+	PAR        bool `json:"par,omitempty"`
+	PARMinutes int  `json:"parMinutes,omitempty"`
+	// NEMSIS is the national EMS dispatch reason (eDispatch.01) the type is sent as to patient-care
+	// reports; empty: suggested from the name.
+	NEMSIS string `json:"nemsis,omitempty"`
 }
 
 // Caller is who reported an incident.
@@ -230,6 +245,10 @@ type Incident struct {
 	NERIS       *NERISRecord    `json:"neris,omitempty"`    // what NERIS last said about it (fire and EMS)
 	Protocol    *ProtocolRun    `json:"protocol,omitempty"` // the call-taking protocol worked on it
 	Files       []IncidentFile  `json:"files,omitempty"`    // attachments: pictures, documents
+	Alarm       int             `json:"alarm,omitempty"`    // the alarm level; 0 or 1 is the first alarm
+	Fireground  *Fireground     `json:"fireground,omitempty"`
+	// ePCR is what each EMS unit's patient-care report system last said (nemsis), by unit.
+	EPCR map[string]*EPCRRecord `json:"epcr,omitempty"`
 }
 
 // TextLine is one line of a text conversation with a caller.
@@ -397,6 +416,18 @@ type Settings struct {
 	Talkgroups        []string `json:"talkgroups,omitempty"`
 	MoveMeters        float64  `json:"moveMeters,omitempty"` // a newer caller location this far away is offered (0: 50 m)
 	FOIADays          int      `json:"foiaDays,omitempty"`   // working days to answer a records request (0: 5)
+
+	// Crews and staffing: the qualifications the roster uses, and what each capability needs of a crew
+	// (nil: advanced life support needs a paramedic).
+	Qualifications []string  `json:"qualifications,omitempty"`
+	CapNeeds       []CapNeed `json:"capNeeds"`
+	// Fire-ground accountability: minutes between roll calls (0: 20) and the benchmarks a commander
+	// reports (empty: the defaults).
+	PARMinutes int         `json:"parMinutes,omitempty"`
+	Benchmarks []Benchmark `json:"benchmarks,omitempty"`
+	// Tow rotation: the classes of tow and the rotation zones (empty: light, medium, heavy and one zone).
+	TowClasses []string `json:"towClasses,omitempty"`
+	TowZones   []string `json:"towZones,omitempty"`
 }
 
 // MarkOutType finds a mark-out type by its code, in any case.

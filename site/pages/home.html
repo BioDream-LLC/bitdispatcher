@@ -2,13 +2,14 @@
   <div class="wrap">
     <div class="hero-copy">
     <p class="eyebrow">Free and open source · Apache 2.0 · 911 dispatch</p>
-    <h1>The 911 dispatch system that is one program and one web page</h1>
-    <p class="lede">bitdispatcher is a complete computer-aided dispatch system for 911 centres: incidents, units recommended by
-      road time, a dispatch map that works with no internet, a screen for every monitor at the console, mark-outs and status
-      checks, a supervisor board and a mobile terminal for the crews. Set up entirely in the browser.</p>
+    <h1>The 911 CAD built for NG9-1-1</h1>
+    <p class="lede"><b>The caller's video, words and language, on every call.</b> bitdispatcher is a complete computer-aided
+      dispatch system with what most CAD systems sell as add-ons, or do not offer, built in: live video and photos from the caller, transcripts with the details pulled out as the caller speaks,
+      translation, vehicle crash data, a record that cannot be quietly changed, and a training board of its own. Free, one
+      program, set up entirely in the browser.</p>
     <div class="actions">
       <a class="btn btn-primary" href="{{DEMO}}">ICON:play Try the live demo</a>
-      <a class="btn btn-line" href="/features/">See everything it does</a>
+      <a class="btn btn-line" href="#apart">What sets it apart</a>
     </div>
     <p class="hero-note">One press: <strong>Sign in as the demo user</strong> on its sign-in page. Or sign in as <code>demo</code>
       with password <code>try-bitdispatcher-demo</code>.</p>
@@ -27,10 +28,73 @@
   <div><b>100%</b><span>Of the settings have a screen in the browser</span></div>
 </div></div>
 
+<section class="edge" id="apart">
+  <div class="wrap">
+    <div class="intro">
+      <p class="eyebrow">Built in, not bought as add-ons</p>
+      <h2>What sets bitdispatcher apart</h2>
+      <p>Few dispatch systems have all of these. bitdispatcher has every one, in the same free program, on the dispatcher's own
+        screen. Each picture below is the real screen. Each says how far it has been tested: <b>live</b> against a real
+        call-handling system in a lab, or with the simulator. None of it is certified yet.</p>
+    </div>
+    <div class="edges">
+      <div class="edge-card"><img src="/assets/screens/edge-ng911.webp" loading="lazy" alt="A 911 call in bitdispatcher: number verified, answered, from the ESInet, the address checked against the county's address point, with Rebid, Send video link and EIDO buttons.">
+        <div class="body"><h3>NG9-1-1 from the ground up</h3>
+        <p>Calls from the ESInet with their location (PIDF-LO), the caller ID's STIR/SHAKEN check, the address checked against the
+          county's address points, rebids, the EIDO, ESRP routing and each PSAP's queue state. Text to 911, real-time text and TTY
+          both ways.</p>
+        <p class="tested live">Tested live with BitVoice</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-video.webp" loading="lazy" alt="Caller video, live, inside the incident, with a Blur button.">
+        <div class="body"><h3>Live video from the caller</h3>
+        <p>One click texts the caller a link; their phone's camera streams into the call. It starts blurred, so nobody sees a
+          scene before choosing to.</p>
+        <p class="tested live">Tested live with BitVoice (a test camera)</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-photo.webp" loading="lazy" alt="A caller's photo with when the camera took it, when it arrived, its GPS position and SHA-256 hash, and a Hold as evidence button.">
+        <div class="body"><h3>Photos kept as evidence</h3>
+        <p>A photo shows its facts first: when the camera took it, where, and its SHA-256 hash. It is shown only when someone
+          chooses to, every look is recorded, and one click holds it as evidence.</p>
+        <p class="tested live">Tested live with BitVoice: the hash matches</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-transcript.webp" loading="lazy" alt="Heard on the call: weapon knife, the address, a black Nissan Altima, Virginia plate, heading northbound on Williamson Rd; and the transcript of the call.">
+        <div class="body"><h3>Transcripts, with the details pulled out</h3>
+        <p>The caller's words written out as they speak, and what matters lifted out of them: a weapon, an address, a vehicle, a
+          plate, which way they went. After the call, the recording's summary.</p>
+        <p class="tested live">Tested live with BitVoice's speech-to-text</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-spanish.webp" loading="lazy" alt="A Spanish caller translated line by line, and ready replies in Spanish: Help is on the way, Is the person breathing?">
+        <div class="body"><h3>The caller's language</h3>
+        <p>A Spanish caller translated line by line, and replies the dispatcher picks in English and the caller hears in Spanish,
+          read out or texted. An agency's own language model can take on the rest.</p>
+        <p class="tested sim">Tested with the simulator (a built-in emergency phrasebook)</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-crash.webp" loading="lazy" alt="Vehicle crash data rated high injury risk: a Ford, 40 mph front impact, rollover, two occupants, electric; with ALS, fire for extrication, consider air medical.">
+        <div class="body"><h3>Vehicle crash data, rated</h3>
+        <p>A car's crash notification arrives before anyone calls: speed, rollover, how many inside, an electric car. It is rated
+          by field-triage criteria, with what to send.</p>
+        <p class="tested sim">Tested with the simulator's crash notifications</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-ledger.webp" loading="lazy" alt="Ledger and audit: all 107 events verify, each with its SHA-256 hash.">
+        <div class="body"><h3>A record that cannot quietly change</h3>
+        <p>Every action is an event carrying the hash of the one before it. Change, remove or reorder one and the chain breaks,
+          which anyone can check from the browser. Corrections are new events, never edits.</p>
+        <p class="tested live">In every test run</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-training.webp" loading="lazy" alt="Training scenarios: house fire with people inside, cardiac arrest with a Spanish-speaking caller, interstate crash with crash data, armed robbery, a flood of calls.">
+        <div class="body"><h3>A training board of its own</h3>
+        <p>Scripted scenarios on the agency's own map and units, scored, never touching the live board; shared exercises where
+          an instructor injects callers and radio traffic.</p>
+        <p class="tested live">In every test run</p></div></div>
+      <div class="edge-card"><img src="/assets/screens/edge-layout.webp" loading="lazy" alt="The Layout menu: three ready-made layouts for the supervisor, and sections to drag onto the screen.">
+        <div class="body"><h3>A screen each dispatcher arranges</h3>
+        <p>A new dispatcher can start with just the calls and the incident. Sections drag and snap into place, three ready-made
+          layouts per duty, and a lock.</p>
+        <p class="tested live">In every test run</p></div></div>
+    </div>
+    <p class="edge-more">Also: a map, routing and address search that work with no internet; P25 radio emergencies and unit
+      positions; drones; working through an outage. <a href="/features/">Everything it does</a> ·
+      <a href="/proof/">How each is tested</a></p>
+  </div>
+</section>
+
 <section class="band">
   <div class="wrap">
     <div class="intro">
-      <p class="eyebrow">Built for the dispatcher</p>
+      <p class="eyebrow">And the everyday work, done reliably</p>
       <h2>Everything a small or mid-size 911 centre needs, done reliably</h2>
       <p>The large CAD vendors price out the counties and cities that need dispatch the most. bitdispatcher is one program, free,
         with its source: no server farm, no database to stand up first, no per-seat licence.</p>
@@ -140,6 +204,33 @@
       <a class="btn btn-line" href="/proof/">ICON:check How it is tested</a>
       <a class="btn btn-line" href="/bitvoice/">ICON:phone With BitVoice, and without it</a>
     </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="intro">
+      <p class="eyebrow">New</p>
+      <h2>The rest of what a big CAD does, now built in</h2>
+      <p>What large CAD systems commonly have and bitdispatcher did not, built and tested in the browser this month.
+        Each has a chapter in the <a href="/manual/">manual</a> and can be tried on the demo.</p>
+    </div>
+    <ol class="next-list">
+      <li>Second and third alarms: one command sends the next level of the run card</li>
+      <li>Crews and staffing: who is on each unit this shift, and a medic with no paramedic is not sent as ALS</li>
+      <li>Paging volunteer and off-duty responders, who answer from a link: responding, to the scene, or not available</li>
+      <li>Fire-ground accountability: roll-call (PAR) timers, crews reported missing, benchmarks</li>
+      <li>Tow rotation for police, fair by class and zone</li>
+      <li>Scheduled calls and special events</li>
+      <li>A contacts directory and on-call lists, on each incident's call-out list</li>
+      <li>Geofences: alerts when a unit enters or leaves an area, cautions inside one</li>
+      <li>Each unit's status history for any day</li>
+      <li>Times and details sent to the ambulance crews' patient reports (NEMSIS 3.5)</li>
+      <li>Warrants and civil process, flagged at the address</li>
+    </ol>
+    <p class="edge-more" style="color:var(--dim)">Paging is tested against stand-ins for Twilio, ntfy, email and webhooks; the
+      demo uses a simulated pager. Licensed medical protocols and each state's NCIC and NIBRS connections need those parties'
+      approval as well as code. <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/docs/ROADMAP.md">The roadmap</a></p>
   </div>
 </section>
 

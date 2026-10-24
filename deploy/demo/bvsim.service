@@ -9,7 +9,7 @@ Group=bitdispatcher
 # The secrets it sends (EIDO_TOKEN, RADIO_SECRET, HOOK_TOKEN) are made at install, never in this file:
 # demo.bitdispatcher.com takes EIDOs, radio events and hooks from the internet too.
 EnvironmentFile=/etc/bitdispatcher/push.env
-ExecStart=/opt/bitdispatcher/bin/bvsim -addr 127.0.0.1:9444 -every 35s -calls 3 -eido-url https://127.0.0.1:8443/api/ng911/eido -eido-token ${EIDO_TOKEN} -radio-url https://127.0.0.1:8443/api/radio/events -radio-secret ${RADIO_SECRET} -ali 127.0.0.1:5001 -hook-url https://127.0.0.1:8443/api/hooks -hook-token ${HOOK_TOKEN} -drone-addr 127.0.0.1:9445 -drone-token bd_drone_demo
+ExecStart=/opt/bitdispatcher/bin/bvsim -addr 127.0.0.1:9444 -every 35s -calls 3 -eido-url https://127.0.0.1:8443/api/ng911/eido -eido-token ${EIDO_TOKEN} -radio-url https://127.0.0.1:8443/api/radio/events -radio-secret ${RADIO_SECRET} -ali 127.0.0.1:5001 -hook-url https://127.0.0.1:8443/api/hooks -hook-token ${HOOK_TOKEN} -drone-addr 127.0.0.1:9445 -drone-token bd_drone_demo -pager-addr 127.0.0.1:9446 -pager-cad https://127.0.0.1:8443
 # bvsim makes a new certificate each start: pin it, keep the demo account, and seed an empty board.
 ExecStartPost=+/opt/bitdispatcher/demo-setup.sh
 Restart=always

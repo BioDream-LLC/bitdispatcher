@@ -12,6 +12,7 @@ import { cx, typeName } from './util'
 import type { Call, Recommendation } from './types'
 import StatusBar from './console/StatusBar'
 import EmergencyBanner from './console/EmergencyBanner'
+import { useFenceToasts } from './console/Roadmap'
 import { CareBanner, OfflineBar, TDoSBanner, TrainingBar } from './console/Dream'
 import Queue from './console/Queue'
 import MapView from './console/MapView'
@@ -39,6 +40,7 @@ const slotOf = () => new URLSearchParams(location.hash.split('?')[1] ?? '').get(
 /** The dispatcher's console: the full layout, or one screen of a position spread over several monitors. */
 export default function Console({ screen = 'full' }: { screen?: ScreenKind }) {
   const raw = useStore((s) => s.view)
+  useFenceToasts(raw)
   const lens = useStore((s) => s.lens)
   const view = useMemo(() => (raw ? applyLens(raw, lens) : null), [raw, lens])
   const me = useStore((s) => s.me)

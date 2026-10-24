@@ -6,7 +6,7 @@ import { Field, Modal, StatusChip } from '../ui'
 import type { UnitType, View } from '../types'
 import { Page, Table } from './Admin'
 
-type Draft = { id: string; name: string; type: string; station: string; capabilities: string; radioId: string; radioAlias: string; agency: string; isNew: boolean }
+type Draft = { id: string; name: string; type: string; station: string; capabilities: string; radioId: string; radioAlias: string; agency: string; area: string; minStaff: string; isNew: boolean }
 
 export default function Units({ view }: { view: View }) {
   const [d, setD] = useState<Draft | null>(null)
@@ -15,15 +15,15 @@ export default function Units({ view }: { view: View }) {
     const u = view.units.find((x) => x.id === id)
     setErr(null)
     setD(u
-      ? { id: u.id, name: u.name ?? '', type: u.type, station: u.station ?? '', capabilities: (u.capabilities ?? []).join(', '), radioId: u.radioId ? String(u.radioId) : '', radioAlias: u.radioAlias ?? '', agency: u.agency ?? '', isNew: false }
-      : { id: '', name: '', type: view.settings.unitTypes[0]?.code ?? '', station: view.stations[0]?.id ?? '', capabilities: '', radioId: '', radioAlias: '', agency: '', isNew: true })
+      ? { id: u.id, name: u.name ?? '', type: u.type, station: u.station ?? '', capabilities: (u.capabilities ?? []).join(', '), radioId: u.radioId ? String(u.radioId) : '', radioAlias: u.radioAlias ?? '', agency: u.agency ?? '', area: u.area ?? '', minStaff: u.minStaff ? String(u.minStaff) : '', isNew: false }
+      : { id: '', name: '', type: view.settings.unitTypes[0]?.code ?? '', station: view.stations[0]?.id ?? '', capabilities: '', radioId: '', radioAlias: '', agency: '', area: '', minStaff: '', isNew: true })
   }
   const save = async () => {
     if (!d) return
     try {
       await api.put(`/admin/units/${encodeURIComponent(d.id.trim().toUpperCase())}`, {
         name: d.name, type: d.type, station: d.station, agency: d.agency, radioAlias: d.radioAlias,
-        radioId: d.radioId ? Number(d.radioId) : 0,
+        radioId: d.radioId ? Number(d.radioId) : 0, area: d.area || undefined, minStaff: d.minStaff ? Number(d.minStaff) : 0,
         capabilities: d.capabilities.split(/[,\s]+/).map((c) => c.trim().toLowerCase()).filter(Boolean),
       })
       if (d.isNew) await api.post(`/units/${encodeURIComponent(d.id.trim().toUpperCase())}/status`, { status: 'available', reason: 'new unit' }).catch(() => {})
@@ -106,6 +106,12 @@ export default function Units({ view }: { view: View }) {
             </Field>
             <Field label="Radio alias" htmlFor="ural" hint="Matched when the radio sends no ID">
               <input id="ural" className="input" value={d.radioAlias} onChange={(e) => setD({ ...d, radioAlias: e.target.value })} />
+            </Field>
+            <Field label="Beat or area" htmlFor="uarea" hint="For police backup and response plans">
+              <input id="uarea" className="input" value={d.area} onChange={(e) => setD({ ...d, area: e.target.value })} />
+            </Field>
+            <Field label="Minimum aboard" htmlFor="umin" hint="Empty: the unit type's (Settings)">
+              <input id="umin" className="input font-mono" inputMode="numeric" value={d.minStaff} onChange={(e) => setD({ ...d, minStaff: e.target.value.replace(/\D/g, '') })} />
             </Field>
           </div>
         </Modal>

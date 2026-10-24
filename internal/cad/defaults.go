@@ -21,19 +21,20 @@ func DefaultSettings() Settings {
 		MapCenter:       [2]float64{37.2710, -79.9414},
 		MapZoom:         12,
 		Shifts:          []string{"07:00", "19:00"},
+		Qualifications:  DefaultQualifications(),
 		Dispositions: []string{
 			"Handled", "Transported", "Report taken", "Arrest", "Citation", "Warning", "Unfounded",
 			"Gone on arrival", "Cancelled en route", "Referred", "False alarm", "Duplicate",
 		},
 		UnitTypes: []UnitType{
-			{Code: "engine", Name: "Engine", Discipline: "fire", Capabilities: []string{"engine", "fire", "bls"}},
-			{Code: "ladder", Name: "Ladder / truck", Discipline: "fire", Capabilities: []string{"ladder", "fire"}},
+			{Code: "engine", Name: "Engine", Discipline: "fire", Capabilities: []string{"engine", "fire", "bls"}, MinStaff: 3},
+			{Code: "ladder", Name: "Ladder / truck", Discipline: "fire", Capabilities: []string{"ladder", "fire"}, MinStaff: 3},
 			{Code: "rescue", Name: "Rescue", Discipline: "fire", Capabilities: []string{"rescue", "extrication", "fire"}},
 			{Code: "battalion", Name: "Battalion chief", Discipline: "fire", Capabilities: []string{"command"}},
 			{Code: "tanker", Name: "Tanker / tender", Discipline: "fire", Capabilities: []string{"water"}},
 			{Code: "brush", Name: "Brush truck", Discipline: "fire", Capabilities: []string{"brush", "fire"}},
-			{Code: "medic", Name: "Medic (ALS)", Discipline: "ems", Capabilities: []string{"als", "bls", "transport"}},
-			{Code: "ambulance", Name: "Ambulance (BLS)", Discipline: "ems", Capabilities: []string{"bls", "transport"}},
+			{Code: "medic", Name: "Medic (ALS)", Discipline: "ems", Capabilities: []string{"als", "bls", "transport"}, MinStaff: 2},
+			{Code: "ambulance", Name: "Ambulance (BLS)", Discipline: "ems", Capabilities: []string{"bls", "transport"}, MinStaff: 2},
 			{Code: "ems-supervisor", Name: "EMS supervisor", Discipline: "ems", Capabilities: []string{"als", "ems-command"}},
 			{Code: "patrol", Name: "Patrol", Discipline: "police", Capabilities: []string{"police"}},
 			{Code: "police-supervisor", Name: "Police supervisor", Discipline: "police", Capabilities: []string{"police", "police-command"}},
@@ -46,12 +47,16 @@ func DefaultSettings() Settings {
 func DefaultCallTypes() []CallType {
 	r := func(c string, n int) Requirement { return Requirement{Capability: c, Count: n} }
 	return []CallType{
-		{Code: "SF", Name: "Structure fire", Priority: 1, Discipline: "fire", Drone: true, RunCard: []Requirement{r("engine", 3), r("ladder", 1), r("rescue", 1), r("command", 1), r("als", 1)}},
+		{Code: "SF", Name: "Structure fire", Priority: 1, Discipline: "fire", Drone: true, PAR: true, RunCard: []Requirement{r("engine", 3), r("ladder", 1), r("rescue", 1), r("command", 1), r("als", 1)},
+			Alarms: []AlarmLevel{
+				{Name: "2nd alarm", RunCard: []Requirement{r("engine", 2), r("ladder", 1), r("command", 1), r("als", 1)}},
+				{Name: "3rd alarm", RunCard: []Requirement{r("engine", 2), r("ladder", 1), r("water", 1)}},
+			}},
 		{Code: "VF", Name: "Vehicle fire", Priority: 2, Discipline: "fire", RunCard: []Requirement{r("engine", 1)}},
 		{Code: "BF", Name: "Brush fire", Priority: 2, Discipline: "fire", RunCard: []Requirement{r("brush", 1), r("engine", 1)}},
 		{Code: "FA", Name: "Fire alarm", Priority: 2, Discipline: "fire", RunCard: []Requirement{r("engine", 1), r("ladder", 1)}},
 		{Code: "GAS", Name: "Gas leak / odour", Priority: 2, Discipline: "fire", RunCard: []Requirement{r("engine", 1)}},
-		{Code: "HAZ", Name: "Hazardous materials", Priority: 1, Discipline: "fire", Drone: true, RunCard: []Requirement{r("engine", 2), r("command", 1), r("als", 1)}},
+		{Code: "HAZ", Name: "Hazardous materials", Priority: 1, Discipline: "fire", Drone: true, PAR: true, RunCard: []Requirement{r("engine", 2), r("command", 1), r("als", 1)}},
 		{Code: "MVA", Name: "Vehicle crash, injuries", Priority: 1, Discipline: "fire", Drone: true, RunCard: []Requirement{r("engine", 1), r("rescue", 1), r("als", 1), r("police", 1)}},
 		{Code: "MVAPIN", Name: "Vehicle crash, entrapment", Priority: 1, Discipline: "fire", Drone: true, RunCard: []Requirement{r("engine", 1), r("extrication", 1), r("als", 2), r("command", 1), r("police", 1)}},
 		{Code: "CARD", Name: "Cardiac arrest", Priority: 1, Discipline: "ems", Critical: true, RunCard: []Requirement{r("als", 1), r("bls", 2)}},
@@ -74,6 +79,10 @@ func DefaultCallTypes() []CallType {
 		{Code: "MISS", Name: "Missing / endangered person", Priority: 1, Discipline: "police", Drone: true, RunCard: []Requirement{r("police", 2), r("police-command", 1)}},
 		{Code: "ALARM", Name: "Burglar alarm", Priority: 3, Discipline: "police", RunCard: []Requirement{r("police", 1)}},
 		{Code: "PURSUIT", Name: "Pursuit", Priority: 1, Discipline: "police", Drone: true, RunCard: []Requirement{r("police", 2), r("police-command", 1)}},
+		{Code: "EVENT", Name: "Special event / standby", Priority: 5, Discipline: "other", RunCard: nil},
+		{Code: "TRANSFER", Name: "Scheduled transport", Priority: 4, Discipline: "ems", RunCard: []Requirement{r("transport", 1)}},
+		{Code: "TOW", Name: "Tow request / disabled vehicle", Priority: 4, Discipline: "police", RunCard: []Requirement{r("police", 1)}},
+		{Code: "PAPER", Name: "Paper service / warrant service", Priority: 4, Discipline: "police", RunCard: []Requirement{r("police", 1)}},
 		{Code: "OTHER", Name: "Other / unknown", Priority: 3, Discipline: "other", RunCard: nil},
 	}
 }

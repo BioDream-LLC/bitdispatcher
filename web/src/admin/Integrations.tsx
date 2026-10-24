@@ -6,6 +6,7 @@ import { Field } from '../ui'
 import { ago, cx, useNow } from '../util'
 import type { NERISConfig, View, ViewsConfig } from '../types'
 import { Page } from './Admin'
+import { NEMSISSettings, PagingSettings } from './RoadmapIntegrations'
 
 type MV = { id: string; name: string; url: string; fingerprint: string; tokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean }
 type IV = { bitvoiceUrl: string; bitvoiceFingerprint: string; bitvoiceTokenSet: boolean; eidoTokenSet: boolean; radioSecretSet: boolean; aliListen: string; more?: MV[] }
@@ -184,6 +185,8 @@ export default function Integrations({ view }: { view: View }) {
       <Connections view={view} />
       <ViewsSettings />
       <NERISSettings />
+      <NEMSISSettings />
+      <PagingSettings />
       <LISSettings />
       <Partners />
       <PublicFeedSettings view={view} />

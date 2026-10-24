@@ -76,6 +76,10 @@ type Engine struct {
 
 	subMu sync.Mutex
 	subs  map[chan Notice]struct{}
+
+	// pageOut are pages written but not yet delivered, with each person's answer token (kept only here,
+	// never in the ledger): the server takes them to deliver (TakePage).
+	pageOut map[string][]PageRecipient
 }
 
 // Open opens the ledger at path, replays it and seeds a new system with default settings and call types.
@@ -368,6 +372,12 @@ func (e *Engine) SaveCallType(a Actor, c CallType) error {
 			return problem(fmt.Sprintf("runCard[%d]", i), "each run card line needs a capability and 1 to 20 units")
 		}
 	}
+	if err := checkAlarms(c); err != nil {
+		return err
+	}
+	if c.PARMinutes < 0 || c.PARMinutes > 60 {
+		return problem("parMinutes", "a roll-call interval is 0 (the setting) to 60 minutes")
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	_, err := e.write(a, EvCallTypeSaved, refs{}, c)
@@ -410,8 +420,17 @@ func (e *Engine) unitType(code string) *UnitType {
 	return nil
 }
 
-// Capabilities of a unit: its type's and its own.
+// Capabilities of a unit: its type's and its own, less any its recorded crew cannot staff (crew.go).
 func (s *State) Capabilities(u *Unit) []string {
+	out := s.baseCapabilities(u)
+	if drop := s.crewDrops(u); len(drop) > 0 {
+		out = slices.DeleteFunc(out, func(c string) bool { return slices.Contains(drop, c) })
+	}
+	return out
+}
+
+// baseCapabilities are a unit's type's capabilities and its own, whoever is aboard.
+func (s *State) baseCapabilities(u *Unit) []string {
 	var out []string
 	for _, t := range s.Settings.UnitTypes {
 		if t.Code == u.Type {

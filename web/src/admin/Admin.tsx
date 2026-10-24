@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -24,6 +24,11 @@ import Facilities from './Facilities'
 import GuidanceAdmin from './GuidanceAdmin'
 import Protocols from './Protocols'
 import Disclosure from './Disclosure'
+import Personnel from './Personnel'
+import Paging from './Paging'
+import Tows from './Tows'
+import Directory from './Directory'
+import Geofences from './Geofences'
 
 // Charts are large; they load when the report is opened.
 const Reports = lazy(() => import('./Reports'))
@@ -42,6 +47,11 @@ const PAGES = [
   { to: 'users', label: 'Users & positions', icon: UsersIcon, admin: true },
   { to: 'workstations', label: 'Workstations', icon: MonitorSmartphone, admin: true },
   { to: 'sites', label: 'Sites', icon: Network, admin: true },
+  { to: 'personnel', label: 'Personnel & crews', icon: HardHat, admin: false },
+  { to: 'paging', label: 'Paging groups', icon: BellRing, admin: false },
+  { to: 'tows', label: 'Tow rotation', icon: TowIcon, admin: false },
+  { to: 'directory', label: 'Contacts & on call', icon: BookUser, admin: false },
+  { to: 'geofences', label: 'Areas (geofences)', icon: Hexagon, admin: false },
   { to: 'premises', label: 'Premises & hazards', icon: ShieldAlert, admin: false },
   { to: 'migrate', label: 'Migration', icon: FileInput, admin: true },
   { to: 'advisory', label: 'Advisory panel', icon: Lightbulb, admin: false },
@@ -102,6 +112,11 @@ export default function Admin() {
             <Route path="gis" element={<GisAdmin />} />
             <Route path="sites" element={<Sites />} />
             <Route path="premises" element={<Premises />} />
+            <Route path="personnel" element={<Personnel view={view} />} />
+            <Route path="paging" element={<Paging view={view} />} />
+            <Route path="tows" element={<Tows view={view} />} />
+            <Route path="directory" element={<Directory view={view} />} />
+            <Route path="geofences" element={<Geofences view={view} />} />
             <Route path="migrate" element={<Migrate />} />
             <Route path="quality" element={<Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Quality /></Suspense>} />
             <Route path="reports" element={<Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Reports view={view} /></Suspense>} />

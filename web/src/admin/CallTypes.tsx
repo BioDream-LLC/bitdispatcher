@@ -3,10 +3,10 @@ import { toast } from 'sonner'
 import { ClipboardList, Plus, Trash2, X } from 'lucide-react'
 import { api, ApiError, errText } from '../api'
 import { Field, Modal, Priority } from '../ui'
-import type { Requirement, View } from '../types'
+import type { AlarmLevel, Requirement, View } from '../types'
 import { Page, Table } from './Admin'
 
-type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string; isNew: boolean }
+type Draft = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[]; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string; alarms?: AlarmLevel[]; par?: boolean; parMinutes?: number; nemsis?: string; isNew: boolean }
 
 // importCSV reads call types from a spreadsheet: code, name, priority, discipline, group, run card
 // ("2 engine; 1 ladder"), notify ("Fire marshal; Animal control"). A header row is skipped.
@@ -32,7 +32,7 @@ export default function CallTypes({ view }: { view: View }) {
   const save = async () => {
     if (!d) return
     try {
-      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, autoDispatch: !!d.autoDispatch && d.priority >= 3, notify: d.notify, group: d.group })
+      await api.put(`/admin/calltypes/${encodeURIComponent(d.code.trim().toUpperCase())}`, { name: d.name, priority: d.priority, discipline: d.discipline, runCard: d.runCard, critical: !!d.critical, drone: !!d.drone, autoDispatch: !!d.autoDispatch && d.priority >= 3, notify: d.notify, group: d.group, alarms: (d.alarms ?? []).filter((a) => a.runCard.length), par: !!d.par, parMinutes: d.parMinutes || 0, nemsis: d.nemsis || undefined })
       toast.success(`Call type ${d.code.toUpperCase()} saved`)
       setD(null)
     } catch (e) {
@@ -65,7 +65,7 @@ export default function CallTypes({ view }: { view: View }) {
         {view.callTypes.map((c) => (
           <tr key={c.code} className="cursor-pointer hover:bg-slate-800/50" onClick={() => open(c.code)}>
             <td className="px-3 py-1.5 font-mono font-bold text-slate-100">{c.code}</td>
-            <td className="px-3 text-slate-200">{c.name}{c.critical && <span className="chip ml-1 bg-teal-500/20 text-teal-200">critical</span>}{c.drone && <span className="chip ml-1 bg-cyan-500/20 text-cyan-200">drone</span>}{c.autoDispatch && <span className="chip ml-1 bg-amber-500/20 text-amber-200">auto-dispatch</span>}</td>
+            <td className="px-3 text-slate-200">{c.name}{c.critical && <span className="chip ml-1 bg-teal-500/20 text-teal-200">critical</span>}{c.drone && <span className="chip ml-1 bg-cyan-500/20 text-cyan-200">drone</span>}{c.autoDispatch && <span className="chip ml-1 bg-amber-500/20 text-amber-200">auto-dispatch</span>}{(c.alarms?.length ?? 0) > 0 && <span className="chip ml-1 bg-orange-500/20 text-orange-200">{c.alarms!.length + 1} alarms</span>}{c.par && <span className="chip ml-1 bg-rose-500/20 text-rose-200">PAR</span>}</td>
             <td className="px-3"><Priority p={c.priority} /></td>
             <td className="px-3 text-slate-400">{c.discipline}</td>
             <td className="px-3 font-mono text-xs text-slate-300">{(c.runCard ?? []).map((r) => `${r.count}×${r.capability}`).join('  ') || <span className="text-slate-500">none: chosen by hand</span>}</td>
@@ -135,9 +135,44 @@ export default function CallTypes({ view }: { view: View }) {
               <datalist id="caps">{caps.map((c) => <option key={c} value={c} />)}</datalist>
               <button className="btn mt-2" onClick={() => setD({ ...d, runCard: [...d.runCard, { capability: '', count: 1 }] })}><Plus size={13} aria-hidden /> Add line</button>
             </div>
+            <div className="sm:col-span-4">
+              <span className="label">Further alarms</span>
+              <p className="mb-1 text-xs text-slate-500">Each further alarm adds units to the run card. ALARM on the command line (or the incident's Upgrade button) moves an incident up one, and the recommendation fills the bigger card.</p>
+              {(d.alarms ?? []).map((al, ai) => (
+                <div key={ai} className="mb-2 rounded border border-slate-800 p-2">
+                  <div className="flex items-center gap-2">
+                    <input aria-label={`Alarm ${ai + 2} name`} className="input w-40" value={al.name} onChange={(e) => setD({ ...d, alarms: (d.alarms ?? []).map((x, j) => (j === ai ? { ...x, name: e.target.value } : x)) })} />
+                    <span className="text-xs text-slate-500">adds</span>
+                    <button className="btn btn-ghost ml-auto px-1.5" aria-label={`Remove the ${al.name}`} onClick={() => setD({ ...d, alarms: (d.alarms ?? []).filter((_, j) => j !== ai) })}><X size={13} aria-hidden /></button>
+                  </div>
+                  <ul className="mt-1 space-y-1">
+                    {al.runCard.map((r, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <input aria-label={`${al.name} line ${i + 1} count`} type="number" min={1} max={20} className="input w-20 font-mono" value={r.count} onChange={(e) => setD({ ...d, alarms: (d.alarms ?? []).map((x, j) => (j === ai ? { ...x, runCard: x.runCard.map((y, k) => (k === i ? { ...y, count: Number(e.target.value) } : y)) } : x)) })} />
+                        <span className="text-slate-500">×</span>
+                        <input aria-label={`${al.name} line ${i + 1} capability`} list="caps" className="input font-mono" value={r.capability} onChange={(e) => setD({ ...d, alarms: (d.alarms ?? []).map((x, j) => (j === ai ? { ...x, runCard: x.runCard.map((y, k) => (k === i ? { ...y, capability: e.target.value.trim().toLowerCase() } : y)) } : x)) })} />
+                        <button className="btn btn-ghost px-1.5" aria-label={`Remove ${al.name} line ${i + 1}`} onClick={() => setD({ ...d, alarms: (d.alarms ?? []).map((x, j) => (j === ai ? { ...x, runCard: x.runCard.filter((_, k) => k !== i) } : x)) })}><X size={13} aria-hidden /></button>
+                      </li>
+                    ))}
+                  </ul>
+                  <button className="btn mt-1 h-7" onClick={() => setD({ ...d, alarms: (d.alarms ?? []).map((x, j) => (j === ai ? { ...x, runCard: [...x.runCard, { capability: '', count: 1 }] } : x)) })}><Plus size={12} aria-hidden /> Add line</button>
+                </div>
+              ))}
+              <button className="btn" onClick={() => setD({ ...d, alarms: [...(d.alarms ?? []), { name: ordinal((d.alarms?.length ?? 0) + 2) + ' alarm', runCard: [{ capability: 'engine', count: 2 }] }] })}><Plus size={13} aria-hidden /> Add the {ordinal((d.alarms?.length ?? 0) + 2)} alarm</button>
+            </div>
+            <label className="flex items-start gap-2 text-sm text-slate-300 sm:col-span-2">
+              <input type="checkbox" className="mt-1" checked={!!d.par} onChange={(e) => setD({ ...d, par: e.target.checked })} />
+              <span>Fire-ground accountability<span className="block text-xs text-slate-500">The roll-call (PAR) clock starts when the first unit arrives</span></span>
+            </label>
+            <Field label="Roll call every (minutes)" htmlFor="cpm" hint="0: the setting (20 unless changed)"><input id="cpm" type="number" min={0} max={60} className="input w-24 font-mono" value={d.parMinutes ?? 0} onChange={(e) => setD({ ...d, parMinutes: Number(e.target.value) })} /></Field>
+            <Field label="NEMSIS dispatch reason" htmlFor="cnem" hint="For EMS patient-care reports (eDispatch.01); empty: suggested from the name"><input id="cnem" className="input font-mono" placeholder="2301…" value={d.nemsis ?? ''} onChange={(e) => setD({ ...d, nemsis: e.target.value.trim() })} /></Field>
           </div>
         </Modal>
       )}
     </Page>
   )
+}
+
+function ordinal(n: number) {
+  return n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`
 }

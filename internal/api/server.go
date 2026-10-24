@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/biodream-llc/bitdispatcher/internal/nemsis"
 	"io"
 	"log/slog"
 	"net"
@@ -44,6 +45,8 @@ type Integrations struct {
 	Partners   []Partner         `json:"partners"`     // neighbouring agencies' CADs (CAD-to-CAD)
 	PublicFeed PublicFeed        `json:"publicFeed"`   // what is happening, for the public and apps like PulsePoint
 	LIS        LIS               `json:"lis"`          // a location server asked by HELD (supplemental location)
+	Paging     Paging            `json:"paging"`       // pages to volunteer and off-duty responders
+	NEMSIS     nemsis.Config     `json:"nemsis"`       // EMS responses to the patient-care report system
 }
 
 // Server is the API.
@@ -365,6 +368,7 @@ func (s *Server) routes() {
 	s.replayRoutes()
 	s.lisRoutes()
 	s.recordsRoutes()
+	s.roadmapRoutes()
 	s.lockRoutes()
 	s.workstationRoutes()
 	m.HandleFunc("POST /api/auth/logout", s.logout)
@@ -616,6 +620,7 @@ type View struct {
 	TDoS      cad.TDoS              `json:"tdos"`
 	Training  *TrainingView         `json:"training,omitempty"`
 	Entry     EntryView             `json:"entry"`
+	Roadmap   RoadmapView           `json:"roadmap"`
 }
 
 // HealthView is every interface's health.
@@ -712,6 +717,7 @@ func (s *Server) view() ([]byte, error) {
 		sort.Slice(v.Calls, func(i, j int) bool { return v.Calls[i].Start.After(v.Calls[j].Start) })
 		v.Training = s.trainingView()
 		v.Entry = s.entryView(st, now)
+		v.Roadmap = s.roadmapView(st, now, v.Incidents)
 		v.Summaries, v.Drones, v.Care, v.Breaks, v.TDoS = map[string]string{}, []*cad.Drone{}, []*cad.CareCase{}, st.Breaks, st.TDoS
 		for _, in := range v.Incidents {
 			if in.Status != cad.Closed {
@@ -1712,6 +1718,9 @@ func (s *Server) Run(ctx context.Context) {
 	go s.autoDispatcher(ctx)
 	go s.lisAuto(ctx)
 	go s.policyWatch(ctx)
+	go s.pager(ctx)
+	go s.scheduler(ctx)
+	go s.epcrAuto(ctx)
 	go s.translator(ctx)
 	if s.Advisory != nil {
 		go s.Advisory.Run(ctx)

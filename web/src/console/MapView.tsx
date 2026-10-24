@@ -261,6 +261,14 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
         m.addLayer({ id: 'grid', type: 'line', source: 'grid', paint: { 'line-color': '#64748b', 'line-opacity': ['case', ['get', 'major'], 0.32, 0.12], 'line-width': ['case', ['get', 'major'], 1, 0.5] } }),
       )
     }
+    // Areas (geofences): alert areas orange, caution areas yellow, under everything else.
+    const fences: GeoJSON.Feature[] = (view.roadmap?.geofences ?? []).filter((g) => g.ring.length >= 3).map((g) => ({
+      type: 'Feature', properties: { kind: g.kind, name: g.name }, geometry: { type: 'Polygon', coordinates: [[...g.ring, g.ring[0]]] },
+    }))
+    ensure('fences', { type: 'FeatureCollection', features: fences }, () => {
+      m.addLayer({ id: 'fence-fill', type: 'fill', source: 'fences', paint: { 'fill-color': ['match', ['get', 'kind'], 'caution', '#facc15', '#fb923c'], 'fill-opacity': 0.07 } })
+      m.addLayer({ id: 'fence-line', type: 'line', source: 'fences', paint: { 'line-color': ['match', ['get', 'kind'], 'caution', '#facc15', '#fb923c'], 'line-width': 1.4, 'line-dasharray': [4, 2], 'line-opacity': 0.7 } })
+    })
     const circles: GeoJSON.Feature[] = []
     for (const c of view.calls) {
       if (c.state === 'ended' || !hasPoint(c.location) || !c.location.radius || !show.calls) continue

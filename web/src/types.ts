@@ -22,14 +22,14 @@ export type Location = {
 
 export type Station = { id: string; name: string; address?: string; lat: number; lon: number }
 
-export type UnitType = { code: string; name: string; discipline: string; capabilities: string[]; cover?: boolean }
+export type UnitType = { code: string; name: string; discipline: string; capabilities: string[]; cover?: boolean; minStaff?: number }
 
 export type Position = { lat: number; lon: number; accuracy?: number; speed?: number; heading?: number; source: string; at: string }
 
 export type Unit = {
   id: string; name?: string; type: string; station?: string; capabilities?: string[]; radioId?: number; radioAlias?: string; agency?: string
   status: string; statusAt: string; incident?: string; position?: Position; lastHeard?: string; emergency?: string; covering?: string
-  markOut?: MarkOut; checked?: string; checkedBy?: string; area?: string
+  markOut?: MarkOut; checked?: string; checkedBy?: string; area?: string; minStaff?: number; crew?: CrewSeat[]
   caps: string[]
 }
 
@@ -37,7 +37,9 @@ export type MarkOut = { code: string; location?: Location; note?: string }
 export type MarkOutType = { code: string; name: string; minutes: number; discipline?: string; interruptible?: boolean }
 
 export type Requirement = { capability: string; count: number }
-export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string }
+export type CallType = { code: string; name: string; priority: number; discipline: string; runCard: Requirement[] | null; critical?: boolean; drone?: boolean; autoDispatch?: boolean; notify?: string[]; group?: string
+  alarms?: AlarmLevel[]; par?: boolean; parMinutes?: number; nemsis?: string }
+export type AlarmLevel = { name: string; runCard: Requirement[] }
 
 export type Assignment = {
   unit: string; status: string; recommended: boolean; dispatched: string
@@ -54,6 +56,7 @@ export type Incident = { files?: IncidentFile[]; protocol?: ProtocolRun; neris?:
   modifiers?: string[]; persons?: Person[]; vehicles?: Vehicle[]; callerAt?: Location; notices?: Contact[]; talkgroup?: string; locVerified?: boolean
   newLocation?: { location: Location; call?: string; metres: number; at: string }; guidance?: Shown[]
   changed?: { from?: Location; to: Location; at: string; by: string; why?: string }
+  alarm?: number; fireground?: Fireground; epcr?: Record<string, EPCRRecord>
 }
 
 export type Person = {
@@ -149,6 +152,7 @@ export type Settings = {
   modifiers?: Modifier[]; duties?: { callTakersDispatch?: boolean; crossDiscipline?: boolean; selfAttach?: boolean }
   security?: { mfa?: '' | 'off' | 'admins' | 'everyone'; lockMinutes?: number; stagedChanges?: boolean }
   ackSeconds?: number; overrideReasonOff?: boolean; talkgroups?: string[]; moveMeters?: number; foiaDays?: number
+  qualifications?: string[]; capNeeds?: CapNeed[] | null; parMinutes?: number; benchmarks?: Benchmark[]; towClasses?: string[]; towZones?: string[]
 }
 
 export type Failure = { at: string; what: string; call?: string; error: string }
@@ -202,6 +206,7 @@ export type View = { placeViews?: boolean; messages?: UnitMessage[]; stationAler
   premises?: Record<string, Premise[]>; prior?: Record<string, History[]>
   summaries?: Record<string, string>; drones?: Drone[]; radio?: RadioLine[]; care?: CareCase[]; breaks?: Record<string, Break>; tdos?: TDoS; training?: TrainingView
   entry?: EntryView
+  roadmap?: RoadmapView
 }
 
 export type Premise = { id: string; name?: string; address: string; lat: number; lon: number; hazards?: string[]; notes?: string; contacts?: string[]; expires?: string; source?: string; photos?: PremisePhoto[]; updated: string; by: string }
@@ -267,4 +272,62 @@ export type Handling = {
   recording?: string; summary?: string; summaryBy?: string; briefing?: string; briefedBy?: string; taker?: string
   endCause?: string; endedBy?: string
   lvf?: { address: string; valid: boolean; matched?: string; invalid?: string[]; position?: string; within?: boolean; suggestions?: { address: string; why: string }[]; at: string }
+}
+
+// ---- the roadmap features (internal/cad alarm.go, crew.go, fireground.go, pages.go, tow.go, schedule.go,
+// directory.go, geofence.go, history.go, warrants.go; internal/api roadmap.go) ----
+
+export type CrewSeat = { member: string; name: string; role?: string; since: string }
+export type Member = { id: string; name: string; rank?: string; quals?: string[]; agency?: string; station?: string; volunteer?: boolean; phone?: string; email?: string; topic?: string; inactive?: boolean; note?: string; riding?: string }
+export type MemberBrief = { id: string; name: string; rank?: string; quals?: string[]; station?: string; volunteer?: boolean; inactive?: boolean; riding?: string }
+export type CapNeed = { capability: string; qualification: string; count: number }
+
+export type PARCheck = { at: string; by: string; ok: string[]; missing?: string[]; pax?: Record<string, number>; note?: string }
+export type BenchmarkMark = { code: string; name: string; at: string; by: string }
+export type Benchmark = { code: string; name: string }
+export type Fireground = { started: string; startedBy: string; auto?: boolean; minutes: number; lastPar?: string; checks: PARCheck[]; missing?: string[]; benchmarks: BenchmarkMark[]; ended?: string }
+
+export type PageGroup = { id: string; name: string; members: string[]; gateways: string[]; units?: string[]; stations?: string[]; types?: string[]; note?: string; off?: boolean }
+export type PageResult = { gateway: string; kind: string; to: string; ok: boolean; detail?: string; at: string }
+export type PageReply = { answer: 'responding' | 'scene' | 'unavailable'; eta?: number; at: string; name: string }
+export type Page = { id: string; at: string; by: string; incident?: string; groups: string[]; subject: string; text: string; auto?: boolean; to: { member: string; name: string }[]; results: PageResult[]; replies: Record<string, PageReply> }
+export type Gateway = { id: string; name: string; kind: string; url?: string; token?: string; account?: string; from?: string; smtpHost?: string; smtpPort?: number; smtpUser?: string; smtpPassword?: string; smtpStartTls?: boolean; to?: string }
+export type GatewayKind = { kind: string; name: string; fields: string[]; note: string }
+export type ResponderBrief = { paged: number; responding: number; toScene: number; unavailable: number; replies: PageReply[] }
+
+export type TowCompany = { id: string; name: string; phone: string; address?: string; classes: string[]; zones?: string[]; off?: boolean; note?: string }
+export type Tow = { id: string; at: string; by: string; incident?: string; company: string; name: string; phone: string; class: string; zone?: string; kind: 'rotation' | 'owner' | 'police'; skipped?: string[]; vehicle?: string; result: 'called' | 'accepted' | 'declined' | 'no-answer' | 'cancelled' | 'arrived'; resultAt?: string; note?: string }
+export type TowTurn = { company: TowCompany; lastTurn?: string; why?: string }
+
+export type Scheduled = { id: string; kind: 'call' | 'event'; title: string; type: string; priority?: number; location?: Location; start: string; minutes?: number; lead?: number; units?: string[]; notes?: string; repeat?: '' | 'daily' | 'weekdays' | 'weekly'; until?: string; off?: boolean; last?: string; incident?: string; by?: string; next?: string }
+export type UpcomingItem = { item: Scheduled; at: string; end: string; running?: boolean }
+
+export type Phone = { label?: string; number: string }
+export type DirEntry = { id: string; name: string; org?: string; category?: string; phones: Phone[]; email?: string; address?: string; notes?: string; tags?: string[]; types?: string[] }
+export type OnCallShift = { entry: string; from: string; to: string }
+export type OnCallList = { id: string; name: string; types?: string[]; shifts: OnCallShift[]; backup?: string; notes?: string }
+export type CallOut = { entry?: DirEntry; list?: string; until?: string; backup?: boolean; notify?: string }
+export type OnCallBrief = { list: string; id: string; entry?: DirEntry; until?: string; backup?: boolean }
+
+export type Geofence = { id: string; name: string; kind: 'alert' | 'caution'; ring: [number, number][]; note?: string; enter?: boolean; leave?: boolean; disciplines?: string[]; units?: string[]; color?: string; off?: boolean }
+export type FenceAlert = { at: string; unit: string; fence: string; name: string; enter: boolean; seq: number }
+
+export type StatusSpan = { from: string; to: string; status: string; incident?: string; markOut?: string; reason?: string; by?: string; seconds: number; open?: boolean }
+export type UnitMark = { at: string; kind: string; text: string; by?: string }
+export type UnitHistory = { unit: string; from: string; to: string; spans: StatusSpan[]; marks: UnitMark[]; totals: Record<string, number>; incidents: string[]; committed: number; known: number }
+
+export type EPCRRecord = { unit: string; at: string; ok: boolean; status?: number; error?: string; by: string }
+
+export type PaperSubject = { name: string; dob?: string; sex?: string; description?: string }
+export type PaperAttempt = { at: string; by: string; unit?: string; result: string; note?: string; incident?: string }
+export type Paper = { id: string; kind: string; number?: string; court?: string; subject: PaperSubject; location?: Location; charge?: string; issued?: string; expires?: string; caution?: string; notes?: string; status: 'active' | 'served' | 'recalled' | 'returned'; statusAt?: string; statusBy?: string; attempts: PaperAttempt[]; entered: string; by: string }
+export type PaperFlag = { count: number; kinds: string[]; caution?: string }
+
+export type AlarmBrief = { level: number; name: string; nextName?: string; nextAdds?: Requirement[] }
+export type RoadmapView = {
+  members: MemberBrief[]; pageGroups: PageGroup[]; gateways: { id: string; name: string; kind: string }[]; pages: Page[]
+  towCompanies: TowCompany[]; tows: Tow[]; towClasses: string[]; upcoming: UpcomingItem[]; callOut: Record<string, CallOut[]>
+  geofences: Geofence[]; fenceAlerts: FenceAlert[]; cautions: Record<string, { id: string; name: string; note: string }[]>; papers: Record<string, PaperFlag>
+  benchmarks: Benchmark[]; alarms: Record<string, AlarmBrief>; staffing: Record<string, string[]>; epcr: boolean; parDue: Record<string, string>
+  responders: Record<string, ResponderBrief>; onCallNow: OnCallBrief[]
 }

@@ -223,3 +223,25 @@ footer.site p { margin-top: 12px; }
 .cmdline .c { color: #64748b; }
 /* A phone: the menu holds the demo link, so the header keeps only the brand and the menu button. */
 @media (max-width: 560px) { .top .cta { display: none; } .top .wrap { gap: 12px; } .signin { display: grid; } }
+
+/* ---- What sets it apart: tiles with a picture of the real screen, and how each was tested */
+section.edge { padding: 80px 0 88px; background: linear-gradient(180deg, #0b1220, #111a2e); color: #e2e8f0; }
+section.edge .eyebrow { color: #fb923c; }
+section.edge h2 { color: #fff; font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -.02em; margin: 0 0 14px; }
+section.edge .intro p { color: #cbd5e1; }
+.edges { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.edge-card { background: #0f172a; border: 1px solid #1e293b; border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.edge-card:hover { border-color: #fb923c; box-shadow: 0 0 0 1px #fb923c, 0 12px 32px rgba(251, 146, 60, .25); transform: translateY(-3px); }
+@media (prefers-reduced-motion: reduce) { .edge-card { transition: none; } .edge-card:hover { transform: none; } }
+.edge-card img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; background: #020617; border-bottom: 1px solid #1e293b; }
+.edge-card .body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.edge-card h3 { margin: 0; color: #fff; font-size: 1.12rem; }
+.edge-card p { margin: 0; color: #cbd5e1; font-size: .95rem; }
+.edge-card .tested { margin-top: auto; padding-top: 6px; font-size: .78rem; font-weight: 700; letter-spacing: .02em; }
+.tested.live { color: #4ade80; }
+.tested.sim { color: #fbbf24; }
+.edge-more { margin: 30px 0 0; color: #94a3b8; font-size: .95rem; }
+.edge-more a { color: #fdba74; }
+.next-list { columns: 2 320px; column-gap: 40px; margin: 0; padding-left: 20px; color: var(--dim); }
+.next-list li { break-inside: avoid; margin: 0 0 8px; }

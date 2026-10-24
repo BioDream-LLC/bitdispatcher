@@ -14,6 +14,7 @@ import CallAssist from './CallAssist'
 import HandlingBox, { CallerIDChip } from './Handling'
 import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
+import { AlarmBar, CallOutBox, CrewLine, EPCRBox, FiregroundBox, HistoryButton, PagingBox, SafetyFlags, TowBox } from './Roadmap'
 import { run as runLine } from './UnitBoard'
 import { api, errText } from '../api'
 import EntryFacts, { AckCell } from './Entry'
@@ -398,7 +399,7 @@ function Timeline({ inc, now }: { inc: Incident; now: number }) {
   const kindColor: Record<string, string> = {
     created: 'text-sky-300', dispatch: 'text-orange-300', status: 'text-slate-300', note: 'text-slate-100', 'priority-note': 'text-rose-200 font-semibold',
     change: 'text-violet-300', call: 'text-sky-300', close: 'text-emerald-300', reopen: 'text-amber-300', 'auto-dispatch': 'text-amber-200', correction: 'text-violet-200', shared: 'text-sky-200', protocol: 'text-teal-200', file: 'text-slate-300', emergency: 'text-rose-300 font-bold',
-    radio: 'text-teal-200 italic', drone: 'text-cyan-300',
+    radio: 'text-teal-200 italic', drone: 'text-cyan-300', alarm: 'text-orange-300 font-bold', par: 'text-rose-200', benchmark: 'text-sky-200', page: 'text-sky-300', tow: 'text-amber-200', crew: 'text-slate-300', scheduled: 'text-teal-300', area: 'text-orange-200', paper: 'text-rose-200', epcr: 'text-pink-200',
   }
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Timeline">
@@ -407,7 +408,7 @@ function Timeline({ inc, now }: { inc: Incident; now: number }) {
       </div>
       <ol className="min-h-0 flex-1 space-y-0.5 overflow-y-auto py-1 text-xs">
         {inc.timeline.map((t) => (
-          <li key={t.seq + t.kind + t.text} className={cx('flex gap-1.5', t.kind === 'priority-note' && 'rounded bg-rose-500/10 px-1')}>
+          <li key={t.seq + t.kind + t.text} className={cx('flex gap-1.5', (t.kind === 'priority-note' || t.priority) && 'rounded bg-rose-500/10 px-1')}>
             <span className="shrink-0 font-mono text-[10px] text-slate-500 tnum" title={new Date(t.at).toLocaleString()}>{hhmm(t.at)}</span>
             <span className="w-14 shrink-0 truncate font-mono text-[10px] text-slate-500" title={t.actor}>{t.actor}</span>
             <span className={cx('min-w-0 break-words', kindColor[t.kind] ?? 'text-slate-300')}>{t.text}</span>
@@ -514,13 +515,20 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
             )}
           </div>
         </div>
+        <SafetyFlags inc={inc} view={view} />
         <EntryFacts inc={inc} view={view} />
         {!closed && view.summaries?.[inc.number] && <SummaryBox inc={inc} text={view.summaries[inc.number]} />}
         <PremiseBox premises={view.premises?.[inc.number]} prior={view.prior?.[inc.number]} />
         <DroneBox inc={inc} view={view} />
         {calls.map((c) => <CallBox key={c.id} call={c} view={view} now={now} />)}
+        <FiregroundBox inc={inc} view={view} />
+        <AlarmBar inc={inc} view={view} reload={reloadRec} />
         {!closed && <RecommendBox inc={inc} rec={rec} reload={reloadRec} />}
         <UnitsOn inc={inc} view={view} now={now} />
+        <PagingBox inc={inc} view={view} />
+        <CallOutBox inc={inc} view={view} />
+        <TowBox inc={inc} view={view} />
+        <EPCRBox inc={inc} view={view} />
         <IncidentFiles inc={inc} />
         {!closed && can.dispatch(me) && <ShareBox inc={inc} />}
         <Timeline inc={inc} now={now} />
@@ -632,6 +640,7 @@ export function UnitDetail({ view, id }: { view: View; id: string }) {
         </span>
         <span className="text-slate-500">Radio</span><span className="text-slate-200">{u.radioId ? `ID ${u.radioId}` : 'not mapped'}{u.radioAlias ? ` · ${u.radioAlias}` : ''}{u.lastHeard ? ` · heard ${ago(u.lastHeard, now)} ago` : ''}</span>
         <span className="text-slate-500">Can do</span><span className="text-slate-300">{u.caps.join(', ')}</span>
+        <CrewLine view={view} unitId={u.id} />
       </div>
       {can.dispatch(me) && (
         <div className="flex flex-wrap gap-1">
@@ -642,6 +651,7 @@ export function UnitDetail({ view, id }: { view: View; id: string }) {
           ))}
           <button className="btn h-6 px-1.5 py-0 font-mono text-[10px] text-teal-300" onClick={() => openMarkOut(u.id)} title="Mark out: meal, court, fuel…">MO…</button>
           {checkDue(view, u) > 0 && <button className="btn h-6 px-1.5 py-0 text-[10px] text-emerald-300" onClick={() => runLine(`SC ${u.id}`)} title="Status check: all right, its timer starts again">Check OK</button>}
+          <HistoryButton unit={u.id} />
         </div>
       )}
     </div>

@@ -678,6 +678,7 @@ func (s *State) afterApply(e ledger.Event) {
 		s.tdosEnded(e)
 	}
 	s.careCheck(e)
+	s.roadmapAfter(e)
 }
 
 // ---- critical-call care ----

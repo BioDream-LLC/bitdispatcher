@@ -42,7 +42,13 @@ var Verbs = []Verb{
 	{[]string{"T", "TYPE"}, "T <type>", "Change the selected incident's call type"},
 	{[]string{"CL", "CLOSE"}, "CL <disposition> [text]", "Close the selected incident"},
 	{[]string{"RO", "REOPEN"}, "RO #incident <reason>", "Reopen a closed incident"},
-	{[]string{"ACK"}, "ACK [units…]", "With units: they acknowledged their assignment; alone: acknowledge the oldest open emergency"},
+	{[]string{"ACK"}, "ACK [units…]", "With units: they acknowledged their assignment; alone: acknowledge the emergency in the bar (the newest)"},
+	{[]string{"ALARM", "2ND", "3RD"}, "ALARM [level] [#incident] [/ reason]", "Upgrade the incident to its next alarm (or to a level; down needs a reason); REC then sends the extra units"},
+	{[]string{"PAR"}, "PAR [MISSING units…|FOUND unit|START [minutes]|END]", "Record a roll call of the crews on scene: all accounted for, or who is missing"},
+	{[]string{"BM"}, "BM <benchmark>", "Record a fire-ground benchmark: PS primary search, UC under control, LS loss stopped…"},
+	{[]string{"TOW"}, "TOW [class] [zone] [/ vehicle]", "Call the next tow company on the rotation for the selected incident"},
+	{[]string{"PAGE"}, "PAGE <groups…> [/ text]", "Page responder groups about the selected incident"},
+	{[]string{"DIR"}, "DIR <words>", "Look up the contacts directory: DIR water, DIR medical examiner"},
 	{[]string{"TG"}, "TG <talkgroup>", "Set the selected incident's talkgroup"},
 	{[]string{"BOLO"}, "BOLO <text>", "Issue a BOLO for the selected incident (or none)"},
 	{[]string{"TONE", "ALERT"}, "TONE [units…] [#incident]", "Tone out the stations of the units on the selected incident again (or of the units named)"},
@@ -508,14 +514,15 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 		}
 		key := ""
 		e.Read(func(s *State) {
-			var oldest *Emergency
+			// The newest: the one flashing in the emergency bar.
+			var newest *Emergency
 			for _, em := range s.Emergencies {
-				if em.AckedAt.IsZero() && (oldest == nil || em.Raised.Before(oldest.Raised)) {
-					oldest = em
+				if em.AckedAt.IsZero() && (newest == nil || em.Raised.After(newest.Raised)) {
+					newest = em
 				}
 			}
-			if oldest != nil {
-				key = oldest.Key
+			if newest != nil {
+				key = newest.Key
 			}
 		})
 		if key == "" {
@@ -525,6 +532,9 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 			return fail(err)
 		}
 		return CommandResult{OK: true, Message: "Emergency acknowledged"}
+	}
+	if r, ok := e.roadmapCommand(a, verb, args, selected); ok {
+		return r
 	}
 	return CommandResult{Message: "Unknown command " + verb + ": HELP lists them"}
 }

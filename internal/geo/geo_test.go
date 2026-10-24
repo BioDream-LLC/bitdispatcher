@@ -22,3 +22,17 @@ func TestDrive(t *testing.T) {
 		t.Fatalf("estimate %+v", e)
 	}
 }
+
+func TestInPolygon(t *testing.T) {
+	sq := [][2]float64{{-80, 37}, {-79.9, 37}, {-79.9, 37.1}, {-80, 37.1}}
+	if !InPolygon(37.05, -79.95, sq) {
+		t.Error("centre should be inside")
+	}
+	if InPolygon(37.2, -79.95, sq) || InPolygon(37.05, -80.1, sq) {
+		t.Error("outside points reported inside")
+	}
+	closed := append(sq, sq[0])
+	if !InPolygon(37.05, -79.95, closed) {
+		t.Error("closed ring")
+	}
+}

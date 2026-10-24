@@ -174,15 +174,32 @@ type State struct {
 	StationAlerts []*StationAlert      `json:"stationAlerts"`
 	alertBase     int                  // tone-outs dropped from the front, for numbering
 	Protocols     map[string]*Protocol `json:"protocols"` // the agency's call-taking question sets
-	premGrid      grid
-	premIDs       []string
-	premIdx       map[string]int
-	histGrid      grid
-	yearCount     map[string]int // incidents per site and year, for numbering
+	// The roadmap features: the roster, paging, tow rotation, the schedule, the directory, areas on the
+	// map and papers to serve.
+	Members      map[string]*Member    `json:"members"`
+	PageGroups   map[string]*PageGroup `json:"pageGroups"`
+	Pages        []*Page               `json:"pages"`
+	pageCount    int
+	TowCompanies map[string]*TowCompany `json:"towCompanies"`
+	Tows         []*Tow                 `json:"tows"`
+	towCount     int
+	Scheduled    map[string]*Scheduled  `json:"scheduled"`
+	Directory    map[string]*DirEntry   `json:"directory"`
+	OnCall       map[string]*OnCallList `json:"onCall"`
+	Geofences    map[string]*Geofence   `json:"geofences"`
+	FenceAlerts  []FenceAlert           `json:"fenceAlerts"`
+	inFence      map[string][]string
+	Papers       map[string]*Paper `json:"papers"`
+	paperCount   int
+	premGrid     grid
+	premIDs      []string
+	premIdx      map[string]int
+	histGrid     grid
+	yearCount    map[string]int // incidents per site and year, for numbering
 }
 
 func newState() *State {
-	return &State{
+	s := &State{
 		Settings: DefaultSettings(), Stations: map[string]*Station{}, Units: map[string]*Unit{},
 		CallTypes: map[string]*CallType{}, Incidents: map[string]*Incident{}, Calls: map[string]*Call{},
 		Emergencies: map[string]*Emergency{}, Users: map[string]*UserInfo{}, yearCount: map[string]int{},
@@ -191,6 +208,8 @@ func newState() *State {
 		Drones: map[string]*Drone{}, Care: map[string]*CareCase{}, Breaks: map[string]*Break{},
 		BOLOs: map[string]*BOLO{}, Facilities: map[string]*Facility{}, Plans: map[string]*ResponsePlan{}, Guidance: map[string]*GuidanceDoc{},
 	}
+	s.initRoadmap()
+	return s
 }
 
 func decode[T any](e ledger.Event) (T, error) {
@@ -206,6 +225,12 @@ func decode[T any](e ledger.Event) (T, error) {
 // an error, because the ledger was written by commands that validated it.
 func (s *State) apply(e ledger.Event) error {
 	s.Seq++ // events applied: the ledger's sequence on one site, the merged count on several
+	if ok, err := s.applyRoadmap(e); ok {
+		if err == nil {
+			s.afterApply(e)
+		}
+		return err
+	}
 	if ok, err := s.applyAuto(e); ok {
 		if err == nil {
 			s.afterApply(e)

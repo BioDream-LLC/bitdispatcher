@@ -1,6 +1,8 @@
+import { useState } from 'react'
+import { DirectoryDialog, ScheduleDialog } from './Roadmap'
 import { BreakButton } from './Dream'
 import { Link } from 'react-router-dom'
-import { Activity, CircleHelp, Cog, LogOut, Moon, Radio, Server, Siren, Sun, Phone, FileText, Database, MapIcon, MonitorCheck, LayoutDashboard } from 'lucide-react'
+import { Activity, CircleHelp, Cog, LogOut, Moon, Radio, Server, Siren, Sun, Phone, FileText, Database, MapIcon, MonitorCheck, LayoutDashboard, BookUser, CalendarClock, Gavel } from 'lucide-react'
 import { DISCIPLINES, lensName } from '../lens'
 import { screenDef, type ScreenKind } from '../screens'
 import { api } from '../api'
@@ -184,6 +186,7 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
           </span>
         </Tip>
         <BreakButton view={view} />
+        <RoadmapButtons view={view} />
         {onScreens && (
           <button className="btn btn-ghost px-1.5" onClick={onScreens} aria-label="Screens: spread this position over monitors" title="Screens: spread this position over monitors (Ctrl+Shift+S)">
             <MonitorCheck size={14} aria-hidden />
@@ -227,4 +230,20 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
 // psapTrouble: a PSAP the ESInet routes to whose queue or service is not normal (NENA state events).
 function psapTrouble(ps?: { queue?: string; service?: string }[]) {
   return (ps ?? []).some((p) => (p.queue && p.queue !== 'Active') || (p.service && p.service !== 'Normal'))
+}
+
+/** The contacts directory, the schedule and the papers to serve, one click from every console. */
+function RoadmapButtons({ view }: { view: View }) {
+  const me = useStore((s) => s.me)
+  const [open, setOpen] = useState<'' | 'dir' | 'sched'>('')
+  const police = me && (me.duty === 'police' || me.duty === 'dispatcher' || me.duty === 'records' || me.role === 'supervisor' || me.role === 'admin')
+  return (
+    <>
+      <button className="btn btn-ghost px-1.5" onClick={() => setOpen('dir')} aria-label="Contacts directory" title="Contacts directory and who is on call (DIR)"><BookUser size={14} aria-hidden /></button>
+      <button className="btn btn-ghost px-1.5" onClick={() => setOpen('sched')} aria-label="Scheduled calls and events" title="Scheduled calls and special events"><CalendarClock size={14} aria-hidden /></button>
+      {police && <Link to="/papers" className="btn btn-ghost px-1.5" aria-label="Warrants and papers" title="Warrants and papers to serve"><Gavel size={14} aria-hidden /></Link>}
+      {open === 'dir' && <DirectoryDialog onClose={() => setOpen('')} />}
+      {open === 'sched' && <ScheduleDialog view={view} onClose={() => setOpen('')} />}
+    </>
+  )
 }

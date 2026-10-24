@@ -7,7 +7,8 @@ import type { View } from '../types'
 type Ex = { key: string; level: 'urgent' | 'watch'; text: string; incident?: string }
 
 /** What needs a supervisor now, across the centre: emergencies, units that have not acknowledged, P1s
- * waiting, overdue status checks, notifications not made and newer caller locations not decided. */
+ * waiting, overdue status checks, notifications not made, newer caller locations not decided, roll calls overdue
+ * or crews unaccounted for, pages no one has answered and units short-staffed. */
 export default function Exceptions({ view }: { view: View }) {
   const now = useNow()
   const ack = (view.settings.ackSeconds || 60) * 1000
@@ -22,11 +23,20 @@ export default function Exceptions({ view }: { view: View }) {
     }
     const notify = (i.notices ?? []).filter((n) => n.status === 'pending' && now - Date.parse(n.at) > 5 * 60_000)
     if (notify.length) out.push({ key: 'n' + i.number, level: 'watch', text: `${name}: ${notify.map((n) => n.who).join(', ')} not yet notified`, incident: i.number })
+    if (i.fireground?.missing?.length) out.push({ key: 'm' + i.number, level: 'urgent', text: `${name}: ${i.fireground.missing.join(', ')} NOT ACCOUNTED FOR at the last roll call`, incident: i.number })
+    const due = Date.parse(view.roadmap?.parDue?.[i.number] ?? '')
+    if (due && now > due) out.push({ key: 'par' + i.number, level: now - due > 5 * 60_000 ? 'urgent' : 'watch', text: `${name}: roll call (PAR) overdue ${Math.round((now - due) / 60000)} min`, incident: i.number })
+    const rb = view.roadmap?.responders?.[i.number]
+    if (rb && rb.paged > 0 && rb.responding + rb.toScene === 0 && i.timeline.some((t) => t.kind === 'page' && now - Date.parse(t.at) > 5 * 60_000)) out.push({ key: 'pg' + i.number, level: 'watch', text: `${name}: paged ${rb.paged}, no one responding yet`, incident: i.number })
     if (i.newLocation && now - Date.parse(i.newLocation.at) > 60_000) out.push({ key: 'l' + i.number, level: 'watch', text: `${name}: a newer caller location waits for a decision`, incident: i.number })
   }
   for (const u of view.units) {
     const by = overdue(view, u, now)
     if (by > 0) out.push({ key: 'o' + u.id, level: by > 5 * 60_000 ? 'urgent' : 'watch', text: `${u.id} status check overdue ${Math.round(by / 60000)} min`, incident: u.incident })
+  }
+  for (const [unit, short] of Object.entries(view.roadmap?.staffing ?? {})) {
+    const u = view.units.find((x) => x.id === unit)
+    if (u && u.status !== 'oos') out.push({ key: 's' + unit, level: 'watch', text: `${unit} short-staffed: ${short.join(', ')}`, incident: u.incident })
   }
   return (
     <section className="max-h-[38%] shrink-0 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/70" aria-label="Exceptions">

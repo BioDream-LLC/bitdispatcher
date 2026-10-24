@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import * as maplibregl from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { toast } from 'sonner'
-import { FileText, Image as ImageIcon, LocateFixed, LogOut, MapPin, Navigation, Phone, Send, ShieldAlert, Siren } from 'lucide-react'
+import { FileText, Image as ImageIcon, LocateFixed, LogOut, MapPin, Navigation, Phone, Send, ShieldAlert, Siren, HardHat } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import NcicPanel from '../rms/NcicPanel'
 import type { Meta } from '../rms/Rms'
@@ -15,7 +15,8 @@ import PremiseBox from '../console/PremiseBox'
 import { ViewsButton } from '../views/PlaceViews'
 import MdtMessages from './Messages'
 import { clock, cx, mi, prio, statusMeta, useNow } from '../util'
-import type { BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, UnitMessage, View } from '../types'
+import { CrewDialog } from '../console/Roadmap'
+import type { MemberBrief, PaperFlag, BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, UnitMessage, View } from '../types'
 import { dispatchStyle } from '../console/mapStyle'
 
 maplibregl.setWorkerUrl(workerUrl)
@@ -25,6 +26,7 @@ type MDTView = {
   emergency?: { key: string; raised: string; ackedBy?: string }; pending: Incident[]; statuses: string[]; bolos?: BOLO[]
   settings: { agency: string; mapCenter: [number, number]; mapZoom: number; avlStaleSeconds: number; markOuts?: MarkOutType[] }
   health: View['health']; placeViews?: boolean; messages?: UnitMessage[]; selfAttach?: boolean
+  roster?: MemberBrief[]; staffing?: string[]; alarm?: string; cautions?: { id: string; name: string; note: string }[]; papers?: PaperFlag
 }
 
 // The next status a crew normally gives, so it is the big button.
@@ -48,6 +50,7 @@ export default function Mdt() {
   const now = useNow()
   const nav = useNavigate()
   const [ncic, setNcic] = useState(false)
+  const [crewOpen, setCrewOpen] = useState(false)
   const [rmsMeta, setRmsMeta] = useState<Meta | null>(null)
   const unitParam = me?.role === 'field' ? '' : `?unit=${encodeURIComponent(me?.console ?? '')}`
   const load = () => api.get<MDTView>('/mdt' + unitParam).then((v) => { setM(v); setErr('') }).catch((e) => setErr(errText(e)))
@@ -167,6 +170,7 @@ export default function Mdt() {
         }}><FileText size={14} aria-hidden /> Report</button>}
         <button className="btn h-9" onClick={() => api.get<Meta>('/rms/meta').then((x) => { setRmsMeta(x); setNcic(true) }).catch((e) => toast.error(errText(e)))}><ShieldAlert size={14} aria-hidden /> NCIC</button>
         <Link to="/rms" className="btn h-9">My reports</Link>
+        {(m.roster?.length ?? 0) > 0 && <button className="btn h-9" onClick={() => setCrewOpen(true)}><HardHat size={14} aria-hidden /> Crew {u!.crew?.length ? `(${u!.crew.length})` : ''}</button>}
         <span className="text-xs text-slate-500">{me?.name}</span>
         <button className="btn" onClick={signOut} aria-label="Sign out"><LogOut size={14} aria-hidden /></button>
       </header>
@@ -181,8 +185,11 @@ export default function Mdt() {
                 <div className="flex items-center gap-2">
                   <span className={cx('rounded px-2 py-0.5 font-mono text-lg font-black', prio(inc.priority).bg, prio(inc.priority).fg)}>P{inc.priority}</span>
                   <span className="text-xl font-bold">{m.typeName}</span>
+                  {m.alarm && <span className="chip bg-orange-500/30 text-base text-orange-100">{m.alarm}</span>}
                   <span className="ml-auto font-mono text-sm text-slate-400">{inc.number}</span>
                 </div>
+                {m.papers && <div role="alert" className="mt-2 rounded border border-rose-600 bg-rose-950/50 px-2 py-1 text-base font-bold text-rose-100">{m.papers.count} active {m.papers.count === 1 ? 'paper' : 'papers'} at this address ({m.papers.kinds.join(', ')}){m.papers.caution ? ` · CAUTION: ${m.papers.caution}` : ''}</div>}
+                {(m.cautions ?? []).map((c) => <div key={c.id} role="note" className="mt-2 rounded border border-yellow-600 bg-yellow-500/10 px-2 py-1 text-sm text-yellow-100"><b>{c.name}:</b> {c.note}</div>)}
                 <div className="mt-2 flex items-start gap-2 text-2xl font-bold leading-tight text-amber-200">
                   <MapPin size={22} className="mt-1 shrink-0" aria-hidden /> {inc.location?.address || (inc.location?.lat != null ? `${inc.location.lat.toFixed(5)}, ${inc.location.lon!.toFixed(5)}` : 'No location yet')}
                 </div>
@@ -294,6 +301,10 @@ export default function Mdt() {
         <MdtMap m={m} route={route} here={here} />
       </div>
       {rmsMeta && <NcicPanel open={ncic} onOpenChange={setNcic} meta={rmsMeta} reason={inc?.number ?? ''} />}
+      {crewOpen && (
+        <CrewDialog view={{ units: [m.unit], roadmap: { members: m.roster ?? [] } } as unknown as View} unitId={m.unit.id} onClose={() => { setCrewOpen(false); load() }}
+          save={async (crew) => { await api.put('/mdt/crew' + unitParam, { crew }) }} />
+      )}
     </div>
   )
 }

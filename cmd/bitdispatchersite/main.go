@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"html"
+	"image/png"
 	"io"
 	"os"
 	"os/exec"
@@ -322,8 +323,10 @@ func copyShots(root, out string) error {
 		}
 		var cmd *exec.Cmd
 		switch {
-		case cwebp != "":
+		case cwebp != "" && widerThan(f, 1600):
 			cmd = exec.Command(cwebp, "-quiet", "-q", "82", "-resize", "1600", "0", f, "-o", dst)
+		case cwebp != "":
+			cmd = exec.Command(cwebp, "-quiet", "-q", "82", f, "-o", dst) // never enlarged
 		case convert != "":
 			cmd = exec.Command(convert, f, "-resize", "1600x>", "-quality", "82", dst)
 		}
@@ -339,6 +342,17 @@ func copyShots(root, out string) error {
 		pngFallback = true
 	}
 	return nil
+}
+
+// widerThan says whether a PNG is wider than w pixels (unreadable: assumed so).
+func widerThan(path string, w int) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return true
+	}
+	defer f.Close()
+	c, err := png.DecodeConfig(f)
+	return err != nil || c.Width > w
 }
 
 // pngFallback is set when the screenshots were copied as PNGs; the layout then rewrites the pages' .webp references.

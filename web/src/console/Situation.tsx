@@ -9,6 +9,7 @@ import { activity as doing, ago, clock, cx, ms, overdue, statusMeta, typeName, u
 import type { Call, Coverage, View } from '../types'
 import { Passdown, BOLOs, Facilities, Messages } from './Ops'
 import { CallBox, UnitDetail } from './IncidentPanel'
+import { TodayBox } from './Roadmap'
 
 const LABEL: Record<string, string> = {
   'incident.created': 'created', 'incident.dispatch': 'dispatched to', 'incident.note': 'noted on', 'incident.changed': 'changed',
@@ -55,6 +56,7 @@ export default function Situation({ view, onCreateFromCall }: { view: View; onCr
           </div>
         )}
         {selUnit && <UnitDetail view={view} id={selUnit} />}
+        <TodayBox view={view} />
         <Messages view={view} />
         <Passdown view={view} />
         <BOLOs view={view} />

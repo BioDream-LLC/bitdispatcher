@@ -237,10 +237,39 @@ export default function SettingsPage({ view }: { view: View }) {
           </div>
         </section>
         <section className="panel space-y-3 rounded-lg p-4 lg:col-span-2">
+          <h2 className="font-semibold text-slate-100">Crews, the fire ground and tows</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Qualifications" htmlFor="quals" hint="Separated by commas: offered on the roster (Personnel & crews)"><input id="quals" className="input font-mono" key={'q' + (s.qualifications ?? []).join()} defaultValue={(s.qualifications ?? []).join(', ')} onBlur={(e) => up({ qualifications: e.target.value.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean) })} /></Field>
+            <Field label="Roll call (PAR) every, minutes" htmlFor="parm" hint="At a fire whose call type asks for accountability; 0: 20"><input id="parm" type="number" min={0} max={60} className="input w-24 font-mono" value={s.parMinutes ?? 0} onChange={(e) => up({ parMinutes: Number(e.target.value) })} /></Field>
+            <div className="md:col-span-2">
+              <span className="label">What a capability needs of a crew</span>
+              <p className="mb-1 text-xs text-slate-500">Only for units whose crew is recorded: a unit without the qualification aboard loses the capability (a medic with no paramedic is not sent as ALS). {s.capNeeds == null && 'Now: the default, ALS needs a paramedic.'}</p>
+              <ul className="space-y-1">
+                {(s.capNeeds ?? [{ capability: 'als', qualification: 'paramedic', count: 1 }]).map((n, i, all) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <input aria-label={`Need ${i + 1} capability`} className="input w-32 font-mono" value={n.capability} onChange={(e) => up({ capNeeds: all.map((x, j) => (j === i ? { ...x, capability: e.target.value.trim().toLowerCase() } : x)) })} />
+                    <span className="text-slate-500">needs</span>
+                    <input aria-label={`Need ${i + 1} count`} type="number" min={1} max={6} className="input w-16 font-mono" value={n.count || 1} onChange={(e) => up({ capNeeds: all.map((x, j) => (j === i ? { ...x, count: Number(e.target.value) } : x)) })} />
+                    <input aria-label={`Need ${i + 1} qualification`} className="input w-40 font-mono" value={n.qualification} onChange={(e) => up({ capNeeds: all.map((x, j) => (j === i ? { ...x, qualification: e.target.value.trim().toLowerCase() } : x)) })} />
+                    <span className="text-slate-500">aboard</span>
+                    <button className="btn btn-ghost px-1.5" aria-label={`Remove need ${i + 1}`} onClick={() => up({ capNeeds: all.filter((_, j) => j !== i) })}><X size={13} aria-hidden /></button>
+                  </li>
+                ))}
+              </ul>
+              <button className="btn mt-1" onClick={() => up({ capNeeds: [...(s.capNeeds ?? [{ capability: 'als', qualification: 'paramedic', count: 1 }]), { capability: '', qualification: '', count: 1 }] })}><Plus size={13} aria-hidden /> Add a need</button>
+            </div>
+            <Field label="Fire-ground benchmarks" htmlFor="bms" hint="One a line: a code, a space, the name (BM PS on the command line). Empty: the usual ones"><textarea id="bms" rows={4} className="input font-mono" key={'b' + JSON.stringify(s.benchmarks ?? [])} defaultValue={(s.benchmarks ?? []).map((b) => `${b.code} ${b.name}`).join('\n')} onBlur={(e) => up({ benchmarks: e.target.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const [c, ...rest] = l.split(/\s+/); return { code: c.toUpperCase(), name: rest.join(' ') || c } }) })} /></Field>
+            <div className="space-y-3">
+              <Field label="Tow classes" htmlFor="towc" hint="Separated by commas; empty: light, medium, heavy"><input id="towc" className="input font-mono" key={'tc' + (s.towClasses ?? []).join()} defaultValue={(s.towClasses ?? []).join(', ')} onBlur={(e) => up({ towClasses: e.target.value.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean) })} /></Field>
+              <Field label="Tow zones" htmlFor="towz" hint="Separated by commas: each zone has its own rotation; empty: one for the whole area"><input id="towz" className="input" key={'tz' + (s.towZones ?? []).join()} defaultValue={(s.towZones ?? []).join(', ')} onBlur={(e) => up({ towZones: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
+            </div>
+          </div>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4 lg:col-span-2">
           <h2 className="font-semibold text-slate-100">Unit types</h2>
           <p className="text-xs text-slate-400">The kinds of unit and the capabilities each has. Run cards ask for capabilities; a unit can add its own. Kinds kept covered get move-up suggestions when a station has none available.</p>
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500"><th>Code</th><th>Name</th><th>Discipline</th><th>Capabilities</th><th title="Suggest move-ups when a station has none of this kind available">Keep covered</th><th /></tr></thead>
+            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500"><th>Code</th><th>Name</th><th>Discipline</th><th>Capabilities</th><th title="Suggest move-ups when a station has none of this kind available">Keep covered</th><th title="How many aboard to be fully staffed, when crews are recorded">Minimum aboard</th><th /></tr></thead>
             <tbody>
               {s.unitTypes.map((t, i) => (
                 <tr key={i}>
@@ -253,6 +282,7 @@ export default function SettingsPage({ view }: { view: View }) {
                   </td>
                   <td className="pr-2"><input aria-label="Capabilities" className="input font-mono" value={t.capabilities.join(', ')} onChange={(e) => upType(i, { capabilities: e.target.value.split(/[,\s]+/).filter(Boolean) })} /></td>
                   <td className="pr-2 text-center"><input type="checkbox" aria-label={`Keep ${t.name} covered`} checked={t.cover ?? COVER.includes(t.code)} onChange={(e) => upType(i, { cover: e.target.checked })} /></td>
+                  <td className="pr-2"><input type="number" min={0} max={12} aria-label={`${t.name} minimum aboard`} className="input w-20 font-mono" value={t.minStaff ?? 0} onChange={(e) => upType(i, { minStaff: Number(e.target.value) || undefined })} /></td>
                   <td><button className="btn btn-ghost px-1.5" aria-label={`Remove ${t.name}`} onClick={() => up({ unitTypes: s.unitTypes.filter((_, j) => j !== i) })}><X size={13} aria-hidden /></button></td>
                 </tr>
               ))}

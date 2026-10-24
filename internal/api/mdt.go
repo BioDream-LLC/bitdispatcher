@@ -79,6 +79,13 @@ type MDTView struct {
 	PlaceViews bool           `json:"placeViews,omitempty"` // pictures of the place from the side can be looked up
 	Messages   []*cad.Message `json:"messages"`             // the last day's messages to and from this unit
 	SelfAttach bool           `json:"selfAttach,omitempty"` // the crew may attach itself to a waiting incident
+	// The roster to pick the crew from, the incident's alarm, cautions of the area and warrants at the
+	// address (police units only).
+	Roster   []MemberBrief  `json:"roster"`
+	Staffing []string       `json:"staffing,omitempty"`
+	Alarm    string         `json:"alarm,omitempty"`
+	Cautions []CautionBrief `json:"cautions,omitempty"`
+	Papers   *PaperFlag     `json:"papers,omitempty"`
 }
 
 func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
@@ -138,6 +145,35 @@ func (s *Server) mdt(w http.ResponseWriter, r *http.Request, se *auth.Session, a
 			}
 		}
 		v.Messages = copyMessages(st.MessagesFor(unit, time.Now().Add(-messageWindow)))
+		v.Roster = []MemberBrief{}
+		for _, m := range st.Roster() {
+			if !m.Inactive {
+				v.Roster = append(v.Roster, MemberBrief{ID: m.ID, Name: m.Name, Rank: m.Rank, Quals: m.Quals, Station: m.Station, Volunteer: m.Volunteer, Riding: st.RidingOn(m.ID)})
+			}
+		}
+		v.Staffing = st.Staffing(st.Units[unit])
+		if in := st.Incidents[st.Units[unit].Incident]; in != nil {
+			if in.AlarmLevel() > 1 {
+				v.Alarm = st.AlarmName(in)
+			}
+			if in.Location.HasPoint() {
+				for _, g := range st.CautionsAt(*in.Location.Lat, *in.Location.Lon) {
+					v.Cautions = append(v.Cautions, CautionBrief{ID: g.ID, Name: g.Name, Note: g.Note})
+				}
+			}
+			if ps := st.PapersNear(in.Location); len(ps) > 0 {
+				f := PaperFlag{Count: len(ps)}
+				for _, p := range ps {
+					if !slices.Contains(f.Kinds, p.Kind) {
+						f.Kinds = append(f.Kinds, p.Kind)
+					}
+					if p.Caution != "" {
+						f.Caution = strings.TrimPrefix(f.Caution+"; "+p.Caution, "; ")
+					}
+				}
+				v.Papers = &f
+			}
+		}
 		v.SelfAttach = st.Settings.Duties.SelfAttach
 		v.Settings.Agency, v.Settings.MapCenter, v.Settings.MapZoom, v.Settings.AVLStale = st.Settings.Agency, st.Settings.MapCenter, st.Settings.MapZoom, st.Settings.AVLStaleSeconds
 		v.Settings.MarkOuts = []cad.MarkOutType{}

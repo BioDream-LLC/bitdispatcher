@@ -33,3 +33,18 @@ func Drive(lat1, lon1, lat2, lon2, roadFactor, kmh float64) Estimate {
 	m := Distance(lat1, lon1, lat2, lon2) * roadFactor
 	return Estimate{Metres: m, Seconds: m / (kmh * 1000 / 3600)}
 }
+
+// InPolygon reports whether a point is inside a polygon ring of [lon, lat] points (the ring may be open
+// or closed). Points on an edge may fall either side.
+func InPolygon(lat, lon float64, ring [][2]float64) bool {
+	in := false
+	n := len(ring)
+	for i, j := 0, n-1; i < n; j, i = i, i+1 {
+		xi, yi := ring[i][0], ring[i][1]
+		xj, yj := ring[j][0], ring[j][1]
+		if (yi > lat) != (yj > lat) && lon < (xj-xi)*(lat-yi)/(yj-yi)+xi {
+			in = !in
+		}
+	}
+	return in
+}

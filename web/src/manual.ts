@@ -13,6 +13,8 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
     ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
+  { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports and papers to serve.',
+    ids: ['alarms', 'admin-personnel', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'unit-history', 'epcr', 'papers'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
     ids: ['admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
@@ -276,7 +278,13 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
 | \`TG <talkgroup>\` | Set the selected incident's talkgroup |
 | \`BOLO <text>\` | Issue a BOLO for the selected incident, or none |
 | \`ATTACH <call> #26-000123\` | Attach a 911 call to an incident |
-| \`ACK\` | Acknowledge the oldest open emergency |`,
+| \`ACK\` | Acknowledge the emergency in the red bar (the newest) |
+| \`ALARM\` · \`ALARM 3\` · \`2ND\` | Upgrade the selected incident to its next alarm (or a level); \`REC\` then sends the extra units. See [Alarm levels](#alarms) |
+| \`PAR\` · \`PAR MISSING E3\` · \`PAR FOUND E3\` | Record a roll call of the crews on scene. See [Accountability](#accountability) |
+| \`BM UC\` | Record a fire-ground benchmark (UC fire under control, PS primary search…) |
+| \`TOW\` · \`TOW heavy North / VA ABC-1234\` | Call the next tow company on the rotation. See [Tow rotation](#admin-tows) |
+| \`PAGE <group> / text\` | Page a responder group about the selected incident. See [Paging](#admin-paging) |
+| \`DIR water\` | Look up the contacts directory. See [Directory](#admin-directory) |`,
   },
   {
     id: 'keys', title: 'Keyboard', keys: 'keyboard shortcuts keys hotkeys f2 ctrl k f7',
@@ -929,6 +937,119 @@ A request names a requester, a contact, what is asked for, the incidents, and wh
 4. **Approve and release** is the moment a person authorises the release: accepted redactions are applied permanently and the copy is checked for leaks before it leaves. A released copy can then be downloaded, and its hash is shown.
 
 > Records work needs the records duty, a supervisor or an administrator.`,
+  },
+  {
+    id: 'alarms', title: 'Alarm levels: 2nd and 3rd alarms', keys: 'alarm 2nd 3rd second third upgrade greater alarm box working fire run card',
+    body: `A working fire outgrows its first run card. Each call type may have **further alarms** (Admin › Call types): the 2nd alarm, the 3rd, each adding units to what the incident needs. The first alarm is the call type's own run card.
+
+## Upgrading
+- On the incident, **Upgrade to 2nd alarm** says what it adds (\`+2 engine, 1 ladder…\`); or type \`ALARM\` (\`2ND\`, \`3RD\`, \`ALARM 3\` for a level).
+- The upgrade is a priority line on the timeline every dispatcher and crew sees, with what it adds.
+- The recommendation then fills the bigger run card, counting the units already there, and \`REC\` (or Ctrl Enter) sends the extra units. Paging groups and station alerts follow the dispatch as usual.
+- **Bring down** goes back a level, with a reason.
+
+
+> Setting up: Admin › Call types › a type › Further alarms. Each alarm has a name and run-card lines (capability and count). The structure fire type comes with a 2nd and 3rd alarm to edit.`,
+  },
+  {
+    id: 'admin-personnel', title: 'Personnel and crews', route: '/admin/personnel', keys: 'personnel roster crew staffing members qualifications paramedic minimum staffing shift riding',
+    body: `The **roster** is the agency's people: a number, name, rank, qualifications (paramedic, EMT, driver, officer…), home station, and how to page them (a phone for texts, an email, a push topic). Add them one by one or **Import from CSV** (columns: id, name, rank, qualifications separated by ;, station, phone, email, volunteer).
+
+## Who is aboard
+On any unit (the unit's panel › Crew › change) or from the crew's own terminal (**Crew**), pick who rides it this shift. A member is on one unit at a time: putting them on another moves them. The incident's timeline records crew changes on a unit working it.
+
+## What staffing changes
+- **Minimum aboard** (Admin › Settings › Unit types, or per unit in Admin › Units): a unit below it is shown short-staffed, in the recommendation's reasons and on the supervisor's exceptions.
+- **What a capability needs** (Admin › Settings › Crews): by default ALS needs a paramedic aboard. A medic whose recorded crew has no paramedic is not recommended for an ALS line (it is still BLS and transport).
+- A unit with **no crew recorded** is taken as staffed: an agency that does not keep rosters here sees no change.
+
+> Dispatchers see the roster without phone numbers and emails; supervisors see them.`,
+  },
+  {
+    id: 'accountability', title: 'Fire-ground accountability: roll calls (PAR)', keys: 'par personnel accountability report roll call benchmark elapsed time mayday missing crew fire ground',
+    body: `At a working fire the incident commander takes a **roll call** (a PAR) of every crew on scene at set intervals, and dispatch keeps the clock.
+
+- A call type marked **Fire-ground accountability** (Admin › Call types) starts the clock when the first unit arrives on scene; **Start roll calls** starts it on any fire incident.
+- The incident shows the time since the clock started and when the next PAR is due; it turns amber when overdue, and the supervisor's board lists it.
+- **All accounted for** (or \`PAR\`) records a roll call of every crew on scene. A crew that did not answer: click it, then **Report … missing** (or \`PAR MISSING E3\`). That is a red, flashing line on the incident and an urgent exception for the supervisor until **E3 found** (\`PAR FOUND E3\`).
+- **Benchmarks** the commander reports (primary search complete, fire under control, loss stopped…) are one click each, or \`BM UC\`, with the time since the incident started.
+- The clock stops when the incident closes; it cannot be stopped while a crew is missing.
+
+> The interval is 20 minutes unless changed in Admin › Settings or on the call type.`,
+  },
+  {
+    id: 'admin-paging', title: 'Paging responders', route: '/admin/paging', keys: 'paging page pager volunteer off duty sms text email push ntfy twilio iamresponding active911 responding groups',
+    body: `Volunteer and off-duty firefighters and EMTs are called by **page**. A **paging group** says who is paged together and how:
+- **Members** from the roster ([Personnel](#admin-personnel)).
+- **Gateways**: how pages go out, set up by an administrator in Admin › Integrations › Paging: a text by Twilio, an email, a push to phones by ntfy, a webhook, or IamResponding and Active911 (both take dispatch by email in their documented formats).
+- **Automatic**: page the group when one of its units or stations is dispatched, or when an incident of one of its call types gets units. Each group is paged once per incident by its rule.
+
+## A page
+The page's subject is the call type and address, the text the incident's summary and units. Each person gets a link to answer: **Responding to the station**, **Going straight to the scene**, or **Not available**, with when they expect to arrive. No sign-in: the link is the key, and works only for that person and that page.
+
+On the incident, **Responders** shows how many were paged and responding, each person's answer and minutes away; **Page** pages more groups. \`PAGE <group> / text\` does it from the command line. A page no one has answered after five minutes is on the supervisor's exceptions; failed deliveries are on the timeline.
+
+> Set the **address responders open** (Admin › Integrations › Paging) to the address phones reach this server at; without it pages go out with no answer link. Tested against stand-ins for Twilio, ntfy, email and a webhook; not certified by IamResponding or Active911.`,
+  },
+  {
+    id: 'admin-tows', title: 'Tow rotation', route: '/admin/tows', keys: 'tow rotation wrecker towing company class zone heavy light owner choice declined turn',
+    body: `Police call wreckers from approved companies **in turn**. Each company tows some classes (light, medium, heavy) in some zones (Admin › Settings lists both; one zone for the whole area by default).
+
+- **Next on rotation** on the incident (or \`TOW\`, \`TOW heavy North\`) gives the company whose last turn in that class and zone is the oldest, with its number to call, and records the call.
+- Mark what they said: **Accepted**, **Declined** or **No answer** (both lose the turn; ask for the next), then **Arrived** or **Cancel**.
+- An **owner's choice** or **officer's choice** of company is recorded but takes no one's turn.
+- A suspended company is passed over, and the rotation screen says why each company is or is not offered.
+
+Every request and answer is on the incident's timeline and in the ledger, so the rotation's fairness can be shown.`,
+  },
+  {
+    id: 'schedule', title: 'Scheduled calls and special events', keys: 'schedule scheduled call transport event special event standby fair parade repeat daily weekly',
+    body: `Work known ahead of time (the calendar button in the status bar):
+- A **scheduled call** (a planned transport, an escort, a business check) becomes an incident by itself at its time, or a set number of minutes early, and sends its units if they are available (those that are not are named on the incident).
+- A **special event** (a fair, a parade, a game) becomes a standby incident for its hours, and is listed as running on every console.
+- Either can repeat every day, on weekdays or every week, until a last day.
+
+**Scheduled today** on the situation panel lists what is coming in the next 24 hours and what is running now. An occurrence missed by more than an hour (the server was down) is not made late; it is skipped and recorded.`,
+  },
+  {
+    id: 'admin-directory', title: 'Contacts directory and on-call lists', route: '/admin/directory', keys: 'directory contacts phone numbers utility on call rota call out list notify agency medical examiner interpreter',
+    body: `The numbers dispatch calls: utilities, agencies, the medical examiner, interpreters, public works. Each entry has numbers with labels (after hours, cell), an email, notes and tags.
+
+- **On-call lists** say who answers tonight: shifts of directory entries by date and time, with a backup when no shift covers the time.
+- An entry or list can be on the **call-out list** of call types: every incident of the type lists **To call** with the person on call now and the number (a tap calls it on a phone), and **Called** logs it on the incident. A call type's notifications (Admin › Call types › Notify) are matched to entries by name, organisation or tag.
+- The directory button in the status bar (or \`DIR water\`) searches by name, organisation, tag or number; the situation panel shows who is on call now.`,
+  },
+  {
+    id: 'admin-geofences', title: 'Areas on the map (geofences)', route: '/admin/geofences', keys: 'geofence area zone polygon alert enter leave caution school zone map draw',
+    body: `Areas drawn on the map:
+- An **alert area** tells dispatch when a unit enters or leaves it (a unit leaving the county, entering a hazard zone, arriving at a hospital): a notice on every console, the situation panel's **Area alerts**, and a line on the unit's incident. It can watch only some disciplines or units.
+- A **caution area** puts its note on every incident inside it (a school zone, a firing range, a block known for trouble), on the console and the crews' terminals.
+
+**Draw a new area**: click the corners on the map, then Finish. Areas show on the console map, dashed. Whether a unit is inside is worked out from its positions as they arrive, so an area drawn around a unit already there is not an arrival.`,
+  },
+  {
+    id: 'unit-history', title: "A unit's status history", keys: 'unit status history day utilisation timeline committed time csv',
+    body: `**History** on a unit's panel shows its day from the ledger: a bar of its statuses across the day, every status with when, how long, the incident and who changed it, its status checks, crew changes and move-ups, the incidents it worked, and the share of its known time spent on incidents. Pick another day with the date; **CSV** downloads the same.`,
+  },
+  {
+    id: 'epcr', title: 'Patient-care reports (NEMSIS)', keys: 'epcr nemsis patient care report ems hand off times eTimes eDispatch imagetrend eso',
+    body: `An EMS crew writes its patient-care report in its ePCR system; the dispatch part (when the call came in, when the unit was notified, en route, on scene, left the scene, at the hospital, back in service, where, and the dispatch reason) comes from bitdispatcher.
+
+- **NEMSIS** on an EMS unit of the incident downloads its response as a NEMSIS 3.5 record, to import into any ePCR that takes NEMSIS files.
+- With a patient-care report system set up (Admin › Integrations › Patient-care reports), **Send** posts it there, and **automatic** sends each EMS unit's response when it clears. What the system answered is on the incident.
+- The dispatch reason is the call type's NEMSIS code (Admin › Call types), or suggested from its name.
+
+> The record carries dispatch, times and the scene only; the crew completes the patient sections. It follows the NEMSIS 3.5.1 schema for those sections; tested against a stand-in, not a vendor's system.`,
+  },
+  {
+    id: 'papers', title: 'Warrants and papers to serve', route: '/papers', keys: 'warrant warrants civil process paper service protective order eviction summons subpoena serve attempt caution',
+    body: `The papers a sheriff's office or police department holds to serve: arrest and bench warrants, protective orders, evictions, summonses and subpoenas (the gavel button in the status bar). Each has the person, where to serve it, the court and number, any **caution** (armed, violent, dog), and every attempt.
+
+- An incident near the address of an active paper (or naming its person) shows **active paper at this address** with the caution to every console and to the police crews' terminals; **Details** (police dispatch, records and supervisors) shows the papers.
+- **Record the attempt**: the unit, the result (no answer, not there, moved, refused, served) and a note. Served closes it; **Recalled** and **Returned unserved** need a reason.
+- Every look at the papers is recorded in the ledger.
+
+> Confirm every warrant with the issuing agency (and NCIC where it applies) before acting on it.`,
   }
 ]
 
