@@ -216,7 +216,7 @@ func (s *Server) ibrMonth(r *http.Request) (ibr.Submission, error) {
 	if err != nil {
 		return ibr.Submission{}, &cad.Problem{Field: "month", Message: "the month is YYYY-MM"}
 	}
-	sub := ibr.Submission{Year: m.Year(), Month: int(m.Month()), Loc: time.Local}
+	sub := ibr.Submission{Year: m.Year(), Month: int(m.Month()), Loc: time.Local, FBI: r.URL.Query().Get("format") == "fbi"}
 	s.Eng.Read(func(st *cad.State) {
 		sub.ORI = strings.ToUpper(st.Settings.ORI)
 		for _, rp := range st.Reports {
@@ -266,8 +266,8 @@ func (s *Server) ibrFile(w http.ResponseWriter, r *http.Request, se *auth.Sessio
 	}
 	sort.Strings(nums)
 	s.Eng.Record(a, cad.EvIBRExported, map[string]any{"month": fmt.Sprintf("%04d-%02d", sub.Year, sub.Month), "ori": sub.ORI, "reports": nums,
-		"incidents": sum.Incidents, "arrests": sum.Arrests, "zero": sum.Zero, "sha256": hex.EncodeToString(h[:])})
+		"incidents": sum.Incidents, "arrests": sum.Arrests, "zero": sum.Zero, "fbi": sub.FBI, "sha256": hex.EncodeToString(h[:])})
 	w.Header().Set("Content-Type", "text/plain; charset=us-ascii")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%04d%02d.ibr.txt"`, sub.ORI, sub.Year, sub.Month))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%04d%02d.%s.txt"`, sub.ORI, sub.Year, sub.Month, map[bool]string{true: "nibrs", false: "ibr"}[sub.FBI]))
 	w.Write(b)
 }

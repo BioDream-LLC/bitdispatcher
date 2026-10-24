@@ -56,7 +56,7 @@ func (s *State) applyRoadmap(e ledger.Event) (bool, error) {
 		}
 		return true, nil
 	}
-	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts} {
 		if ok, err := f(e); ok {
 			return true, err
 		}
@@ -75,4 +75,5 @@ func (s *State) initRoadmap() {
 	s.Members, s.PageGroups, s.TowCompanies = map[string]*Member{}, map[string]*PageGroup{}, map[string]*TowCompany{}
 	s.Scheduled, s.Directory, s.OnCall = map[string]*Scheduled{}, map[string]*DirEntry{}, map[string]*OnCallList{}
 	s.Geofences, s.Papers, s.inFence = map[string]*Geofence{}, map[string]*Paper{}, map[string][]string{}
+	s.AlertLists, s.Alerts = map[string]*AlertList{}, []*PublicAlert{}
 }

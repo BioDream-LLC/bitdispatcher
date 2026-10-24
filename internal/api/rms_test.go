@@ -110,6 +110,9 @@ func TestIBRFile(t *testing.T) {
 	if code != 200 || len(b) != 45 || string(b[4:6]) != "0A" {
 		t.Fatalf("file: %d %q", code, b)
 	}
+	if code, b = a.do("POST", "/api/rms/ibr?month="+month+"&format=fbi", nil, true); code != 200 || string(b[:6]) != "00430A" {
+		t.Fatalf("FBI file: %d %q", code, b)
+	}
 	d := login(t, ts, "d1", pw["d1"])
 	if code, _ := d.do("POST", "/api/rms/ibr?month="+month, nil, true); code != 403 {
 		t.Fatalf("a dispatcher made the state file: %d", code)

@@ -11,6 +11,7 @@ import { can, store, useStore } from '../store'
 import { avl, cx, hasPoint, mins, ms, prio, statusMeta, useNow, overdue } from '../util'
 import type { Recommendation, RouteView, SearchResult, View } from '../types'
 import { dispatchStyle, type Theme } from './mapStyle'
+import { alertAreas } from './PublicAlerts'
 
 maplibregl.setWorkerUrl(workerUrl)
 
@@ -268,6 +269,11 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
     ensure('fences', { type: 'FeatureCollection', features: fences }, () => {
       m.addLayer({ id: 'fence-fill', type: 'fill', source: 'fences', paint: { 'fill-color': ['match', ['get', 'kind'], 'caution', '#facc15', '#fb923c'], 'fill-opacity': 0.07 } })
       m.addLayer({ id: 'fence-line', type: 'line', source: 'fences', paint: { 'line-color': ['match', ['get', 'kind'], 'caution', '#facc15', '#fb923c'], 'line-width': 1.4, 'line-dasharray': [4, 2], 'line-opacity': 0.7 } })
+    })
+    // Public alerts in force: red for real ones, amber for tests and exercises.
+    ensure('palerts', { type: 'FeatureCollection', features: alertAreas(view.roadmap?.publicAlerts) }, () => {
+      m.addLayer({ id: 'palert-fill', type: 'fill', source: 'palerts', paint: { 'fill-color': ['case', ['==', ['get', 'real'], 1], '#f43f5e', '#f59e0b'], 'fill-opacity': 0.12 } })
+      m.addLayer({ id: 'palert-line', type: 'line', source: 'palerts', paint: { 'line-color': ['case', ['==', ['get', 'real'], 1], '#f43f5e', '#f59e0b'], 'line-width': 2, 'line-opacity': 0.8 } })
     })
     const circles: GeoJSON.Feature[] = []
     for (const c of view.calls) {

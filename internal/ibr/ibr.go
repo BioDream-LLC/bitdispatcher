@@ -29,7 +29,15 @@ type Submission struct {
 	Reports []cad.RMSReport // approved reports
 	Deletes []Delete        // reports sent before and since changed or withdrawn
 	Loc     *time.Location  // the agency's time zone, for incident dates and hours
+	// FBI writes the FBI's own layout, without Virginia's additions: for states that take the national
+	// flat file, and for checking with the FBI's and SEARCH's validators.
+	FBI bool
 }
+
+// fbiLength is each level's length in the FBI layout. Virginia's additions all follow the FBI's fields
+// (VA 2025.2 Technical Specification), so the FBI segment is the Virginia one cut short; the Group A
+// arrestee is longer, with its clearance fields (80 to 110) left blank.
+var fbiLength = map[byte]int{'0': 43, '1': 87, '2': 71, '3': 307, '4': 141, '6': 110, '7': 66}
 
 // Delete withdraws an incident sent before (Group A: its number and incident date).
 type Delete struct {
@@ -127,6 +135,17 @@ func (w *writer) seg(length int, level, action byte, number string) segment {
 }
 
 func (w *writer) add(b segment) {
+	if n, ok := fbiLength[b[4]]; ok && w.s.FBI {
+		if b[4] == '6' {
+			copy(b[79:85], "      ") // Virginia's drug pairs
+		}
+		if len(b) > n {
+			b = b[:n]
+		} else {
+			b = append(b, bytes.Repeat([]byte{' '}, n-len(b))...)
+		}
+		b.num(1, 4, n)
+	}
 	w.buf.Write(b)
 	w.buf.WriteString("\r\n")
 	w.n++
@@ -343,6 +362,12 @@ func (w *writer) incident(r cad.RMSReport) {
 			}
 		}
 		w.add(g)
+	}
+
+	// Every arrestee is an offender (NIBRS 656): one arrested and not listed as a suspect is one too.
+	for _, p := range arrestees[min(len(suspects), len(arrestees)):] {
+		p.Role = "suspect"
+		suspects = append(suspects, p)
 	}
 
 	// Level 5, offenders: 00 when nothing is known.

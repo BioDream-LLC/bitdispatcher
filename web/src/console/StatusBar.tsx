@@ -10,6 +10,7 @@ import { can, store, useStore } from '../store'
 import { Logo, Tip } from '../ui'
 import { ago, cx, discipline, ms, useNow } from '../util'
 import type { View } from '../types'
+import { PublicAlertsButton } from './PublicAlerts'
 
 const THEMES = ['midnight', 'dark', 'night', 'light'] as const
 
@@ -187,6 +188,7 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
         </Tip>
         <BreakButton view={view} />
         <RoadmapButtons view={view} />
+        <PublicAlertsButton view={view} />
         {onScreens && (
           <button className="btn btn-ghost px-1.5" onClick={onScreens} aria-label="Screens: spread this position over monitors" title="Screens: spread this position over monitors (Ctrl+Shift+S)">
             <MonitorCheck size={14} aria-hidden />

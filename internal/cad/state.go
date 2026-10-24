@@ -191,6 +191,9 @@ type State struct {
 	inFence      map[string][]string
 	Papers       map[string]*Paper `json:"papers"`
 	paperCount   int
+	AlertLists   map[string]*AlertList `json:"alertLists"` // public alert subscriber lists
+	Alerts       []*PublicAlert        `json:"alerts"`
+	alertCount   int
 	premGrid     grid
 	premIDs      []string
 	premIdx      map[string]int

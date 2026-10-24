@@ -47,6 +47,7 @@ type Integrations struct {
 	LIS        LIS               `json:"lis"`          // a location server asked by HELD (supplemental location)
 	Paging     Paging            `json:"paging"`       // pages to volunteer and off-duty responders
 	NEMSIS     nemsis.Config     `json:"nemsis"`       // EMS responses to the patient-care report system
+	Alerting   Alerting          `json:"alerting"`     // public alerts (mass notification)
 }
 
 // Server is the API.
@@ -369,6 +370,7 @@ func (s *Server) routes() {
 	s.lisRoutes()
 	s.recordsRoutes()
 	s.roadmapRoutes()
+	s.publicAlertRoutes()
 	s.lockRoutes()
 	s.workstationRoutes()
 	m.HandleFunc("POST /api/auth/logout", s.logout)
@@ -1719,6 +1721,7 @@ func (s *Server) Run(ctx context.Context) {
 	go s.lisAuto(ctx)
 	go s.policyWatch(ctx)
 	go s.pager(ctx)
+	go s.alerter(ctx)
 	go s.scheduler(ctx)
 	go s.epcrAuto(ctx)
 	go s.translator(ctx)

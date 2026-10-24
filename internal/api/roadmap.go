@@ -52,6 +52,25 @@ type RoadmapView struct {
 	PARDue       map[string]time.Time      `json:"parDue"`
 	Responders   map[string]ResponderBrief `json:"responders"` // by incident: who answered its pages
 	OnCallNow    []OnCallBrief             `json:"onCallNow"`
+	PublicAlerts []PublicAlertBrief        `json:"publicAlerts"` // in force, or waiting for approval
+}
+
+// PublicAlertBrief is a public alert as every console sees it: what it says and where, not who it went to.
+type PublicAlertBrief struct {
+	ID         string        `json:"id"`
+	State      string        `json:"state"`
+	Status     string        `json:"status"`
+	MsgType    string        `json:"msgType"`
+	Event      string        `json:"event"`
+	EventName  string        `json:"eventName"`
+	Headline   string        `json:"headline"`
+	Short      string        `json:"short,omitempty"`
+	Area       cad.AlertArea `json:"area"`
+	Expires    time.Time     `json:"expires"`
+	Sent       time.Time     `json:"sent,omitzero"`
+	By         string        `json:"by"`
+	ApprovedBy string        `json:"approvedBy,omitempty"`
+	Incident   string        `json:"incident,omitempty"`
 }
 
 // MemberBrief is a member as every console sees them: no phone or email.
@@ -131,7 +150,15 @@ func (s *Server) roadmapView(st *cad.State, now time.Time, open []*cad.Incident)
 		TowCompanies: []*cad.TowCompany{}, Tows: st.OpenTows(now), TowClasses: st.Settings.TowClassList(), Upcoming: st.Upcoming(now, 24*time.Hour),
 		CallOut: map[string][]cad.CallOut{}, Geofences: []*cad.Geofence{}, FenceAlerts: []cad.FenceAlert{}, Cautions: map[string][]CautionBrief{},
 		Papers: map[string]PaperFlag{}, Benchmarks: st.Settings.BenchmarkList(), Alarms: map[string]AlarmBrief{}, Staffing: map[string][]string{},
-		PARDue: map[string]time.Time{}, Responders: map[string]ResponderBrief{}, OnCallNow: []OnCallBrief{}}
+		PARDue: map[string]time.Time{}, Responders: map[string]ResponderBrief{}, OnCallNow: []OnCallBrief{}, PublicAlerts: []PublicAlertBrief{}}
+	for i := len(st.Alerts) - 1; i >= 0; i-- {
+		p := st.Alerts[i]
+		if p.InForce(now) || p.State == cad.AlertPending && p.Expires.After(now) {
+			v.PublicAlerts = append(v.PublicAlerts, PublicAlertBrief{ID: p.ID, State: p.State, Status: p.Status, MsgType: p.MsgType, Event: p.Event,
+				EventName: p.EventName, Headline: p.Text.Headline, Short: p.Text.Short, Area: p.Area, Expires: p.Expires, Sent: p.Sent, By: p.By,
+				ApprovedBy: p.ApprovedBy, Incident: p.Incident})
+		}
+	}
 	if v.Tows == nil {
 		v.Tows = []*cad.Tow{}
 	}

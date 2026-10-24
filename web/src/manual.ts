@@ -13,8 +13,8 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
     ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
-  { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports and papers to serve.',
-    ids: ['alarms', 'admin-personnel', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'unit-history', 'epcr', 'papers'] },
+  { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports, papers to serve and alerts to the public.',
+    ids: ['alarms', 'admin-personnel', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
     ids: ['admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
@@ -380,6 +380,8 @@ A crew acts only as its own unit. Dispatchers can open the terminal at #/mdt to 
 ### The state file
 
 Supervisors see **State IBR file** under the list. Choose the month and press **File**: bitdispatcher writes the month's approved reports in Virginia's incident-based reporting format (the FBI's position-based flat file with Virginia's additions, 2025.2 specification): Group A incidents with their offence, property, victim, offender and arrestee segments, Group B arrests, or a zero report when there is nothing. Upload it to the Virginia Crime Repository by the 15th of the next month. Reports that fail the checks are left out and listed. Making the file is a ledger event, with its SHA-256.
+
+**Format: FBI national** writes the same reports in the FBI's own flat-file layout, without Virginia's additions, for states that take the national file. That file has been checked with SEARCH's NIBRS Pre-Certification Tool validator, which applies the FBI's edits (\`scripts/nibrs-validator.sh\`); passing it is not FBI or state certification.
 
 > The settings need the agency's nine-character ORI (Admin › Settings). Before the first production upload, the Virginia State Police ask for a test file by email (dart@vsp.virginia.gov).
 
@@ -1050,7 +1052,42 @@ Every request and answer is on the incident's timeline and in the ledger, so the
 - Every look at the papers is recorded in the ledger.
 
 > Confirm every warrant with the issuing agency (and NCIC where it applies) before acting on it.`,
-  }
+  },
+  {
+    id: 'public-alerts', title: 'Alerting the public', keys: 'public alert mass notification warn shelter in place evacuate wea wireless emergency alert eas cap ipaws amber 911 outage megaphone cancel update approve',
+    body: `Supervisors warn the public from the console: **shelter in place**, **evacuate**, police activity, a hazardous spill, a missing child, 911 being down. Press the **megaphone** in the status bar, or **Alert the public** on an incident.
+
+## Writing an alert
+- **Real alert**, **Exercise** or **Test**: an exercise or test is marked as one everywhere it goes. Check this first.
+- **Kind of alert**: the SAME event code (SPW shelter in place, EVI evacuation, LEW law enforcement, HMW hazardous materials, CAE child abduction, TOE 911 outage…). Choosing one fills the wording, in English and Spanish, to start from.
+- **Headline**, **what is happening** and **what to do**.
+- **Phone alert**: what phones show first (Wireless Emergency Alerts, 90 characters) and what text messages and push notifications say; the counter turns red past the limit. A **longer phone alert** (360) is optional.
+- **Also in Spanish** adds a Spanish version; people on the lists who chose Spanish get it.
+- **Where**: around the incident (a quarter mile to two miles), an area drawn on the map (Admin › Geofences), or **everyone** in the jurisdiction (its county codes).
+- **Expires after** one to 24 hours.
+- **Send to** the subscriber lists and the CAP systems (sirens, alert software) chosen; **keep it off some channels** asks IPAWS alert software to leave out radio and TV, weather radio, phones or public sites.
+
+**Check** shows the CAP message it makes and anything wrong with it, and how many people it reaches. **Send** asks once more, with the exact phone text and area. With **two-person approval** on, the alert waits until a second supervisor presses **Approve** (the megaphone shows *to approve*); its author can withdraw it, and the second supervisor can reject it with a reason.
+
+## In force
+An alert in force shows red on the map (amber for a test) and on the megaphone, and is in the public alert feed. **Update** sends a new version to the same people that replaces it; **Cancel** sends the all-clear. Every alert, approval and delivery is in the ledger and on the incident's timeline.
+
+> Sending to IPAWS itself (Wireless Emergency Alerts and the EAS) needs FEMA's agreement and the agency's own alert origination software; bitdispatcher writes its messages to the IPAWS profile for that software, and checks them with Google's CAP library and its IPAWS profile and with EAS Station's feed reader. No message has been sent to IPAWS.`,
+  },
+  {
+    id: 'admin-publicalerts', title: 'Public alerts: settings and lists', route: '/admin/publicalerts', keys: 'public alerts settings cap sender same county code feed atom ipaws receivers subscribers list csv two person approval time zone',
+    body: `How public alerts are written and where they go (Admin › Public alerts). Administrators change the settings; supervisors keep the lists.
+
+- **Sender**: the agency's CAP sender ID, an address it owns (alerts@county.gov), and its name.
+- **Jurisdiction** and **county codes**: the six-digit SAME codes of the counties covered (0, the state's FIPS code and the county's: 051770 is Roanoke city), used for an alert to everyone and added to every alert for radio and TV.
+- **Time zone**: CAP times carry the agency's offset.
+- **Two-person approval** (recommended): a second supervisor approves each alert before it goes.
+- **Public alert feed**: an Atom feed linking to each CAP message, and an IPAWS-style feed with the messages inside, for sirens, broadcasters' EAS encoders and apps. They show only alerts in force.
+- **CAP receivers**: systems each alert is POSTed to as CAP (with a Bearer token); **Send a test** sends a test message.
+- **Subscriber lists**: people who asked for alerts, reached through the paging gateways (text, email, push). A person with a place given gets only alerts whose area contains it. **Import a CSV** with the columns name, phone, email, topic, lang, lat, lon. A push gateway with no one listed publishes to its own topic, a channel anyone can follow.
+
+> The feeds are public by design: they hold only what was sent to the public.`,
+  },
 ]
 
 /** The chapter for a screen, if it has one. */

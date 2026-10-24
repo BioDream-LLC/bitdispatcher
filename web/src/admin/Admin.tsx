@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -26,6 +26,7 @@ import Protocols from './Protocols'
 import Disclosure from './Disclosure'
 import Personnel from './Personnel'
 import Paging from './Paging'
+import PublicAlerts from './PublicAlerts'
 import Tows from './Tows'
 import Directory from './Directory'
 import Geofences from './Geofences'
@@ -49,6 +50,7 @@ const PAGES = [
   { to: 'sites', label: 'Sites', icon: Network, admin: true },
   { to: 'personnel', label: 'Personnel & crews', icon: HardHat, admin: false },
   { to: 'paging', label: 'Paging groups', icon: BellRing, admin: false },
+  { to: 'publicalerts', label: 'Public alerts', icon: Megaphone, admin: false },
   { to: 'tows', label: 'Tow rotation', icon: TowIcon, admin: false },
   { to: 'directory', label: 'Contacts & on call', icon: BookUser, admin: false },
   { to: 'geofences', label: 'Areas (geofences)', icon: Hexagon, admin: false },
@@ -114,6 +116,7 @@ export default function Admin() {
             <Route path="premises" element={<Premises />} />
             <Route path="personnel" element={<Personnel view={view} />} />
             <Route path="paging" element={<Paging view={view} />} />
+            <Route path="publicalerts" element={<PublicAlerts view={view} />} />
             <Route path="tows" element={<Tows view={view} />} />
             <Route path="directory" element={<Directory view={view} />} />
             <Route path="geofences" element={<Geofences view={view} />} />

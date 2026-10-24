@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
@@ -54,6 +55,40 @@ func runPager(addr, cad string) {
 			}
 			resp.Body.Close()
 		}()
+	})
+	// A simulated CAP receiver (a siren controller): takes each public alert's CAP message, says what it
+	// would do, and refuses what is not CAP 1.2.
+	mux.HandleFunc("POST /cap/{name}", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		var m struct {
+			XMLName    xml.Name
+			Identifier string `xml:"identifier"`
+			Status     string `xml:"status"`
+			MsgType    string `xml:"msgType"`
+			Info       []struct {
+				Event string `xml:"event"`
+				Area  []struct {
+					Desc string `xml:"areaDesc"`
+				} `xml:"area"`
+			} `xml:"info"`
+		}
+		if err := xml.Unmarshal(body, &m); err != nil || m.XMLName.Space != "urn:oasis:names:tc:emergency:cap:1.2" || len(m.Info) == 0 {
+			http.Error(w, "not a CAP 1.2 message", http.StatusBadRequest)
+			return
+		}
+		act := "SOUND"
+		if m.MsgType == "Cancel" {
+			act = "STOP"
+		}
+		if m.Status != "Actual" {
+			act = "silent " + strings.ToLower(m.Status)
+		}
+		area := ""
+		if len(m.Info[0].Area) > 0 {
+			area = m.Info[0].Area[0].Desc
+		}
+		log.Printf("cap receiver %s (simulated): %s for %s %s %q in %q", r.PathValue("name"), act, m.MsgType, m.Identifier, m.Info[0].Event, area)
+		w.WriteHeader(http.StatusAccepted)
 	})
 	log.Printf("simulated pager on http://%s (ntfy-style)", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))

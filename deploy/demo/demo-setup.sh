@@ -143,5 +143,18 @@ if [ "$(api GET /schedule | jq '.items | length')" = "0" ]; then
   api PUT /schedule "{\"kind\":\"event\",\"title\":\"City market festival (demo)\",\"type\":\"EVENT\",\"location\":{\"address\":\"Market Square, Roanoke\"},\"start\":\"$TODAY10\",\"minutes\":480,\"repeat\":\"daily\",\"notes\":\"Street closures on Market St and Campbell Ave (demo)\"}" >/dev/null || true
   echo "seeded the schedule"
 fi
+# Public alerts, seeded once: the settings (the public feed stays off on the demo, so nothing visitors write
+# is published), a simulated siren controller, and residents reached by the simulated pager.
+if [ "$(api GET /admin/alerting | jq -r '.sender')" = "" ]; then
+  api PUT /admin/alerting '{"sender":"alerts@demo.bitdispatcher.com","senderName":"Roanoke Valley Demo 911 (demo data)","jurisdiction":"Roanoke Valley (demo)","geocodes":["051770","051161","051775"],"timeZone":"America/New_York","feed":false,"twoPerson":false,"receivers":[{"id":"siren","name":"Siren controller (simulated)","url":"http://127.0.0.1:9446/cap/sirens"}]}' >/dev/null || true
+  api PUT /admin/alertlists '{"id":"","name":"Residents (simulated)","gateways":["sim"],"note":"Demo: fictional people reached by the simulated pager","people":[
+    {"name":"Resident downtown (demo)","topic":"res-downtown","lat":37.2715,"lon":-79.9410},
+    {"name":"Resident Old Southwest (demo)","topic":"res-osw","lat":37.2640,"lon":-79.9500},
+    {"name":"Resident Williamson Rd (demo)","topic":"res-wmsn","lat":37.2990,"lon":-79.9330},
+    {"name":"Residente en el centro (demo)","topic":"res-es","lang":"es","lat":37.2725,"lon":-79.9395},
+    {"name":"Resident Salem (demo)","topic":"res-salem","lat":37.2935,"lon":-80.0548},
+    {"name":"Resident anywhere (demo)","topic":"res-all"}]}' >/dev/null || true
+  echo "seeded public alerts"
+fi
 api POST /auth/logout '{}' >/dev/null || true
 echo "demo ready"

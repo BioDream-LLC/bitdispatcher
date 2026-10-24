@@ -80,6 +80,8 @@ type Engine struct {
 	// pageOut are pages written but not yet delivered, with each person's answer token (kept only here,
 	// never in the ledger): the server takes them to deliver (TakePage).
 	pageOut map[string][]PageRecipient
+	// alertOut are public alerts issued here and not yet delivered.
+	alertOut map[string]bool
 }
 
 // Open opens the ledger at path, replays it and seeds a new system with default settings and call types.

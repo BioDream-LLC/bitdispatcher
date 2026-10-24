@@ -20,5 +20,7 @@ What large CAD systems commonly have, in the order it was built. All eleven were
 ## Still to do
 
 Not only code: licensed medical-dispatch protocols (bitdispatcher has its own protocol engine; the scripts
-most centres use are licensed), each state's NCIC switch and NIBRS submission (the state's approval), and
-mass notification (a separate product bitdispatcher would connect to).
+most centres use are licensed), each state's NCIC switch and NIBRS submission (the state's approval; the
+NIBRS file is checked with SEARCH's validator in the FBI's layout, and NCIC against our own simulator), and
+IPAWS itself for public alerts (FEMA's agreement: bitdispatcher writes and checks the messages to its
+profile, publishes a CAP feed and sends to CAP receivers and subscriber lists).

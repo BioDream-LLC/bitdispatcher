@@ -227,10 +227,12 @@
       <li>Each unit's status history for any day</li>
       <li>Times and details sent to the ambulance crews' patient reports (NEMSIS 3.5)</li>
       <li>Warrants and civil process, flagged at the address</li>
+      <li>Alerting the public: shelter in place or evacuate an area, as CAP to the IPAWS profile, with two-person approval</li>
     </ol>
     <p class="edge-more" style="color:var(--dim)">Paging is tested against stand-ins for Twilio, ntfy, email and webhooks; the
-      demo uses a simulated pager. Licensed medical protocols and each state's NCIC and NIBRS connections need those parties'
-      approval as well as code. <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/docs/ROADMAP.md">The roadmap</a></p>
+      demo uses a simulated pager. Public alerts are checked with Google's CAP library and its IPAWS profile and with EAS
+      Station's feed reader, and the NIBRS file with SEARCH's validator; none of that is certification. Licensed medical
+      protocols, each state's NCIC and NIBRS connections, and IPAWS itself need those parties' approval as well as code. <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/docs/ROADMAP.md">The roadmap</a></p>
   </div>
 </section>
 

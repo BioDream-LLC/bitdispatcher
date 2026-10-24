@@ -15,6 +15,7 @@ import HandlingBox, { CallerIDChip } from './Handling'
 import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
 import { AlarmBar, CallOutBox, CrewLine, EPCRBox, FiregroundBox, HistoryButton, PagingBox, SafetyFlags, TowBox } from './Roadmap'
+import { PublicAlertBox } from './PublicAlerts'
 import { run as runLine } from './UnitBoard'
 import { api, errText } from '../api'
 import EntryFacts, { AckCell } from './Entry'
@@ -526,6 +527,7 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
         {!closed && <RecommendBox inc={inc} rec={rec} reload={reloadRec} />}
         <UnitsOn inc={inc} view={view} now={now} />
         <PagingBox inc={inc} view={view} />
+        <PublicAlertBox inc={inc} view={view} />
         <CallOutBox inc={inc} view={view} />
         <TowBox inc={inc} view={view} />
         <EPCRBox inc={inc} view={view} />

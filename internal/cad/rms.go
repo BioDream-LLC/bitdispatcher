@@ -439,6 +439,16 @@ func CheckReport(r RMSReport) []RMSCheck {
 		if len(arrestees) > 0 {
 			add("cleared", "a report with an arrest is cleared by arrest, not exceptionally")
 		}
+		// NIBRS 558: an exceptional clearance needs an offender whose age, sex and race are all known.
+		known := false
+		for _, p := range r.People {
+			age := strings.TrimSpace(p.Age)
+			known = known || p.Role == "suspect" && (p.DOB != "" || age != "" && age != "00") &&
+				p.Sex != "" && p.Sex != "U" && p.Race != "" && p.Race != "U"
+		}
+		if !known {
+			add("cleared", "an exceptional clearance needs a suspect whose age, sex and race are all known")
+		}
 	default:
 		add("cleared", "%s is not a clearance", r.Cleared)
 	}

@@ -329,5 +329,26 @@ export type RoadmapView = {
   towCompanies: TowCompany[]; tows: Tow[]; towClasses: string[]; upcoming: UpcomingItem[]; callOut: Record<string, CallOut[]>
   geofences: Geofence[]; fenceAlerts: FenceAlert[]; cautions: Record<string, { id: string; name: string; note: string }[]>; papers: Record<string, PaperFlag>
   benchmarks: Benchmark[]; alarms: Record<string, AlarmBrief>; staffing: Record<string, string[]>; epcr: boolean; parDue: Record<string, string>
-  responders: Record<string, ResponderBrief>; onCallNow: OnCallBrief[]
+  responders: Record<string, ResponderBrief>; onCallNow: OnCallBrief[]; publicAlerts?: PublicAlertBrief[]
+}
+
+// ---- public alerts (internal/cad/publicalerts.go, internal/api/publicalerts.go, internal/alerting) ----
+export type AlertText = { headline: string; description?: string; instruction?: string; short?: string; long?: string }
+export type AlertArea = { desc: string; polygon?: [number, number][]; geocodes?: string[]; fence?: string }
+export type PublicAlertBrief = {
+  id: string; state: 'pending' | 'issued' | 'rejected' | 'updated' | 'cancelled'; status: 'Actual' | 'Exercise' | 'Test'; msgType: 'Alert' | 'Update' | 'Cancel'
+  event: string; eventName: string; headline: string; short?: string; area: AlertArea; expires: string; sent?: string; by: string; approvedBy?: string; incident?: string
+}
+export type PublicAlert = Omit<PublicAlertBrief, 'headline' | 'short'> & {
+  identifier: string; of?: string; category: string; response?: string; urgency: string; severity: string; certainty: string
+  text: AlertText; spanish?: AlertText; block?: string[]; lists?: string[]; receivers?: string[]; created: string; rejected?: string
+  supersededBy?: string; results: PageResult[]; reached: number
+}
+export type Subscriber = { name?: string; phone?: string; email?: string; topic?: string; lang?: string; lat?: number; lon?: number }
+export type AlertList = { id: string; name: string; gateways: string[]; people: Subscriber[]; note?: string }
+export type CAPReceiver = { id: string; name: string; url: string; token?: string; off?: boolean }
+export type SAMEEvent = { code: string; name: string; category: string; warning: boolean }
+export type AlertingSettings = {
+  sender: string; senderName: string; jurisdiction: string; geocodes: string[]; feed: boolean; twoPerson: boolean; timeZone?: string
+  web?: string; contact?: string; receivers: CAPReceiver[]; feedUrl: string; events: SAMEEvent[]; channels: string[]; ready: string[]
 }
