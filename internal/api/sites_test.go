@@ -62,8 +62,16 @@ func TestTwoSitesOverHTTPS(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if h := sA.siteHealth(); len(h) != 1 || !h[0].OK {
-		t.Fatalf("health %+v", h)
+	// North's health is set by its own poll of south, which can finish after the copies arrive.
+	for {
+		h := sA.siteHealth()
+		if len(h) == 1 && h[0].OK {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("health %+v", h)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 	// A wrong token is refused.
 	anon := &client{t: t, base: tsA.URL, c: tsA.Client()}
