@@ -91,6 +91,7 @@ func menus() []navMenu {
 		navMenu{"proof", "Proof", []navItem{
 			{"How it is tested", "/proof/", "check", "The tests every change passes, and what has not been tried yet"},
 			{"With BitVoice, and without", "/bitvoice/", "phone", "Calls from BitVoice or any standards-compliant call handling"},
+			{"BitVoice.org", bitvoiceURL, "globe", "BioDream's free, open-source phone system and 911 call handling"},
 			{"Continuous integration", "https://github.com/BioDream-LLC/bitdispatcher/actions/workflows/ci.yml", "server", "Every change built and tested in public"},
 		}},
 		navMenu{"learn", "Learn", []navItem{
@@ -194,6 +195,32 @@ func panelHead(m navMenu) string {
 	return "The manual, the articles and the source"
 }
 
+// bitvoiceURL is BitVoice's own website.
+const bitvoiceURL = "https://bitvoice.org"
+
+// bitvoiceAbout explains what BitVoice is, for every page that mentions it. onBitvoicePage drops the
+// link back to /bitvoice/ (the reader is already there) in favour of BitVoice's public-safety page.
+func bitvoiceAbout(onBitvoicePage bool) string {
+	second := `<a class="btn btn-line" href="/bitvoice/">` + icon("plug") + `How bitdispatcher uses it</a>`
+	if onBitvoicePage {
+		second = `<a class="btn btn-line" href="` + bitvoiceURL + `/public-safety/">` + icon("shield") + `BitVoice for public safety</a>`
+	}
+	return `<aside class="bv-about" id="what-is-bitvoice" aria-labelledby="what-is-bitvoice-h">
+<p class="eyebrow">What is BitVoice?</p>
+<h3 id="what-is-bitvoice-h">The phone system that answers the call, before bitdispatcher sends help</h3>
+<p><b>BitVoice</b> is BioDream's other free, open-source program (Apache 2.0): a complete phone system in one program,
+run from a web page, with extensions, queues, menus, voicemail, recording, trunks and desk phones. It is an alternative to
+FreePBX and Asterisk, with neither underneath.</p>
+<p>BitVoice also has a 911 answering-point profile: NG911 calls with the caller's location, ALI spill and EIDO to a CAD,
+text to 911 and TTY, caller photos and live video, speech-to-text on its own server, and a P25 radio console. Those
+public-safety parts are a lab track, as bitdispatcher is: not certified and not yet in service anywhere.</p>
+<p>In a 911 centre, call handling answers the call and the CAD sends help. BitVoice can be the first and bitdispatcher is
+the second. bitdispatcher works with any standards-compliant call handling, and BitVoice is never required. Where this site
+says "tested live with BitVoice", it means against a real BitVoice in a lab, not on live 911 calls.</p>
+<p class="actions"><a class="btn btn-primary" href="` + bitvoiceURL + `">` + icon("phone") + `Visit bitvoice.org</a>` + second + `</p>
+</aside>`
+}
+
 // footer is the menu across the bottom: every section, the manual's languages, and who makes it.
 func footer() string {
 	var b strings.Builder
@@ -209,7 +236,7 @@ func footer() string {
 		}
 		b.WriteString("</div>\n")
 	}
-	b.WriteString(`<div><b>Product</b><a href="/features/">Everything it does</a><a href="/bitvoice/">With BitVoice</a><a href="` + demoURL + `">Live demonstration</a><a href="/get/">Get it</a>`)
+	b.WriteString(`<div><b>Product</b><a href="/features/">Everything it does</a><a href="/bitvoice/">With BitVoice</a><a href="` + bitvoiceURL + `">BitVoice.org</a><a href="` + demoURL + `">Live demonstration</a><a href="/get/">Get it</a>`)
 	b.WriteString(`<b class="second">Evidence</b><a href="/proof/">How it is tested</a><a href="https://github.com/BioDream-LLC/bitdispatcher/actions/workflows/ci.yml">Continuous integration</a></div>` + "\n")
 	b.WriteString(`<div><b>Manual</b><a href="/manual/">English</a>`)
 	for _, l := range langs {

@@ -122,6 +122,8 @@ func build(root, out, base string) error {
 		"{{TESTED}}", markdown(parts["TESTED"]),
 		"{{STATUS}}", markdown(parts["STATUS"]),
 		"{{BITVOICE}}", markdown(parts["BITVOICE"]),
+		"{{BITVOICE_ABOUT}}", bitvoiceAbout(false),
+		"{{BITVOICE_ABOUT_HERE}}", bitvoiceAbout(true),
 		"{{TECH_TILES}}", tiles(),
 		"{{TECH_COUNT}}", fmt.Sprint(len(arts)),
 		"{{MANUAL_INDEX}}", manualIndex(string(manualHTML)),

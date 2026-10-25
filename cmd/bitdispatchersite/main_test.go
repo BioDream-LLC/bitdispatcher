@@ -114,3 +114,30 @@ func TestArticlesAndLanguages(t *testing.T) {
 		}
 	}
 }
+
+// Every page that names BitVoice says what it is and links to bitvoice.org.
+func TestBitVoiceExplained(t *testing.T) {
+	out := t.TempDir()
+	if err := build("../..", out, "https://bitdispatcher.com"); err != nil {
+		t.Fatal(err)
+	}
+	pages := []string{"index.html", "bitvoice/index.html"}
+	for _, a := range arts {
+		if strings.Contains(a.body, "BitVoice") {
+			pages = append(pages, filepath.Join("tech", a.slug, "index.html"))
+		}
+	}
+	if len(pages) < 4 {
+		t.Fatalf("only %d pages name BitVoice; expected the articles too", len(pages))
+	}
+	for _, p := range pages {
+		b, err := os.ReadFile(filepath.Join(out, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(b)
+		if !strings.Contains(s, `id="what-is-bitvoice"`) || !strings.Contains(s, `href="https://bitvoice.org"`) {
+			t.Errorf("%s names BitVoice without explaining it or linking to bitvoice.org", p)
+		}
+	}
+}

@@ -215,6 +215,11 @@ section.band.soft { background: var(--paper-2); border-top: 1px solid var(--line
 .prose-lite { max-width: 880px; }
 .prose-lite h2 { margin-top: 1.5em; }
 .prose-lite ul:not(.ticks) li { margin: 0 0 .4em; }
+.bv-about { border: 2px solid var(--ink); border-left: 8px solid var(--amber); background: var(--card); color: var(--body); padding: 22px 26px; margin: 0 0 32px; max-width: 880px; }
+.prose .bv-about { margin: 40px 0 0; }
+.bv-about h3 { margin: 6px 0 12px; }
+.bv-about p { margin: 0 0 12px; }
+.bv-about .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 0; }
 .lab-note { border-left: 5px solid var(--amber); background: var(--card); padding: 14px 18px; }
 table { border-collapse: collapse; width: 100%; font-size: .94rem; margin: 18px 0; background: var(--card); }
 th { text-align: left; font: 700 .76rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); background: var(--paper-2); border-bottom: 2px solid var(--ink); padding: 10px 12px; }

@@ -10,7 +10,7 @@
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg?logo=go&logoColor=white)](https://go.dev)
 [![Version](https://img.shields.io/badge/version-v0.0.0-orange.svg)](#status)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#build-and-run)
-[![Works with](https://img.shields.io/badge/works%20with-BitVoice-3b82f6.svg)](https://github.com/biodream-llc/bitvoice)
+[![Works with](https://img.shields.io/badge/works%20with-BitVoice-3b82f6.svg)](https://bitvoice.org)
 [![CI](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml)
 
 <p align="center">
@@ -39,7 +39,7 @@
 
 **The dispatcher decides.** Recommendations, advisory checks and agency scripts advise; nothing dispatches, closes or changes the priority of an incident on its own.
 
-**Standards at every boundary.** Caller location arrives as ALI spill, NENA i3 PIDF-LO or an EIDO incident from any call-handling system. With [BitVoice](https://github.com/biodream-llc/bitvoice), BioDream's open-source phone system and 911 call handling, it uses every hook BitVoice offers a CAD; without it, it works on its own.
+**Standards at every boundary.** Caller location arrives as ALI spill, NENA i3 PIDF-LO or an EIDO incident from any call-handling system. With [BitVoice](https://bitvoice.org), BioDream's open-source phone system and 911 call handling, it uses every hook BitVoice offers a CAD; without it, it works on its own.
 
 ## Everything it does
 
@@ -210,7 +210,7 @@ make web build sim
 
 bitdispatcher takes caller location from any standards-compliant call-handling system: **ALI spill** over TCP or serial, **NENA i3 PIDF-LO**, and **EIDO** incidents (NENA-STA-024).
 
-With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice's live event stream (calls ringing before answer, rebids, caller photos), sends EIDO both ways, texts the caller and takes text-to-911 calls, sends a video link and shows live video (blurred until revealed), shows whether the caller's number was verified (STIR/SHAKEN), checks the caller's address against BitVoice's address data (LVF), shows BitVoice's check of a rebid location, keeps callers' photos as evidence (hash, the camera's time and GPS; each look recorded, naming the dispatcher in BitVoice's records too), takes radio emergencies and acknowledges them both ways, shows unit positions from the radio system, and puts BitVoice's answer times, exposure record and i3 log beside CAD reports. The full list is in [docs/BITVOICE.md](docs/BITVOICE.md). BitVoice is never required.
+With [BitVoice](https://bitvoice.org) it also uses BitVoice's live event stream (calls ringing before answer, rebids, caller photos), sends EIDO both ways, texts the caller and takes text-to-911 calls, sends a video link and shows live video (blurred until revealed), shows whether the caller's number was verified (STIR/SHAKEN), checks the caller's address against BitVoice's address data (LVF), shows BitVoice's check of a rebid location, keeps callers' photos as evidence (hash, the camera's time and GPS; each look recorded, naming the dispatcher in BitVoice's records too), takes radio emergencies and acknowledges them both ways, shows unit positions from the radio system, and puts BitVoice's answer times, exposure record and i3 log beside CAD reports. The full list is in [docs/BITVOICE.md](docs/BITVOICE.md). BitVoice is never required.
 
 ## How it is tested
 
@@ -288,6 +288,9 @@ One article for each technology inside bitdispatcher: what it is, the standard b
 
 **Is bitdispatcher really free? What is the licence?**
 Yes. **Apache License 2.0**: commercial use, modification, distribution and private use are all permitted, with no fee and no per-seat or per-console pricing. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+**What is BitVoice?**
+[BitVoice](https://bitvoice.org) is BioDream's other free, open-source program (Apache 2.0): a complete phone system in one program, run from a web page, with extensions, queues, voicemail, recording, trunks and desk phones, as an alternative to FreePBX and Asterisk. It also has a 911 answering-point profile (NG911 calls with location, ALI and EIDO to a CAD, text to 911, caller video, speech-to-text) and a P25 radio console; like bitdispatcher, those public-safety parts are in the lab, not certified and not yet in service. In a 911 centre, call handling answers the call and the CAD sends help: BitVoice can be the first, bitdispatcher is the second. Source: [github.com/BioDream-LLC/bitvoice](https://github.com/BioDream-LLC/bitvoice).
 
 **Do I need BitVoice?**
 No. Any call-handling system that sends ALI spill, i3 location or EIDO works. BitVoice adds the live call stream, radio and video.

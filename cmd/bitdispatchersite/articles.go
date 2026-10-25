@@ -177,6 +177,9 @@ func articlePage(a *article) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<section class="hero small article-hero"><div class="wrap"><p class="eyebrow"><a href="/tech/">Technology</a> / <a href="/tech/#%s">%s</a></p><h1>%s</h1><p class="lede">%s</p><p class="meta"><span class="tile-icon">%s</span>%d minute read</p></div></section>`+"\n",
 		g.key, html.EscapeString(g.title), html.EscapeString(a.title), html.EscapeString(a.summary), icon(a.icon), max(1, (a.words+219)/220))
+	if strings.Contains(a.body, "BitVoice") {
+		body += bitvoiceAbout(false) // every article that names BitVoice says what it is
+	}
 	b.WriteString(`<div class="wrap article-wrap"><article class="prose">` + body + `</article><aside class="toc-side"><div class="sticky"><b>On this page</b><ol>`)
 	for _, h := range heads {
 		fmt.Fprintf(&b, `<li><a href="#%s">%s</a></li>`, h[0], h[1])

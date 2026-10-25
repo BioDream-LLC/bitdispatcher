@@ -52,7 +52,7 @@ The legacy path also lingers awkwardly. Many centers are mid-transition, taking 
 
 Caller location arrives as ALI spill, i3 PIDF-LO or an EIDO, and all three end the same way: a location on the call that the call-taker can accept or keep. Integrations are configured in the browser under **Admin › Integrations**, including a call-handling system and neighboring agencies with their own addresses and token pairs.
 
-With [BitVoice](https://github.com/biodream-llc/bitvoice), BioDream's open-source phone system and 911 call handling, bitdispatcher uses the full live stream: calls ringing before answer, rebids, STIR/SHAKEN verification status, text-to-911, and more. But BitVoice is never required. Any system that sends ALI spill, i3 location or EIDO works on its own.
+With [BitVoice](https://bitvoice.org), BioDream's open-source phone system and 911 call handling, bitdispatcher uses the full live stream: calls ringing before answer, rebids, STIR/SHAKEN verification status, text-to-911, and more. But BitVoice is never required. Any system that sends ALI spill, i3 location or EIDO works on its own.
 
 For testing without a live network, the source includes `cmd/i3caller`, a lab tool that places NG9-1-1 calls over SIP with a PIDF-LO location, RFC 7852 additional data and a STIR/SHAKEN verstat, serving location by reference so each rebid finds the caller farther along. It is explicitly for a lab, never a real 911 line.
 
