@@ -78,3 +78,39 @@ func TestInline(t *testing.T) {
 		}
 	}
 }
+
+// Every technology article is a page with its contents list, is a tile on the home page and in a menu, and
+// every translation of the manual is linked from the footer.
+func TestArticlesAndLanguages(t *testing.T) {
+	out := t.TempDir()
+	if err := build("../..", out, "https://bitdispatcher.com"); err != nil {
+		t.Fatal(err)
+	}
+	home, _ := os.ReadFile(filepath.Join(out, "index.html"))
+	if len(arts) < 20 {
+		t.Fatalf("only %d articles", len(arts))
+	}
+	for _, a := range arts {
+		p, err := os.ReadFile(filepath.Join(out, "tech", a.slug, "index.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(p), `class="toc-side"`) || strings.Count(string(p), "<h2 id=") < 5 {
+			t.Errorf("%s: no contents list or too few sections", a.slug)
+		}
+		if a.words < 1200 {
+			t.Errorf("%s: only %d words", a.slug, a.words)
+		}
+		if got := strings.Count(string(home), `href="/tech/`+a.slug+`/"`); got < 3 {
+			t.Errorf("home page links %s %d times; want a tile, a menu entry and a footer link", a.slug, got)
+		}
+	}
+	if len(langs) == 0 {
+		t.Fatal("no translations of the manual")
+	}
+	for _, l := range langs {
+		if !strings.Contains(string(home), `href="/manual/`+l.code+`/"`) {
+			t.Errorf("home page does not link the %s manual", l.code)
+		}
+	}
+}

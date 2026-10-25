@@ -105,6 +105,7 @@ Where something has been tested only against simulators or sample data rather th
 
 **In the field**
 - A mobile data terminal for crews: assignment, route, premises, notes, one-tap statuses on F-keys, mark-outs, GPS, and the emergency button.
+- The messages, BOLOs and officer-safety notices addressed to the crew or its agency's terminals, highest priority first, with the agency's tones, repeats and acknowledgement as on the console; opening and acknowledging are recorded.
 
 **Records and reporting**
 - Incident reports with the NIBRS data elements checked and supervisor approval; Virginia's incident-based reporting file for the month in one click; a first narrative drafted from the incident's record (or the agency's language model, from the same facts) for the writer to correct and finish.
@@ -124,6 +125,7 @@ Where something has been tested only against simulators or sample data rather th
 - The phone's own device location and floor (altitude), and a trail for a caller on the move; several callers about one fire grouped and attached in one step; non-emergency calls kept to one side, with a person always deciding.
 - Vehicle crash notifications rated for injury risk by delta-V and rollover, with the response to consider (an electric car flagged for the fire crews); drones launched by rule or by a press, flying on the map; radio transmissions' words on the incident; every incident summarised in a paragraph for the crews.
 
+**Reviewing and releasing the record**
 - Review views of each incident (as first entered, summary, detailed, and a full audit with the ledger checked), printed or downloaded, every opening recorded.
 - Records requests: redactions proposed by the agency's own rules, accepted or rejected one by one, released only on a person's approval, made permanent, checked for leaked text, with due dates in working days.
 
@@ -230,16 +232,52 @@ With [BitVoice](https://github.com/biodream-llc/bitvoice) it also uses BitVoice'
 - **Views.** EagleView is built to its published Imagery API and tested against a stand-in, not yet against EagleView itself (that needs an agency's licence or EagleView's sandbox credentials). Panoramax is tested live; Mapillary against a stand-in. Looking a place up tells the provider where the incident is, so each provider is off until an administrator turns it on.
 - **New integrations, tested against stand-ins only:** NERIS (its test environment needs an agency's credentials), neighbouring agencies' CADs (bitdispatcher to bitdispatcher, not another vendor's CAD), station alerting controllers, alarm companies (a JSON contract; the APCO/CSAA ASAP standard is not implemented because its schema is not public), plate readers and gunshot detection (a JSON contract, not Flock's or SoundThinking's own APIs), ProQA (a determinant hook, not a certified ProQA interface), PulsePoint (a documented feed, not PulsePoint's partner interface). Auto-dispatch is off for every call type until an administrator turns it on. See [docs/ALERTS.md](docs/ALERTS.md), [docs/CAD-TO-CAD.md](docs/CAD-TO-CAD.md), [docs/STATION-ALERTING.md](docs/STATION-ALERTING.md), [docs/PROTOCOLS.md](docs/PROTOCOLS.md), [docs/PUBLIC-FEED.md](docs/PUBLIC-FEED.md).
 - **The roadmap features (alarms, crews, roll calls, paging, tows, schedule, directory, areas, unit history, patient-care reports, warrants)** are tested in the browser and against stand-ins: paging against stand-ins for Twilio, ntfy, email and a webhook (the demonstration uses a simulated pager whose simulated responders answer), not certified by IamResponding or Active911; the NEMSIS record checked against the NEMSIS 3.5.1 schema for the sections it carries and sent to a stand-in, not to a vendor's ePCR.
-- **The operational updates (agencies, presets and views, working calls, messages and BOLOs, search and recall, staffing and qualifications, keys and one-line commands)** are tested in the Go suites and in the browser against the built-in simulators; the attachment virus scan was run against ClamAV 1.5.4's clamd with its full signatures (a clean file passes, the standard EICAR test file is refused on both kinds of upload); the agency-scoped board is tested through the API; the priority tones are measured as rendered by Chromium's audio engine (rhythm, level, no clipping) and have not been judged by ear on a dispatch floor; OCR was checked with Tesseract 4 on a rendered plate picture, and PDF text on a Chrome-made PDF. The classic key layout follows PremierOne's documented defaults; it is not a Motorola product or certified by Motorola.
+- **The operational updates (agencies, presets and views, working calls, messages and BOLOs, search and recall, staffing and qualifications, keys and one-line commands)** are tested in the Go suites and in the browser against the built-in simulators; the attachment virus scan was run against ClamAV 1.5.4's clamd with its full signatures (a clean file passes, the standard EICAR test file is refused on both kinds of upload); the agency-scoped board is tested through the API; the mobile terminal's messages and BOLOs (tone, open and acknowledgement by the crew) are tested in the browser; the priority tones are measured as rendered by Chromium's audio engine (rhythm, level, no clipping) and have not been judged by ear on a dispatch floor; OCR was checked with Tesseract 4 on a rendered plate picture, and PDF text on a Chrome-made PDF. The classic key layout follows PremierOne's documented defaults; it is not a Motorola product or certified by Motorola.
 - **Open decisions:** when an ALI-only call (no hang-up signal) should end; whether agency scripts may reach outside the sandbox; VGIN's terms for its data outside Virginia.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design, the rules and the phases, and [docs/OPERATIONS.md](docs/OPERATIONS.md) for the ledger and how reports count.
+
+## The technology, explained
+
+One article for each technology inside bitdispatcher: what it is, the standard behind it, where dispatch systems usually fall short, how bitdispatcher does it, and how far that has been tested. They are on [bitdispatcher.com/tech](https://bitdispatcher.com/tech/); the sources are in [site/articles](site/articles).
+
+| | |
+|---|---|
+| [**Command line and keys**](https://bitdispatcher.com/tech/command-line-and-keys/) | A keyboard-first console: one-line commands, duty-specific key profiles, and a PremierOne-style classic layout. |
+| [**Units by road time**](https://bitdispatcher.com/tech/road-time-recommendation/) | Recommend the right units by capability and real driving time, counting who is on scene and what runs short. |
+| [**Multiple monitors**](https://bitdispatcher.com/tech/multi-monitor/) | A screen per monitor, found with the Window Management API, selection synced, and layouts remembered per position. |
+| [**Many agencies, one floor**](https://bitdispatcher.com/tech/multi-agency/) | A consolidated center dispatches for many agencies, each with its own numbering, units and board, enforced on the server. |
+| [**Messages and BOLOs**](https://bitdispatcher.com/tech/messages-and-bolos/) | An inbox inside CAD with four prioritized tones, acknowledgement, escalation, hashed and virus-scanned attachments, and versions. |
+| [**Search and unit recall**](https://bitdispatcher.com/tech/search-and-recall/) | One search across incidents, BOLOs, people, vehicles, attachments and units, with match reasons, partial plates, and a unit recall timeline. |
+| [**NG9-1-1 and EIDO**](https://bitdispatcher.com/tech/nena-i3-eido/) | How calls reach the CAD over an ESInet with i3 location and EIDO, and move on to the field and to neighbours. |
+| [**Caller location**](https://bitdispatcher.com/tech/caller-location/) | ALI/ANI, wireless Phase I and II, device-based hybrid fixes, HELD, altitude and trails for moving callers. |
+| [**Transcripts and translation**](https://bitdispatcher.com/tech/transcripts-and-translation/) | Transcribe the call live, pull out the facts by rule, and translate Spanish callers line by line with a built-in phrasebook. |
+| [**Crash data and drones**](https://bitdispatcher.com/tech/crash-and-drones/) | Rate crash severity from telematics by delta-V and rollover, flag electric vehicles, and launch a drone by rule or a press. |
+| [**Offline map**](https://bitdispatcher.com/tech/offline-map/) | OpenStreetMap, routing and county GIS recorded into the binary, so the map still works with no internet. |
+| [**Aerial imagery**](https://bitdispatcher.com/tech/aerial-and-oblique-imagery/) | Orthophotos, EagleView obliques, Panoramax and Mapillary street photos, and crews' own pre-plan photos. |
+| [**Mobile data terminal**](https://bitdispatcher.com/tech/mobile-data-terminal/) | A browser terminal for crews: assignment, route, premises, one-tap statuses, GPS, an emergency button, and acknowledged messages. |
+| [**Staffing and qualifications**](https://bitdispatcher.com/tech/staffing-and-qualifications/) | Who is on duty and on each unit, sign-on and relief without gaps, double-assignment blocked, and live capability from the crew aboard. |
+| [**Station alerting and paging**](https://bitdispatcher.com/tech/station-alerting-and-paging/) | Tone out the firehouse and page volunteers by text, email, push and webhook, with responders answering from a link. |
+| [**Public alerts (CAP, IPAWS)**](https://bitdispatcher.com/tech/public-alerting-cap-ipaws/) | Write a public warning once and send it as CAP 1.2 to IPAWS, sirens, alert software and subscribers in English and Spanish. |
+| [**Public incident feed**](https://bitdispatcher.com/tech/public-incident-feed/) | Share open incidents with a website or apps like PulsePoint using hundred-block addresses and coarse points, never callers or notes. |
+| [**NIBRS reporting**](https://bitdispatcher.com/tech/nibrs-reporting/) | Incident reports with the FBI's NIBRS data elements checked, supervisor approval, and Virginia's monthly IBR file in one click. |
+| [**NERIS and NEMSIS**](https://bitdispatcher.com/tech/neris-and-nemsis/) | Fire incidents to NERIS on close, and NEMSIS 3.5 patient-care times from every EMS unit to the agency's ePCR system. |
+| [**NCIC**](https://bitdispatcher.com/tech/ncic/) | Wanted-person, vehicle, gun and article inquiries through the state message switch, each with a purpose and reason in the ledger. |
+| [**Records requests**](https://bitdispatcher.com/tech/records-requests/) | FOIA requests for 911 data: redactions proposed by the agency's rules, accepted one by one, released only on approval. |
+| [**Event ledger**](https://bitdispatcher.com/tech/event-ledger/) | An append-only, SHA-256 hash-chained record of every action, so the day cannot be quietly rewritten. |
+| [**Security**](https://bitdispatcher.com/tech/security/) | How a CAD is secured: duty-based access, enrolled workstations, one-time codes, a hash-chained audit ledger and scanned attachments. |
+| [**Active-active sites**](https://bitdispatcher.com/tech/active-active-sites/) | Several sites all live at once, each holding a verified copy of the others' ledgers, each able to keep dispatching alone through an outage. |
+| [**Scripts and advisories**](https://bitdispatcher.com/tech/scripts-and-advisories/) | Sandboxed agency scripts in JavaScript and Lua, and an advisory panel of deterministic rules from a versioned codebook, tested first. |
+| [**Training and staged changes**](https://bitdispatcher.com/tech/training-and-staged-changes/) | A scored training board on the agency's own map, instructor-led exercises, and config changes tried on a training board before publishing. |
+| [**Responder wellbeing**](https://bitdispatcher.com/tech/responder-wellbeing/) | Critical calls put everyone who worked them on the supervisor's care list for a break and a debrief, with workload and quality on the board. |
+| [**Migration**](https://bitdispatcher.com/tech/migration/) | Bring premises, address history and run cards from CSV exports, and run alongside the old CAD until the floor is ready. |
 
 ## Documentation
 
 | | |
 |---|---|
 | [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) | Every screen, with worked examples. Also `docs/manual/index.html`, and served at `/manual` and under Help by a running instance |
+| **Manual in other languages** | [Dansk](https://bitdispatcher.com/manual/da/), [Deutsch](https://bitdispatcher.com/manual/de/), [Español](https://bitdispatcher.com/manual/es/), [Suomi](https://bitdispatcher.com/manual/fi/), [Français](https://bitdispatcher.com/manual/fr/), [Italiano](https://bitdispatcher.com/manual/it/), [Norsk bokmål](https://bitdispatcher.com/manual/nb/), [Nederlands](https://bitdispatcher.com/manual/nl/), [Polski](https://bitdispatcher.com/manual/pl/), [Português](https://bitdispatcher.com/manual/pt/), [Svenska](https://bitdispatcher.com/manual/sv/): translated by machine from the English (`docs/manual/i18n`), not yet checked by native speakers; the English is the reference. A chapter changed since its translation is shown in English until it is updated. Built in, under `/manual/<language>/` |
 | [**Design**](docs/DESIGN.md) | What bitdispatcher is, its rules, its scope and the phases |
 | [**Operations**](docs/OPERATIONS.md) | The event ledger, the reports and their counting rules |
 | [**BitVoice**](docs/BITVOICE.md) | Every BitVoice hook and how bitdispatcher uses it |

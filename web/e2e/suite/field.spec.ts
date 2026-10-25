@@ -70,3 +70,35 @@ test('dispatch and a crew message each other, and the crew takes a waiting incid
   await expect.poll(async () => (await api.get('/state')).units.find((u: { id: string }) => u.id === 'E4').incident).toBe(inc.number)
   expect(errors).toEqual([])
 })
+
+test('an urgent BOLO reaches the crew on the terminal, sounds, and is acknowledged by the crew', async ({ page, request }) => {
+  const api = await adminAPI(request)
+  expect((await api.put('/admin/users/e5crew', { name: 'Engine 5 crew', role: 'field', password: 'engine-five-crew-e2e', disabled: false })).ok()).toBeTruthy()
+  await page.addInitScript(() => {
+    const w = window as unknown as { __tones: number }
+    w.__tones = 0
+    class Counting extends OfflineAudioContext {
+      constructor() { super(1, 48000, 48000) }
+      resume() { return Promise.resolve() }
+      createOscillator() { w.__tones++; return super.createOscillator() }
+    }
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = Counting
+  })
+  const errors = await signIn(page, 'e5crew', 'engine-five-crew-e2e', 'field', 'E5')
+  const subject = 'Armed suspect seen near Kirk ' + Date.now()
+  const r = await api.post('/comms', { kind: 'bolo', priority: 'urgent', subject, body: 'Approach with caution', plate: 'ZZT987', to: ['E5'] })
+  expect(r.ok()).toBeTruthy()
+  const id = (await r.json()).id
+  const banner = page.getByRole('alert').filter({ hasText: subject })
+  await expect(banner).toBeVisible({ timeout: 20_000 })
+  // The page was used (sign-in), so sound is allowed: the urgent tone was made.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __tones: number }).__tones)).toBeGreaterThan(0)
+  await banner.getByRole('button', { name: subject }).click()
+  await expect(page.getByRole('region', { name: 'Messages and BOLOs for this unit' }).getByText('Approach with caution')).toBeVisible()
+  await banner.getByRole('button', { name: 'Acknowledge' }).click()
+  await expect(banner).toBeHidden()
+  const c = (await api.get('/comms/' + encodeURIComponent(id))).versions.at(-1)
+  expect(Object.keys(c.acked ?? {})).toContain('e5crew')
+  expect(Object.keys(c.opened ?? {})).toContain('e5crew')
+  expect(errors).toEqual([])
+})

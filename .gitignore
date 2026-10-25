@@ -23,3 +23,6 @@
 /web/playwright-report/
 /web/tsconfig.tsbuildinfo
 /dist-site/
+
+# translated manuals' PDFs are built by make manual and published on the website, not committed
+/docs/manual/*/bitdispatcher-manual.pdf

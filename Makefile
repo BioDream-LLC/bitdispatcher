@@ -33,8 +33,9 @@ e2e: build sim
 manual:
 	cd web && $(PNPM) exec tsc src/manual.ts src/figures.ts --outDir /tmp/bitdispatcher-manual --module es2022 --target es2022 --moduleResolution bundler --skipLibCheck && \
 		cp /tmp/bitdispatcher-manual/manual.js /tmp/bitdispatcher-manual/manual.mjs && cp /tmp/bitdispatcher-manual/figures.js /tmp/bitdispatcher-manual/figures.mjs && \
-		mkdir -p $(CURDIR)/docs/manual && node scripts/manual.mjs /tmp/bitdispatcher-manual/manual.mjs $(CURDIR)/docs/manual/index.html $(CURDIR)/docs/manual/bitdispatcher-manual.pdf && \
-		cp $(CURDIR)/docs/manual/index.html $(CURDIR)/docs/manual/bitdispatcher-manual.pdf $(CURDIR)/internal/web/manual/
+		mkdir -p $(CURDIR)/docs/manual && node scripts/manual.mjs /tmp/bitdispatcher-manual/manual.mjs $(CURDIR)/docs/manual $(CURDIR)/docs/manual/i18n && \
+		cp $(CURDIR)/docs/manual/index.html $(CURDIR)/docs/manual/bitdispatcher-manual.pdf $(CURDIR)/internal/web/manual/ && \
+		for f in $(CURDIR)/docs/manual/i18n/*.json; do l=$$(basename $$f .json); mkdir -p $(CURDIR)/internal/web/manual/$$l && cp $(CURDIR)/docs/manual/$$l/index.html $(CURDIR)/internal/web/manual/$$l/; done
 
 test:
 	$(GO) test ./...

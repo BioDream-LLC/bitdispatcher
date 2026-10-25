@@ -1,9 +1,31 @@
 // Adapted from BitVoice's (Apache-2.0, BioDream LLC). Builds docs/manual/index.html from src/manual.ts (the articles under Help) and src/figures.ts, then the
-// PDF with Chromium. Run with: make manual
+// PDF with Chromium; and the same for every translation in docs/manual/i18n/<lang>.json, into <lang>/.
+// Run with: make manual
+//
+//   node scripts/manual.mjs <compiled manual.mjs> <out dir> <i18n dir>
+//
+// A translated chapter is used only while its "src" (a hash of the English title and body) still matches the
+// English: a chapter changed since it was translated is shown in English with a note, never out of date.
 import { chromium } from '@playwright/test'
-import { writeFileSync } from 'fs'
+import { createHash } from 'crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 const { manual, parts } = await import(process.argv[2])
 const { figures } = await import(process.argv[2].replace(/manual\.mjs$/, 'figures.mjs'))
+const outDir = process.argv[3], i18nDir = process.argv[4]
+const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12)
+
+// The English words of the page itself; a translation carries its own.
+const EN = {
+  title: 'bitdispatcher manual',
+  subtitle: 'A free 911 computer-aided dispatch system in one program, set up entirely in the web interface: the dispatcher screen, the recorded map and aerial photos, road-routed recommendations, move-ups, the mobile terminal and reports built from the ledger.',
+  description: 'The bitdispatcher manual: a free 911 computer-aided dispatch system with a recorded dispatch map, aerial photos, road routing, a mobile terminal and ledger-built reports.',
+  manual: 'Manual', findTopic: 'Find a topic', contents: 'Contents', part: 'Part', chapter: 'Chapter', chapterRef: 'chapter',
+  where: 'In the web interface:', figure: 'Figure', chapters: 'chapters', figures: 'figures', thousandWords: 'thousand words',
+  footer: 'bitdispatcher is a product of BioDream LLC, published under the Apache License 2.0. The same chapters are under Help in every bitdispatcher. Map data © OpenStreetMap contributors (ODbL).',
+  pdfFooter: 'bitdispatcher manual', languages: 'Languages', pdf: 'This manual as a PDF',
+}
+const langs = existsSync(i18nDir) ? readdirSync(i18nDir).filter((f) => f.endsWith('.json')).sort().map((f) => JSON.parse(readFileSync(`${i18nDir}/${f}`, 'utf8'))) : []
+let T = EN
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const byId = Object.fromEntries(manual.map((a) => [a.id, a]))
@@ -16,7 +38,7 @@ const number = Object.fromEntries(order.map((id, i) => [id, i + 1]))
 // A link to a screen points at the chapter about that screen: the first in reading order with its route.
 const byRoute = {}
 for (const id of order) { const r = byId[id].route; if (r && !(r in byRoute)) byRoute[r] = id }
-let figureNo = 0
+let figureNo = 0, FIG = {}
 
 function inline(s) {
   let out = '', last = 0
@@ -28,10 +50,10 @@ function inline(s) {
       const [, text, href] = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(t)
       if (href.startsWith('#/')) {
         const id = byRoute[href.slice(1).split('?')[0]]
-        out += id ? `<a href="#${id}">${esc(text)}</a><span class="ref"> (chapter ${number[id]})</span>` : `<strong>${esc(text)}</strong>`
+        out += id ? `<a href="#${id}">${esc(text)}</a><span class="ref"> (${esc(T.chapterRef)} ${number[id]})</span>` : `<strong>${esc(text)}</strong>`
       } else if (href.startsWith('#')) {
         const id = href.slice(1)
-        out += byId[id] ? `<a href="#${id}">${esc(text)}</a><span class="ref"> (chapter ${number[id]})</span>` : esc(text)
+        out += byId[id] ? `<a href="#${id}">${esc(text)}</a><span class="ref"> (${esc(T.chapterRef)} ${number[id]})</span>` : esc(text)
       } else if (href.startsWith('/')) out += `<code>${esc(href)}</code> (${esc(text)})`
       else out += `<a href="${esc(href)}">${esc(text)}</a>`
     }
@@ -51,7 +73,7 @@ function md(text) {
       const f = figures[l.slice(9).trim()]
       if (!f) throw new Error('no figure ' + l.slice(9))
       figureNo++
-      out.push(`<figure>${f.svg}<figcaption><b>Figure ${figureNo}.</b> ${esc(f.title)}</figcaption></figure>`)
+      out.push(`<figure>${f.svg}<figcaption><b>${esc(T.figure)} ${figureNo}.</b> ${esc(FIG[l.slice(9).trim()] || f.title)}</figcaption></figure>`)
       i++; continue
     }
     if (l.startsWith('> ')) { const n = []; for (; i < lines.length && lines[i].startsWith('> '); i++) n.push(lines[i].slice(2)); out.push(`<aside>${inline(n.join(' '))}</aside>`); continue }
@@ -79,17 +101,33 @@ const logo = `<svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true"
 // Its own gradient id: the menu's logo is hidden in print, and a gradient inside hidden SVG draws nothing.
 const bigLogo = logo.replace('width="34" height="34"', 'width="96" height="96"').replaceAll('id="g"', 'id="g2"').replaceAll('url(#g)', 'url(#g2)')
 
-const words = manual.reduce((n, a) => n + a.body.split(/\s+/).length, 0)
-const chapters = parts.map((p, pi) => `<section class="part" id="part-${pi + 1}"><div class="partno">Part ${pi + 1}</div><h1 class="parttitle">${esc(p.title)}</h1><p class="lede">${inline(p.intro)}</p></section>\n` +
+function page(tr) {
+  T = tr ? { ...EN, ...tr.ui } : EN
+  FIG = tr?.figures ?? {}
+  figureNo = 0
+  const lang = tr?.lang ?? 'en'
+  // The chapter or part as this language has it, while the translation is of the English as it is now.
+  const chap = (a) => { const c = tr?.chapters?.[a.id]; return c && c.src === hash(a.title + '\n' + a.body) ? c : null }
+  const part = (p, pi) => { const x = tr?.parts?.[pi]; return x && x.src === hash(p.title + '\n' + p.intro) ? x : p }
+  const up = tr ? '../' : ''
+  const langBar = langs.length ? `<div class="np">${esc(T.languages)}</div><div class="langs">` + [{ lang: 'en', name: 'English' }, ...langs].map((l) =>
+    `<a href="${l.lang === 'en' ? up : (tr ? '../' : '') + l.lang + '/'}" hreflang="${l.lang}" lang="${l.lang}"${l.lang === lang ? ' aria-current="true"' : ''}>${esc(l.name)}</a>`).join('') + '</div>' : ''
+  const pdfHref = tr ? `https://bitdispatcher.com/manual/${lang}/bitdispatcher-manual.pdf` : 'bitdispatcher-manual.pdf'
+  const words = manual.reduce((n, a) => n + (chap(a)?.body ?? a.body).split(/\s+/).length, 0)
+const chapters = parts.map((p, pi) => `<section class="part" id="part-${pi + 1}"><div class="partno">${esc(T.part)} ${pi + 1}</div><h1 class="parttitle">${esc(part(p, pi).title)}</h1><p class="lede">${inline(part(p, pi).intro)}</p></section>\n` +
   p.ids.map((id) => {
-    const a = byId[id]
-    return `<section class="chapter" id="${a.id}"><div class="chapno">Chapter ${number[id]}</div><h2>${esc(a.title)}</h2>${a.route ? `<div class="where">In the web interface: <code>${esc(a.route)}</code></div>` : ''}\n${md(a.body)}</section>`
+    const a = byId[id], c = chap(a)
+    const stale = tr && !c ? `<aside lang="${lang}">${esc(T.untranslated)}</aside>` : ''
+    return `<section class="chapter" id="${a.id}"${tr && !c ? ' lang="en"' : ''}><div class="chapno">${esc(T.chapter)} ${number[id]}</div><h2>${esc(c?.title ?? a.title)}</h2>${a.route ? `<div class="where">${esc(T.where)} <code>${esc(a.route)}</code></div>` : ''}\n${stale}${md(c?.body ?? a.body)}</section>`
   }).join('\n')).join('\n')
 
-const toc = parts.map((p, pi) => `<li class="tp"><a href="#part-${pi + 1}">Part ${pi + 1}. ${esc(p.title)}</a><ol>${p.ids.map((id) => `<li><a href="#${id}"><span>${number[id]}.</span> ${esc(byId[id].title)}</a></li>`).join('')}</ol></li>`).join('')
+const title = (id) => chap(byId[id])?.title ?? byId[id].title
+const toc = parts.map((p, pi) => `<li class="tp"><a href="#part-${pi + 1}">${esc(T.part)} ${pi + 1}. ${esc(part(p, pi).title)}</a><ol>${p.ids.map((id) => `<li><a href="#${id}"><span>${number[id]}.</span> ${esc(title(id))}</a></li>`).join('')}</ol></li>`).join('')
 
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>bitdispatcher manual</title><meta name="description" content="The bitdispatcher manual: a free 911 computer-aided dispatch system with a recorded dispatch map, aerial photos, road routing, a mobile terminal and ledger-built reports.">
+const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(T.title)}</title><meta name="description" content="${esc(T.description)}">
+<link rel="canonical" href="https://bitdispatcher.com/manual/${tr ? lang + '/' : ''}">
+${[{ lang: 'en' }, ...langs].map((l) => `<link rel="alternate" hreflang="${l.lang}" href="https://bitdispatcher.com/manual/${l.lang === 'en' ? '' : l.lang + '/'}">`).join('')}
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;background:#060b16;color:#cbd5e1}
 a{color:#7dd3fc}code{font:0.88em ui-monospace,SFMono-Regular,Menlo,monospace;background:#111a2e;color:#fcd34d;padding:1px 5px;border-radius:5px}
@@ -98,7 +136,7 @@ nav{position:fixed;top:0;left:0;bottom:0;width:300px;overflow-y:auto;background:
 nav .brand{display:flex;gap:10px;align-items:center;margin-bottom:6px}nav .brand b{font-size:20px;background:linear-gradient(90deg,#fb7185,#fdba74);-webkit-background-clip:text;background-clip:text;color:transparent}
 nav input{width:100%;margin:12px 0;padding:8px 10px;border-radius:8px;border:1px solid #334155;background:#020617;color:#e2e8f0}
 nav .np{margin:14px 6px 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a78bfa}
-nav a{display:block;padding:3px 8px;border-radius:6px;color:#94a3b8;text-decoration:none;font-size:14px}nav a:hover{background:#111a2e;color:#e2e8f0}
+nav .where a{display:inline;padding:0;color:#7dd3fc}nav a{display:block;padding:3px 8px;border-radius:6px;color:#94a3b8;text-decoration:none;font-size:14px}nav a:hover{background:#111a2e;color:#e2e8f0}
 main{margin-left:300px;max-width:960px;padding:32px 48px 80px}
 .title{min-height:70vh;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .title h1{font-size:56px;margin:0;background:linear-gradient(90deg,#fb7185,#fdba74);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -114,30 +152,49 @@ figure{margin:20px 0}figure svg{width:100%;height:auto;display:block}figcaption{
 aside{border-left:4px solid #fbbf24;background:#1f1705;color:#fde68a;padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0}
 table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px}th{text-align:left;color:#94a3b8;font-weight:600;border-bottom:1px solid #334155;padding:6px 10px 6px 0}td{border-bottom:1px solid #1e293b;padding:6px 10px 6px 0;vertical-align:top}
 footer{margin-top:60px;color:#64748b;font-size:13px}
+.langs{display:flex;flex-wrap:wrap;gap:2px 4px;padding:0 4px}.langs a{display:inline-block;padding:2px 7px;font-size:13px}.langs a[aria-current]{background:#1e293b;color:#fdba74}
+.notice{border:1px solid #475569;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:12px 16px;font-size:15px}.notice a{font-weight:600}
 @media (max-width:900px){nav{position:static;width:auto;height:auto;max-height:40vh}main{margin:0;padding:20px}.toc{columns:1}}
-@media print{:root{color-scheme:light}body{background:#fff;color:#1e293b;font-size:10.5pt}nav{display:none}main{margin:0;padding:0;max-width:none}
+@media print{:root{color-scheme:light}body{background:#fff;color:#1e293b;font-size:10.5pt}nav{display:none}.notice{background:#f8fafc;color:#0f172a;border-color:#cbd5e1}main{margin:0;padding:0;max-width:none}
 .title{min-height:9in;break-after:page}.title h1{color:#0c4a6e;-webkit-text-fill-color:#0c4a6e}.title .sub{color:#0f172a}
 .contents{break-after:page}.toc ol a,.toc>li>a{color:#0f172a}section.part{break-before:page;border-top-color:#6d28d9}.parttitle{color:#0f172a}
 h2{color:#0c4a6e}h3{color:#5b21b6}h4{color:#0369a1}strong{color:#0f172a}code{background:#f1f5f9;color:#9a3412}pre{background:#f8fafc;color:#14532d;border-color:#e2e8f0;white-space:pre-wrap}
 a{color:#0369a1;text-decoration:none}aside{background:#fffbeb;color:#78350f}th{color:#334155;border-color:#cbd5e1}td{border-color:#e2e8f0}figcaption{color:#475569}
 section.chapter{break-inside:auto}h2,h3,h4{break-after:avoid}figure,table,aside,pre{break-inside:avoid}}
 </style></head><body>
-<nav aria-label="Contents"><div class="brand">${logo}<b>bitdispatcher</b></div><div class="where">Manual</div>
-<input type="search" placeholder="Find a topic" aria-label="Find a topic" oninput="const q=this.value.toLowerCase();document.querySelectorAll('nav a[data-k]').forEach(a=>a.style.display=a.dataset.k.includes(q)?'':'none')">
-${parts.map((p) => `<div class="np">${esc(p.title)}</div>` + p.ids.map((id) => { const a = byId[id]; return `<a href="#${a.id}" data-k="${esc((a.title + ' ' + a.keys).toLowerCase())}">${number[id]}. ${esc(a.title)}</a>` }).join('')).join('\n')}</nav>
+<nav aria-label="${esc(T.contents)}"><div class="brand">${logo}<b>bitdispatcher</b></div><div class="where">${esc(T.manual)} · <a href="${pdfHref}">PDF</a></div>
+${langBar}
+<input type="search" placeholder="${esc(T.findTopic)}" aria-label="${esc(T.findTopic)}" oninput="const q=this.value.toLowerCase();document.querySelectorAll('nav a[data-k]').forEach(a=>a.style.display=a.dataset.k.includes(q)?'':'none')">
+${parts.map((p, pi) => `<div class="np">${esc(part(p, pi).title)}</div>` + p.ids.map((id) => { const a = byId[id]; return `<a href="#${a.id}" data-k="${esc((title(id) + ' ' + a.title + ' ' + a.keys).toLowerCase())}">${number[id]}. ${esc(title(id))}</a>` }).join('')).join('\n')}</nav>
 <main>
-<section class="title">${bigLogo}<h1>bitdispatcher manual</h1><div class="sub">A free 911 computer-aided dispatch system in one program, set up entirely in the web interface: the dispatcher screen, the recorded map and aerial photos, road-routed recommendations, move-ups, the mobile terminal and reports built from the ledger.</div>
-<div class="meta">${order.length} chapters · ${figureNo || '—'} figures · ${Math.round(words / 1000)} thousand words · BioDream LLC</div></section>
-<section class="contents"><h2>Contents</h2><ol class="toc">${toc}</ol></section>
+<section class="title">${bigLogo}<h1>${esc(T.title)}</h1><div class="sub">${esc(T.subtitle)}</div>
+${tr ? `<div class="notice">${esc(T.notice)} ${esc(T.screenNote)} <a href="../" hreflang="en">${esc(T.english)}</a></div>` : ''}
+<div class="meta">${order.length} ${esc(T.chapters)} · FIGURES ${esc(T.figures)} · ${Math.round(words / 1000)} ${esc(T.thousandWords)} · BioDream LLC</div></section>
+<section class="contents"><h2>${esc(T.contents)}</h2><ol class="toc">${toc}</ol></section>
 ${chapters}
-<footer>bitdispatcher is a product of BioDream LLC, published under the Apache License 2.0. The same chapters are under <strong>Help</strong> in every bitdispatcher. Map data © OpenStreetMap contributors (ODbL).</footer></main></body></html>`
+<footer>${esc(T.footer)}</footer></main></body></html>`
+  // The figure count on the title page is known only once the chapters are drawn.
+  return { html: html.replace('FIGURES', String(figureNo)), words, stale: tr ? manual.filter((a) => !chap(a)).map((a) => a.id) : [] }
+}
 
-// The figure count on the title page is known only once the chapters are drawn.
-writeFileSync(process.argv[3], html.replace(/<div class="meta">\d+ chapters · [^·]+ figures/, `<div class="meta">${order.length} chapters · ${figureNo} figures`))
-const b = await chromium.launch(); const p = await b.newPage()
-await p.goto('file://' + process.argv[3])
-await p.pdf({ path: process.argv[4], format: 'Letter', printBackground: true, displayHeaderFooter: true, headerTemplate: '<span></span>',
-  footerTemplate: '<div style="font-size:8px;width:100%;text-align:center;color:#64748b">bitdispatcher manual · BioDream LLC · <span class="pageNumber"></span> / <span class="totalPages"></span></div>',
-  margin: { top: '0.6in', bottom: '0.7in', left: '0.7in', right: '0.7in' } })
-await b.close()
-console.log(order.length, 'chapters,', figureNo, 'figures,', words, 'words')
+async function write(dir, tr, browser) {
+  mkdirSync(dir, { recursive: true })
+  const { html, words, stale } = page(tr)
+  writeFileSync(`${dir}/index.html`, html)
+  const p = await browser.newPage()
+  await p.goto('file://' + `${dir}/index.html`)
+  await p.pdf({ path: `${dir}/bitdispatcher-manual.pdf`, format: 'Letter', printBackground: true, displayHeaderFooter: true, headerTemplate: '<span></span>',
+    footerTemplate: `<div style="font-size:8px;width:100%;text-align:center;color:#64748b">${esc(T.pdfFooter)} · BioDream LLC · <span class="pageNumber"></span> / <span class="totalPages"></span></div>`,
+    margin: { top: '0.6in', bottom: '0.7in', left: '0.7in', right: '0.7in' } })
+  await p.close()
+  return { words, stale }
+}
+
+const browser = await chromium.launch()
+const en = await write(outDir, null, browser)
+console.log(order.length, 'chapters,', figureNo, 'figures,', en.words, 'words')
+for (const tr of langs) {
+  const r = await write(`${outDir}/${tr.lang}`, tr, browser)
+  console.log(`  ${tr.lang} (${tr.name}): ${order.length - r.stale.length} of ${order.length} chapters translated` + (r.stale.length ? `; in English until updated: ${r.stale.join(', ')}` : ''))
+}
+await browser.close()

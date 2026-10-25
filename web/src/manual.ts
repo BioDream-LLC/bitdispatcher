@@ -457,6 +457,7 @@ Browsers keep a page silent until someone has used it. After a reload, the first
 - **Emergency**: hold the button for two seconds. Dispatch sees the emergency banner and acknowledges it.
 - **Photos** on the map, as on the console.
 - **Messages**: what dispatch (or another unit) writes to this unit, with a reply line and quick replies (Copy, Delayed, Need PD…). An urgent message fills the top of the screen and sounds until the crew presses Got it; see [Messages](#messages).
+- **Messages and BOLOs**: the communications addressed to this unit or its agency's terminals (messages, BOLOs, officer-safety notices), highest priority first, with the agency's tones, repeats and acknowledgement as on the console. An urgent or high one that needs acknowledging stays at the top until the crew presses **Acknowledge**; opening one shows every version, the plate and description, and the attachments. Opening and acknowledging are recorded against the unit's sign-on; see [Messages and BOLOs](#inbox).
 - **Take it**: where the agency allows crews to attach themselves (Settings › Roles), an available unit takes a waiting incident from the list in one press; it is recorded as a dispatch by the crew, self-attached.
 
 A crew acts only as its own unit. Dispatchers can open the terminal at #/mdt to see what a unit sees (the position names the unit).`,

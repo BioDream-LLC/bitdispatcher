@@ -91,40 +91,18 @@
   </div>
 </section>
 
-<section class="band">
+<section class="band tech" id="technology">
   <div class="wrap">
     <div class="intro">
-      <p class="eyebrow">And the everyday work, done reliably</p>
-      <h2>Everything a small or mid-size 911 centre needs, done reliably</h2>
-      <p>The large CAD vendors price out the counties and cities that need dispatch the most. bitdispatcher is one program, free,
-        with its source: no server farm, no database to stand up first, no per-seat licence.</p>
+      <p class="eyebrow">Everything in one program</p>
+      <h2>The technology inside, explained</h2>
+      <p>Most centres buy a CAD, then a mapping product, a mobile terminal, a reporting module, a paging service and an
+        alerting tool. bitdispatcher is all of them, in one free download. Each square opens an article on the technology:
+        what it is, the standard behind it, where dispatch systems usually fall short, how bitdispatcher does it, and how far
+        that has been tested.</p>
     </div>
-    <div class="grid">
-      <a class="card" href="/features/#the-dispatchers-console"><div class="icon">ICON:console</div><h3>A console with nothing wasted</h3>
-        <p>911 calls ringing before they are answered, incidents with priority timers, the map, the incident and every unit's
-        status on one screen, and a command line for everything.</p></a>
-      <a class="card" href="/features/#the-dispatchers-console"><div class="icon">ICON:route</div><h3>Units recommended by road</h3>
-        <p>Run cards by capability and road time, counting what is already on scene, saying what is short and which stations would
-        be left empty. One keystroke sends them.</p></a>
-      <a class="card" href="/features/#screens-for-several-monitors"><div class="icon">ICON:monitors</div><h3>A screen for every monitor</h3>
-        <p>Calls, fire houses, police, units, the map and the incident, each on its own monitor, opened in one click and
-        remembered for the position. Choose an incident on one and the others follow.</p></a>
-      <a class="card" href="/features/#fire-ems-and-police"><div class="icon">ICON:siren</div><h3>Fire, EMS and police together</h3>
-        <p>A fire-house board with bays and move-ups, police mark-outs with where each officer is and a timer for every status
-        check, and a screen limited to one discipline when that is wanted.</p></a>
-      <a class="card" href="/features/#the-map-with-no-internet"><div class="icon">ICON:map</div><h3>A map that works with no internet</h3>
-        <p>OpenStreetMap, the county's address points and aerial photos recorded for a 100-mile circle: dispatch styling, road
-        routing and address search, all local.</p></a>
-      <a class="card" href="/features/#in-the-field"><div class="icon">ICON:truck</div><h3>A mobile terminal for the crews</h3>
-        <p>The assignment, the route, the premises' hazards, notes from dispatch, statuses on the F-keys, mark-outs, GPS and the
-        emergency button, on any tablet or laptop.</p></a>
-      <a class="card" href="/features/#records-and-reporting"><div class="icon">ICON:file</div><h3>Reports nobody retypes</h3>
-        <p>Incident reports with NIBRS checked, Virginia's incident-based reporting file in one click, NCIC inquiries, and the
-        daily operations report built from the ledger.</p></a>
-      <a class="card" href="/features/#built-to-keep-running"><div class="icon">ICON:ledger</div><h3>A record that cannot quietly change</h3>
-        <p>Every decision in an append-only, hash-chained ledger, verified from the browser; several sites active-active, each
-        working on when cut off.</p></a>
-    </div>
+    {{TECH_TILES}}
+    <p class="edge-more"><a href="/tech/">All {{TECH_COUNT}} articles, by area</a> · <a href="/features/">Every feature, itemised</a></p>
   </div>
 </section>
 
@@ -241,6 +219,32 @@
       demo uses a simulated pager. Public alerts are checked with Google's CAP library and its IPAWS profile and with EAS
       Station's feed reader, and the NIBRS file with SEARCH's validator; none of that is certification. Licensed medical
       protocols, each state's NCIC and NIBRS connections, and IPAWS itself need those parties' approval as well as code. <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/docs/ROADMAP.md">The roadmap</a></p>
+  </div>
+</section>
+
+<section class="band maker-band">
+  <div class="wrap maker-row">
+    <a class="maker-logo big" href="https://biodream.io"><img src="/assets/biodream-wordmark.png" alt="BioDream" width="132" height="90" loading="lazy"></a>
+    <div>
+      <p class="eyebrow">Who makes it</p>
+      <h2>A product of BioDream LLC</h2>
+      <p>BioDream builds free and source-available software for healthcare, telecom and 911, and publishes the source. Use
+        bitdispatcher free; when it runs something that matters, <a href="https://biodream.io/support/">BioDream can keep it
+        running with you</a>. For the phones and 911 call handling in front of it, BioDream's BitVoice pairs with
+        bitdispatcher, which never requires it: <a href="/bitvoice/">with BitVoice, and without it</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band soft">
+  <div class="wrap">
+    <div class="intro">
+      <p class="eyebrow">The manual, in {{LANG_COUNT}} languages</p>
+      <h2>Every screen and every setting, written down</h2>
+      <p>The manual is built into every bitdispatcher under Help, and published here as one page and a PDF. The translations
+        were made by machine from the English and have not yet been checked by native speakers; the English is the reference.</p>
+    </div>
+    <div class="langs-row"><a class="btn btn-primary" href="/manual/">ICON:book English</a>{{LANGS}}</div>
   </div>
 </section>
 

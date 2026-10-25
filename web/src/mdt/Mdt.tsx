@@ -14,6 +14,7 @@ import { Logo, StatusChip } from '../ui'
 import PremiseBox from '../console/PremiseBox'
 import { ViewsButton } from '../views/PlaceViews'
 import MdtMessages from './Messages'
+import MdtBulletins from './Bulletins'
 import { clock, cx, mi, prio, statusMeta, useNow } from '../util'
 import { CrewDialog } from '../console/Roadmap'
 import type { MemberBrief, PaperFlag, BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, UnitMessage, View } from '../types'
@@ -261,6 +262,7 @@ export default function Mdt() {
               )}
             </div>
           )}
+          {me?.role === 'field' && <MdtBulletins />}
           <MdtMessages unit={u!.id} messages={m.messages ?? []} unitParam={unitParam} />
           {moOpen && (
             <div className="mt-auto space-y-2 rounded-lg border border-teal-700 bg-teal-950/30 p-2" aria-label="Mark out">

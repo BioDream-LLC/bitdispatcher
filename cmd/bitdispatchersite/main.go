@@ -35,13 +35,13 @@ type page struct {
 var pages = []page{
 	{"home.html", "/", "", "bitdispatcher: open-source 911 computer-aided dispatch in one program",
 		"bitdispatcher is a free, Apache-2.0 computer-aided dispatch system for 911 centres: incidents, units recommended by road time, an offline dispatch map, a screen for every monitor, mark-outs, a mobile terminal, NIBRS and NCIC, all from the browser.", "1.0"},
-	{"features.html", "/features/", "features", "Everything bitdispatcher does",
+	{"features.html", "/features/", "learn", "Everything bitdispatcher does",
 		"The dispatcher's console, screens for several monitors, fire houses, police mark-outs, the supervisor board, the offline map, the mobile terminal, records and reporting, itemised.", "0.9"},
-	{"bitvoice.html", "/bitvoice/", "bitvoice", "bitdispatcher with BitVoice, and without it",
+	{"bitvoice.html", "/bitvoice/", "proof", "bitdispatcher with BitVoice, and without it",
 		"bitdispatcher takes calls from any standards-compliant call-handling system through ALI, NENA i3 and EIDO, and uses every hook BitVoice, BioDream's open-source phone system and 911 call handling, offers a CAD.", "0.8"},
 	{"proof.html", "/proof/", "proof", "How bitdispatcher is tested, and what has not been tested",
 		"The tests every change must pass, what bitdispatcher is checked against, and what it has not been tried with yet. Not certified, not yet in service.", "0.8"},
-	{"get.html", "/get/", "get", "Get bitdispatcher",
+	{"get.html", "/get/", "learn", "Get bitdispatcher",
 		"Try the live demonstration in your browser, or build bitdispatcher from source: one Go program with its web interface inside, free under Apache 2.0.", "0.9"},
 }
 
@@ -94,8 +94,25 @@ func build(root, out, base string) error {
 	if err := copyFile(filepath.Join(root, "web/public/favicon.svg"), filepath.Join(out, "assets/bitdispatcher-logo.svg")); err != nil {
 		return err
 	}
+	if err := copyFile(filepath.Join(root, "site/static/biodream-wordmark.png"), filepath.Join(out, "assets/biodream-wordmark.png")); err != nil {
+		return err
+	}
 	if err := copyShots(root, out); err != nil {
 		return err
+	}
+	if err := loadArticles(root); err != nil {
+		return err
+	}
+	if langs, err = manualLangs(root); err != nil {
+		return err
+	}
+	manualHTML, err := os.ReadFile(filepath.Join(root, "docs/manual/index.html"))
+	if err != nil {
+		return err
+	}
+	var langLinks strings.Builder
+	for _, l := range langs {
+		fmt.Fprintf(&langLinks, `<a class="btn btn-line" href="/manual/%s/" hreflang="%s" lang="%s">%s</a>`, l.code, l.code, l.code, html.EscapeString(l.name))
 	}
 
 	fill := strings.NewReplacer(
@@ -105,6 +122,11 @@ func build(root, out, base string) error {
 		"{{TESTED}}", markdown(parts["TESTED"]),
 		"{{STATUS}}", markdown(parts["STATUS"]),
 		"{{BITVOICE}}", markdown(parts["BITVOICE"]),
+		"{{TECH_TILES}}", tiles(),
+		"{{TECH_COUNT}}", fmt.Sprint(len(arts)),
+		"{{MANUAL_INDEX}}", manualIndex(string(manualHTML)),
+		"{{LANGS}}", langLinks.String(),
+		"{{LANG_COUNT}}", fmt.Sprint(len(langs)+1),
 	)
 	var sitemap strings.Builder
 	sitemap.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
@@ -122,13 +144,39 @@ func build(root, out, base string) error {
 		}
 		fmt.Fprintf(&sitemap, "<url><loc>%s%s</loc><priority>%s</priority></url>\n", base, p.path, p.priority)
 	}
-	// The manual, as docs/manual holds it: one HTML file with its own styles, and the PDF.
+	// The technology articles, and their index.
+	if err := write(out, "/tech/", layout(base, "/tech/", "learn", "The technology inside bitdispatcher, explained",
+		"How a 911 dispatch system works, one technology at a time: NG9-1-1 and EIDO, caller location, the offline map, road-time recommendation, the ledger, NIBRS, NCIC and more.", techIndex())); err != nil {
+		return err
+	}
+	fmt.Fprintf(&sitemap, "<url><loc>%s/tech/</loc><priority>0.8</priority></url>\n", base)
+	for _, a := range arts {
+		path := "/tech/" + a.slug + "/"
+		if err := write(out, path, layout(base, path, a.group, a.title+" · bitdispatcher", a.description, articlePage(a))); err != nil {
+			return err
+		}
+		fmt.Fprintf(&sitemap, "<url><loc>%s%s</loc><priority>0.7</priority></url>\n", base, path)
+	}
+	// The manual, as docs/manual holds it: one HTML file with its own styles, and the PDF; and each
+	// translation (its PDF when make manual has built it).
 	for _, f := range []string{"index.html", "bitdispatcher-manual.pdf"} {
 		if err := copyFile(filepath.Join(root, "docs/manual", f), filepath.Join(out, "manual", f)); err != nil {
 			return err
 		}
 	}
-	fmt.Fprintf(&sitemap, "<url><loc>%s/manual/</loc><priority>0.8</priority></url>\n</urlset>\n", base)
+	fmt.Fprintf(&sitemap, "<url><loc>%s/manual/</loc><priority>0.8</priority></url>\n", base)
+	for _, l := range langs {
+		if err := copyFile(filepath.Join(root, "docs/manual", l.code, "index.html"), filepath.Join(out, "manual", l.code, "index.html")); err != nil {
+			return fmt.Errorf("the %s manual is not built (make manual): %w", l.code, err)
+		}
+		if pdf := filepath.Join(root, "docs/manual", l.code, "bitdispatcher-manual.pdf"); fileExists(pdf) {
+			if err := copyFile(pdf, filepath.Join(out, "manual", l.code, "bitdispatcher-manual.pdf")); err != nil {
+				return err
+			}
+		}
+		fmt.Fprintf(&sitemap, "<url><loc>%s/manual/%s/</loc><priority>0.5</priority></url>\n", base, l.code)
+	}
+	sitemap.WriteString("</urlset>\n")
 	if err := os.WriteFile(filepath.Join(out, "sitemap.xml"), []byte(sitemap.String()), 0o644); err != nil {
 		return err
 	}
@@ -191,7 +239,9 @@ func areas(md string) []area {
 var areaIcons = map[string]string{
 	"the-dispatchers-console": "console", "screens-for-several-monitors": "monitors", "fire-ems-and-police": "siren",
 	"the-map-with-no-internet": "map", "in-the-field": "truck", "records-and-reporting": "file",
-	"assisting-the-dispatcher": "spark", "built-to-keep-running": "shield",
+	"assisting-the-dispatcher": "spark", "built-to-keep-running": "shield", "call-taking-and-roles": "phone",
+	"planning-and-the-numbers-to-call": "clock", "the-call-without-the-typing": "mic", "reviewing-and-releasing-the-record": "eye",
+	"looking-after-the-people": "heart", "working-with-others": "globe",
 }
 
 // features turns the README's feature list into the site's sections: one per group, every item a line.
@@ -280,6 +330,8 @@ func siteLink(u string) string {
 		return "/features/"
 	case strings.HasPrefix(u, "docs/manual/"):
 		return "/manual/" + strings.TrimPrefix(u, "docs/manual/")
+	case strings.HasPrefix(u, "/"):
+		return html.EscapeString(u)
 	case !strings.Contains(u, "://"):
 		return "https://github.com/BioDream-LLC/bitdispatcher/blob/main/" + u
 	}
@@ -357,6 +409,11 @@ func widerThan(path string, w int) bool {
 
 // pngFallback is set when the screenshots were copied as PNGs; the layout then rewrites the pages' .webp references.
 var pngFallback bool
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
 
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
