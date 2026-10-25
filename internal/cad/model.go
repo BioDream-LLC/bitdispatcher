@@ -483,6 +483,8 @@ type NextSettings struct {
 	LocLinkText string       `json:"locLinkText,omitempty"`
 	Alarms      AlarmPolicy  `json:"alarms,omitzero"`
 	Intake      IntakeScript `json:"intake,omitzero"`
+	// Support is who the agency asks for help: its IT staff, a support agreement (Admin › Support).
+	Support string `json:"support,omitempty"`
 }
 
 // AlarmPolicy is what an agency checks of an alarm before sending.

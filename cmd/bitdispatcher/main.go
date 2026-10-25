@@ -68,7 +68,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "bitdispatcher %s\n", version)
 		return 0
 	}
-	log := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logs := api.NewLogRing(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}), 500)
+	log := slog.New(logs)
 	if err := os.MkdirAll(*dataDir, 0o700); err != nil {
 		log.Error("data directory", "err", err)
 		return 1
@@ -130,7 +131,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	srv, err := api.New(&api.Server{Eng: eng, Auth: users, BV: bitvoice.New(eng, log), Log: log, DataDir: *dataDir, Version: version, Web: webH, Manual: web.Manual(),
 		Tiles:  api.NewTileCache(filepath.Join(*dataDir, "tiles"), tilesTpl, version),
 		Maps:   mapdata.NewService(filepath.Join(*dataDir, "map"), agent, log),
-		Photos: photos, Advisory: advisory.New(eng, log), GIS: gisSvc, TLSFingerprint: fp})
+		Photos: photos, Advisory: advisory.New(eng, log), GIS: gisSvc, TLSFingerprint: fp, SelfSigned: *certFile == "", Logs: logs})
 	if err != nil {
 		log.Error("server", "err", err)
 		return 1

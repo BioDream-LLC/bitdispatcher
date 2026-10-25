@@ -238,6 +238,8 @@ func (e *Engine) SaveSettings(a Actor, s Settings) error {
 		return problem("next", "the false-alarm limit is 0 to 100")
 	} else if len(n.LocLinkText) > 300 || n.LocLinkText != "" && !strings.Contains(n.LocLinkText, "{link}") {
 		return problem("next", "the location link's text holds {link}, under 300 characters")
+	} else if len(n.Support) > 2000 {
+		return problem("next", "who supports the agency fits in 2000 characters")
 	} else if err := CheckIntake(n.Intake); err != nil {
 		return err
 	}
@@ -446,7 +448,7 @@ func (e *Engine) Record(a Actor, typ string, data any) error {
 		EvPhotosRecording, EvPhotosRecorded, EvPhotosFailed,
 		EvAdvisorySuggested, EvAdvisoryDecided, EvAdvisoryWithdrawn, EvGISImporting, EvGISImported, EvGISFailed, EvJusticeQuery, EvIBRExported,
 		EvLocked, EvUnlocked, EvReviewExported, EvConfigStaged, EvWorkstationCode, EvUserDuties, EvUserMFAReset, EvRecordsViewed, EvTrainingInject,
-		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused:
+		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused, EvSupportBundle:
 	default:
 		return fmt.Errorf("cad: %s is not a record event", typ)
 	}

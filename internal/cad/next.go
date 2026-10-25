@@ -12,15 +12,17 @@ type nextState struct {
 	Cameras     map[string]*Camera       `json:"cameras"`
 	CameraLooks []CameraLook             `json:"cameraLooks"`
 	LocLinks    map[string]*LocationLink `json:"locationLinks"` // by call
+	setupState
 }
 
 func (s *State) initNext() {
 	s.Closures = map[string]*RoadClosure{}
 	s.Cameras, s.CameraLooks, s.LocLinks = map[string]*Camera{}, []CameraLook{}, map[string]*LocationLink{}
+	s.SetupTicks = map[string]SetupTick{}
 }
 
 func (s *State) applyNext(e ledger.Event) (bool, error) {
-	for _, f := range []func(ledger.Event) (bool, error){s.applyCameras, s.applyLocLinks} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyCameras, s.applyLocLinks, s.applySetup} {
 		if ok, err := f(e); ok {
 			return true, err
 		}

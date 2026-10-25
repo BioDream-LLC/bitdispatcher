@@ -451,4 +451,11 @@ export type NextSettings = {
   locLinkMinutes?: number; locLinkText?: string
   alarms?: { falseLimit?: number; falseWords?: string[] }
   intake?: IntakeScript
+  support?: string
 }
+
+export type SetupTick = { step: string; done: boolean; note?: string; by?: string; at?: string }
+export type SetupStep = { id: string; title: string; why: string; need: 'required' | 'recommended' | 'optional'; status: 'done' | 'todo' | 'warn'; detail?: string; page?: string; chapter?: string; manual?: boolean; tick?: SetupTick }
+export type GoLiveItem = { id: string; title: string; result: 'pass' | 'warn' | 'fail'; detail?: string; fix?: string }
+export type GoLiveResult = { at: string; by: string; pass: number; warn: number; fail: number; checks: GoLiveItem[] }
+export type SetupView = { steps: SetupStep[]; done: number; required: number; left: number; goLive?: GoLiveResult; support: string }

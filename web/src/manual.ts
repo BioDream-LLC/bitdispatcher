@@ -16,7 +16,7 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports, papers to serve and alerts to the public.',
     ids: ['alarms', 'admin-personnel', 'staffing', 'admin-qualifications', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'admin-roads', 'admin-cameras', 'admin-alarms', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
-    ids: ['admin-agencies', 'admin-operations', 'admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
+    ids: ['self-service', 'admin-setup', 'admin-golive', 'admin-support', 'admin-agencies', 'admin-operations', 'admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
 
 export const manual: Article[] = [
@@ -33,6 +33,8 @@ export const manual: Article[] = [
 4. **Call types and run cards**: what each kind of incident needs. The defaults are a sensible start. [Open Call types](#/admin/calltypes)
 5. **Users**: dispatchers, supervisors and field crews. [Open Users](#/admin/users)
 6. **Call handling**: connect BitVoice, or point any call-handling system's ALI spill and EIDO at bitdispatcher. [Open Integrations](#/admin/integrations)
+
+Admin › Setup checklist follows these steps and the rest of what comes before the first live call, and Admin › Go-live check tests the result. See [Self-service setup](#self-service). [Open the checklist](#/admin/setup)
 
 > bitdispatcher advises; the dispatcher decides. No feature dispatches a unit, closes an incident or changes a priority on its own.
 
@@ -919,6 +921,71 @@ Only approved text is shown, word for word; nothing is generated. Opening the ta
   {
     id: 'console-route', title: 'The full console', route: '/console', keys: 'console full dispatcher screen call taker switch',
     body: `**#/console** always opens the full dispatcher screen, whatever duty you signed in for: a call-taker can look at the whole board there, and come back to [call entry](#taker) at **#/taker**.`,
+  },
+  {
+    id: 'self-service', title: 'Self-service setup', keys: 'self-service setup install go live remote support on site checklist parallel run cutover backup restore pilot',
+    body: `An agency can set bitdispatcher up by itself, with no one from outside on site. Everything is configured on the admin screens, and the [setup checklist](#admin-setup) shows what is left. Support, whether from community support or a support agreement, is remote: e-mail, phone or a video call.
+
+## Who does what
+- **Your administrator** works through the checklist on the admin screens: the map, stations, units, call types, users and connections.
+- **Your IT staff** run the server (or two, for a [second site](#admin-sites)), its backups and its certificate.
+- **Your phone, radio and paging vendors** connect their systems to bitdispatcher's documented interfaces: ALI spills or EIDO for calls, the station alerting gateway, paging gateways. Anything that needs hands, cables or a site visit is theirs.
+- **Whoever supports you** answers questions and reads the [support bundle](#admin-support) you send. No one needs to see your screen or sign in to your system.
+
+## The order that works
+1. **Install** one server and sign in as the administrator. See [Getting started](#start).
+2. **Work the checklist** from the top: Admin › Setup checklist. Each step opens its page and its chapter here. [Open the checklist](#/admin/setup)
+3. **Bring in the old system's data**: premises and hazards, call types and run cards and, if you want them, past incidents ([Migration](#admin-migrate)); alarm permits ([Alarm companies & permits](#admin-alarms)).
+4. **Train** in Training mode: a copy of the system where nothing reaches real units. See [Training](#training).
+5. **Run beside the old system** for a few weeks: enter calls in both, and compare the recommendations and the times.
+6. **Pass the go-live check**: Admin › Go-live check. Fix what fails and run it again. [Open the check](#/admin/golive)
+7. **Switch over** at a quiet hour, with the old system still running read-only for a day.
+
+## Backups
+The [ledger](#ledger) is the system: every setting, unit and incident is rebuilt from it. Copy the whole data directory off the server every night, keep several nights, and once in a while restore one on a spare computer and sign in. A second site is not a backup: a mistake is copied to both at once. The go-live check proves the ledger replays; it cannot see copies kept elsewhere, so the checklist asks you to confirm them.
+
+> bitdispatcher sends nothing to BioDream or anyone else by itself. A support bundle leaves your system only when an administrator downloads it and chooses to send it.`,
+  },
+  {
+    id: 'admin-setup', title: 'Setup checklist', route: '/admin/setup', keys: 'setup checklist steps progress done required recommended optional not needed mark done confirm',
+    body: `Admin › Setup checklist lists everything to do before the first live call, in order. bitdispatcher checks most steps itself as you work: a step is done when its page has what it needs.
+
+- **Required** steps must be done before going live: the agency's name, the recorded map, stations, units, call types with run cards, the people (administrators with an authenticator), no demonstration data, nightly backups, training, and a passed [go-live check](#admin-golive) from the last week.
+- **Recommended** steps make the system much more useful: the county's GIS, the phone system, station alerting and paging, a second site, running beside the old system, and who supports you.
+- **Optional**: NCIC through the state message switch, which the state's CJIS office has to approve.
+
+Each step says why it matters and what bitdispatcher found (*3 stations; not on the map: Station 4*). **Open** goes to the page that does it; the **?** opens its chapter.
+
+**Mark done** is for what only a person can know: training given, backups copied off the server, the parallel run finished. Add a note if you like (*all three shifts*). **Not needed** is for a recommended or optional step the agency does without, with the reason (*no paging: stations are alerted by radio*). Steps bitdispatcher checks itself cannot be marked done by hand. Every mark is in the ledger with who made it; **Undo** takes it back.`,
+  },
+  {
+    id: 'admin-golive', title: 'Go-live check', route: '/admin/golive', keys: 'go-live check test ready restore ledger verify test calls certificate authenticator mfa paging sites disk demo',
+    body: `Admin › Go-live check runs automatic tests before the first live call. Run it again after any big change: a new map, new stations, a new phone system. **Run the check** takes a few seconds; the result is in the ledger, and the [setup checklist](#admin-setup) counts it as done when nothing failed in the last week.
+
+Each test passes, has something to look at, or fails:
+- **The ledger is intact**: every event's hash and link, from the first.
+- **The ledger restores**: a copy of the ledger is replayed on its own and compared with the running system (stations, units, call types, incidents).
+- **Room on the disk**: fails under 2 GB free, warns under 10 GB.
+- **No demonstration data**: no demo stations, premises, accounts or NCIC simulator.
+- **Administrators use an authenticator** (CJIS asks for a second factor).
+- **A trusted certificate**: warns when the server uses its own self-signed one.
+- **The recorded map covers every station.**
+- **Test calls at every station**: every call type with a run card, at every station that has units. Each is worked out and thrown away: nothing is written to the ledger and no unit is touched. It warns when drive times are straight lines, when another station's unit comes before the station's own (a [response plan](#admin-plans) can be the reason), and when a run card asks for units the agency does not have available.
+- **The phone system is connected**, **station alerting and paging work** (a page delivered in the last 30 days) and **a second site is copying** (in the last 2 minutes).
+
+**Fix** opens the page that fixes a test. The check never pages, texts or queries anyone. It cannot see backups kept elsewhere, the phone system's own wiring or the radio: confirm those on the checklist.`,
+  },
+  {
+    id: 'admin-support', title: 'Support and the support bundle', route: '/admin/support', keys: 'support bundle help contact remote logs diagnostics download redacted secrets privacy',
+    body: `Admin › Support says who your agency asks for help and builds a support bundle to send them.
+
+**Who to ask for help** is the agency's own text: the IT help desk, a support agreement's number and hours. Empty, it points to community support on GitHub (never post caller data, addresses or secrets there). Support for bitdispatcher is remote; anything that needs hands is done by your own staff and vendors.
+
+**Download the bundle** builds one zip file with what a helper needs to find a problem without seeing your screen: the version, operating system and uptime; the ledger's size and check; disk space; the setup checklist and the last go-live check; the link to the phone system and the other sites; counts of units, stations and incidents and the kinds of events in the last 7 days; the settings, stations, units, call types and response plans; the connections; and the server's recent warnings and errors.
+
+**What is left out**: calls, incidents, transcripts, recordings, caller names, numbers and locations, premise notes, usernames, passwords, tokens and keys. Every token, password and key in the connections becomes *(set)*. E-mail addresses, phone numbers and anything that looks like a token are removed from every file.
+
+**Read it before you send it.** A name someone typed into a setting or a call type's notify list stays in. bitdispatcher sends nothing by itself: you download the bundle and decide whether to send it, and to whom. Each download is recorded in the ledger with who made it.`,
   },
   {
     id: 'help', title: 'This manual', route: '/help', keys: 'help manual documentation guide search',

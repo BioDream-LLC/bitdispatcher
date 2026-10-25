@@ -52,6 +52,6 @@ The Go test suite covers the core rules: a camera is not offered until an admini
 
 ## Try it
 
-On the [demonstration](https://demo.bitdispatcher.com), switch cameras on in admin, make an incident near one, and open the camera to see the required reason and the record it leaves. The relevant manual chapters are [Cameras](/manual/#cameras) and [Cameras](/manual/#admin-cameras). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
+Cameras are switched on and listed by an administrator, and the public [demonstration](https://demo.bitdispatcher.com) does not sign people in as administrators. Run bitdispatcher on your own computer with `-demo` (see [Get it](/get/)), sign in as the administrator, switch cameras on and add one, make an incident near it, and open the camera to see the required reason and the record it leaves. The relevant manual chapters are [Cameras](/manual/#cameras) and [Cameras](/manual/#admin-cameras). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
 
 Related: [Road closures and traffic](/tech/road-closures-and-traffic/), [The event ledger](/tech/event-ledger/), [Where the caller is](/tech/caller-location/), [Security](/tech/security/)

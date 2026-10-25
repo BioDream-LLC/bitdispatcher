@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -34,6 +34,9 @@ import RoadsAdmin from './RoadsAdmin'
 import CamerasAdmin from './CamerasAdmin'
 import AlarmsAdmin from './AlarmsAdmin'
 import IntakeAdmin from './IntakeAdmin'
+import Setup from './Setup'
+import GoLive from './GoLive'
+import Support from './Support'
 import { Agencies } from './Agencies'
 import { OperationsRules } from './OperationsRules'
 import { Qualifications } from './Qualifications'
@@ -44,6 +47,9 @@ const Reports = lazy(() => import('./Reports'))
 const Quality = lazy(() => import('./Quality'))
 
 const PAGES = [
+  { to: 'setup', label: 'Setup checklist', icon: ListTodo, admin: true },
+  { to: 'golive', label: 'Go-live check', icon: Rocket, admin: true },
+  { to: 'support', label: 'Support', icon: LifeBuoy, admin: true },
   { to: 'agencies', label: 'Agencies', icon: Landmark, admin: true },
   { to: 'units', label: 'Units', icon: Truck, admin: true },
   { to: 'stations', label: 'Stations', icon: Building2, admin: true },
@@ -113,6 +119,9 @@ export default function Admin() {
         ) : (
           <Routes>
             <Route index element={<Navigate to={pages[0].to} replace />} />
+            <Route path="setup" element={<Setup />} />
+            <Route path="golive" element={<GoLive />} />
+            <Route path="support" element={<Support view={view} />} />
             <Route path="agencies" element={<Agencies view={view} />} />
             <Route path="operations" element={<OperationsRules view={view} />} />
             <Route path="qualifications" element={<Qualifications view={view} />} />

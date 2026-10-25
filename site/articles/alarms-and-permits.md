@@ -69,6 +69,6 @@ What has **not** been tested is bitdispatcher against a **real central station**
 
 ## Try it
 
-On the [demonstration](https://demo.bitdispatcher.com), post an alarm and watch it arrive as a data-only call with its permit and false-alarm notes, then type a phoned alarm on the alarm card. The relevant manual chapters are [Outside alerts](/manual/#alerts) and [Alarms and permits](/manual/#admin-alarms). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
+On the [demonstration](https://demo.bitdispatcher.com), type a phoned alarm on the alarm card and watch it arrive in the queue. Alarm companies' own addresses and the permit list are set up by an administrator, and the public demonstration does not sign people in as administrators: to try those, run bitdispatcher on your own computer with `-demo` (see [Get it](/get/)) and sign in as the administrator. The relevant manual chapters are [Outside alerts](/manual/#alerts) and [Alarms and permits](/manual/#admin-alarms). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
 
 Related: [Cameras near an incident](/tech/cameras-near-an-incident/), [Non-emergency intake](/tech/non-emergency-intake/), [The event ledger](/tech/event-ledger/), [Public incident feed](/tech/public-incident-feed/)

@@ -76,7 +76,10 @@ type Server struct {
 	trees          treeCache
 	next           nextRuntime // closures and traffic, location links, intake sessions (next.go)
 	sites          sites
-	TLSFingerprint string // this site's certificate, for other sites to pin
+	TLSFingerprint string   // this site's certificate, for other sites to pin
+	SelfSigned     bool     // the certificate is the server's own, not one the agency gave it
+	Logs           *LogRing // the recent warnings and errors, for the support bundle (nil: none kept)
+	started        time.Time
 	photoStats     statsCache
 
 	mu     sync.Mutex // integ, ali, aliErr
@@ -110,6 +113,7 @@ const csrfHeader = "X-BitDispatcher"
 // New builds the server and starts the configured integrations.
 func New(s *Server) (*Server, error) {
 	s.mux = http.NewServeMux()
+	s.started = time.Now()
 	if s.Views == nil {
 		s.Views = &views.Service{Agent: "bitdispatcher/" + s.Version + " (+https://github.com/biodream-llc/bitdispatcher)"}
 	}

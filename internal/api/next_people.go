@@ -49,6 +49,7 @@ func (s *Server) nextView(st *cad.State, calls []*cad.Call) NextView {
 }
 
 func (s *Server) nextRoutes() {
+	s.setupRoutes()
 	s.roadRoutes()
 	s.cameraRoutes()
 	s.hereRoutes()

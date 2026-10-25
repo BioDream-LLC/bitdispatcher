@@ -64,6 +64,6 @@ What has **not** been tested is the thing that matters most in the field: the in
 
 ## Try it
 
-On the [demonstration](https://demo.bitdispatcher.com), open **Admin › Non-emergency intake** and use **Try it**: it runs the saved script as a chat and makes nothing, so you can see the questions, watch a hand-over fire on an emergency word, and read the report that would result. The relevant manual chapters are [The non-emergency intake](/manual/#nonemergency) and [Setting up the intake](/manual/#admin-intake). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
+**Admin › Non-emergency intake** is an administrator page, and the public [demonstration](https://demo.bitdispatcher.com) does not sign people in as administrators. Run bitdispatcher on your own computer with `-demo` (see [Get it](/get/)), sign in as the administrator, open the page and use **Try it**: it runs the saved script as a chat and makes nothing, so you can see the questions, watch a hand-over fire on an emergency word, and read the report that would result. The relevant manual chapters are [The non-emergency intake](/manual/#nonemergency) and [Setting up the intake](/manual/#admin-intake). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
 
 Related: [Alarms and permits](/tech/alarms-and-permits/), [Live call transcripts and translation](/tech/transcripts-and-translation/), [Where the caller is](/tech/caller-location/), [The event ledger](/tech/event-ledger/)

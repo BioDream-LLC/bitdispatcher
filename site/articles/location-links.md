@@ -69,6 +69,6 @@ What has **not** been tested is the part that only real phones on a real network
 
 ## Try it
 
-On the [demonstration](https://demo.bitdispatcher.com), open a call with no good location, send a location link, open it in a second browser tab as the caller, press Share, and watch the position land on the call and the map. The relevant manual chapter is [Location links](/manual/#location-link). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
+Run bitdispatcher on your own computer with `-demo` and the BitVoice simulator (see [Get it](/get/)), open a call with no good location, make a location link, open it in a second browser tab as the caller, press Share, and watch the position land on the call and the map. The public address the link uses is set by an administrator. The relevant manual chapter is [Location links](/manual/#location-link). The source is on [GitHub](https://github.com/BioDream-LLC/bitdispatcher).
 
 Related: [Where the caller is](/tech/caller-location/), [Station alerting and paging](/tech/station-alerting-and-paging/), [The event ledger](/tech/event-ledger/), [Cameras near an incident](/tech/cameras-near-an-incident/), [Non-emergency intake](/tech/non-emergency-intake/)
