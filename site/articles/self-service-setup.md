@@ -29,6 +29,7 @@ bitdispatcher checks most steps itself as the administrator works. A step is don
 - room on the disk;
 - no demonstration data left;
 - every administrator has an authenticator;
+- FIPS 140-3 mode, with the Go Cryptographic Module validated under certificate #5247;
 - a trusted certificate rather than the server's own;
 - the recorded map covers every station;
 - **test calls**: every call type with a run card, at every station that has units. Each is worked out and thrown away, so nothing is written to the ledger and no unit is touched. The check warns when drive times are straight lines, when another station's unit comes before the station's own, and when a run card asks for units the agency does not have available;

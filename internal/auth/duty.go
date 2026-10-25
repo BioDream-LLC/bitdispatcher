@@ -13,9 +13,11 @@ package auth
 // (and code), keeping everything open on the screen.
 
 import (
+	"crypto/fips140"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base32"
 	"encoding/binary"
@@ -217,18 +219,21 @@ func (s *Store) SignIn(r Request) (*Session, *Need, error) {
 				s.save()
 			}
 			if strings.TrimSpace(r.Code) == "" {
-				return nil, &Need{Enrol: &Enrol{Secret: u.PendingTOTP, URI: otpURI(s.Issuer, u.Username, u.PendingTOTP)}}, nil
+				return nil, &Need{Enrol: &Enrol{Secret: plainSecret(u.PendingTOTP), URI: otpURI(s.Issuer, u.Username, u.PendingTOTP)}}, nil
 			}
 			step, ok := checkTOTP(u.PendingTOTP, r.Code, s.now(), 0)
 			if !ok {
 				s.fail(username)
-				return nil, &Need{Enrol: &Enrol{Secret: u.PendingTOTP, URI: otpURI(s.Issuer, u.Username, u.PendingTOTP)}}, ErrBadCode
+				return nil, &Need{Enrol: &Enrol{Secret: plainSecret(u.PendingTOTP), URI: otpURI(s.Issuer, u.Username, u.PendingTOTP)}}, ErrBadCode
 			}
 			u.TOTP, u.PendingTOTP, u.TOTPStep = u.PendingTOTP, "", step
 			s.save()
 		} else {
 			if strings.TrimSpace(r.Code) == "" {
 				return nil, &Need{Code: true}, nil
+			}
+			if err := fipsRefuses(u.TOTP); err != nil {
+				return nil, nil, err
 			}
 			step, ok := checkTOTP(u.TOTP, r.Code, s.now(), u.TOTPStep)
 			if !ok {
@@ -330,6 +335,9 @@ func (s *Store) Unlock(id, password, code string) (*Session, error) {
 		return nil, err
 	}
 	if u.TOTP != "" {
+		if err := fipsRefuses(u.TOTP); err != nil {
+			return nil, err
+		}
 		step, ok := checkTOTP(u.TOTP, code, s.now(), u.TOTPStep)
 		if !ok {
 			s.fail(se.Username)
@@ -354,12 +362,35 @@ func (s *Store) Touch(id string) {
 
 // ---- one-time codes (RFC 6238) ----
 
+// A secret is kept as its base32 text, which means HMAC-SHA-1 (what every authenticator app does), or as
+// "sha256:" and the text for HMAC-SHA-256. A server in FIPS 140-only mode (GODEBUG=fips140=only) makes
+// SHA-256 secrets, because the Go Cryptographic Module refuses HMAC-SHA-1 there; not every authenticator
+// app supports them (docs/COMPLIANCE.md).
+const sha256Prefix = "sha256:"
+
+// ErrTOTPNotFIPS is a SHA-1 authenticator on a server in FIPS 140-only mode.
+var ErrTOTPNotFIPS = errors.New("this authenticator uses SHA-1, which this server's FIPS 140-only mode does not allow: an administrator resets it, and the next sign-in sets up a new one")
+
 func newSecret() string {
 	b := make([]byte, 20)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
-	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b)
+	text := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b)
+	if fips140.Enforced() {
+		return sha256Prefix + text
+	}
+	return text
+}
+
+// plainSecret is the secret as an authenticator app takes it.
+func plainSecret(stored string) string { return strings.TrimPrefix(stored, sha256Prefix) }
+
+func fipsRefuses(stored string) error {
+	if fips140.Enforced() && !strings.HasPrefix(stored, sha256Prefix) {
+		return ErrTOTPNotFIPS
+	}
+	return nil
 }
 
 func otpURI(issuer, user, secret string) string {
@@ -367,19 +398,29 @@ func otpURI(issuer, user, secret string) string {
 		issuer = "bitdispatcher"
 	}
 	label := url.PathEscape(issuer + ":" + user)
-	q := url.Values{"secret": {secret}, "issuer": {issuer}, "algorithm": {"SHA1"}, "digits": {"6"}, "period": {"30"}}
+	alg := "SHA1"
+	if strings.HasPrefix(secret, sha256Prefix) {
+		alg = "SHA256"
+	}
+	q := url.Values{"secret": {plainSecret(secret)}, "issuer": {issuer}, "algorithm": {alg}, "digits": {"6"}, "period": {"30"}}
 	return "otpauth://totp/" + label + "?" + q.Encode()
 }
 
-// TOTP is the code for a secret at a time step (30 seconds).
+// TOTP is the code for a secret at a time step (30 seconds). A secret starting "sha256:" uses HMAC-SHA-256.
 func TOTP(secret string, step int64) string {
+	h := sha1.New
+	if strings.HasPrefix(secret, sha256Prefix) {
+		h, secret = sha256.New, plainSecret(secret)
+	} else if fips140.Enforced() {
+		return "" // HMAC-SHA-1 is refused (fipsRefuses says why)
+	}
 	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(strings.TrimRight(secret, "=")))
 	if err != nil {
 		return ""
 	}
 	var msg [8]byte
 	binary.BigEndian.PutUint64(msg[:], uint64(step))
-	m := hmac.New(sha1.New, key)
+	m := hmac.New(h, key)
 	m.Write(msg[:])
 	sum := m.Sum(nil)
 	off := sum[len(sum)-1] & 0x0f

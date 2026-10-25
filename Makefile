@@ -6,13 +6,29 @@ PKG     := ./cmd/bitdispatcher
 VERSION ?= v0.0.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build sim test vet fmt check web web-test manual e2e site clean
+.PHONY: all build fips sim test test-fips vet vuln fmt check web web-test manual e2e site clean
 
 all: check build
 
 # The web interface is built into internal/web/dist and committed, so `go build` needs no Node.
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) $(PKG)
+
+# fips builds with the Go Cryptographic Module v1.0.0, which holds FIPS 140-3 certificate #5247, and runs
+# in FIPS 140-3 mode. GODEBUG=fips140=only at run time also refuses every non-approved algorithm.
+fips:
+	GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) $(PKG)
+
+# test-fips runs the Go tests in FIPS 140-only mode: anything using a non-approved algorithm fails.
+test-fips:
+	GOFIPS140=v1.0.0 GODEBUG=fips140=only $(GO) test ./...
+
+# vuln looks for known vulnerabilities in the Go code and the standard library it calls, and in the web
+# interface's packages. govulncheck is pinned; install it with
+#   go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+vuln:
+	govulncheck ./...
+	cd web && $(PNPM) audit
 
 # bvsim is a stand-in for BitVoice's CAD hooks, for demonstrations and tests without a phone system.
 sim:

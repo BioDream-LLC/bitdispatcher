@@ -124,7 +124,11 @@ func TestMFA(t *testing.T) {
 	if code != 202 || need.Need.Enrol == nil || !strings.HasPrefix(need.Need.Enrol.URI, "otpauth://totp/") {
 		t.Fatalf("enrol: %d %s", code, b)
 	}
-	codeNow := auth.TOTP(need.Need.Enrol.Secret, time.Now().Unix()/30)
+	secret := need.Need.Enrol.Secret
+	if strings.Contains(need.Need.Enrol.URI, "algorithm=SHA256") {
+		secret = "sha256:" + secret // a server in FIPS 140-only mode
+	}
+	codeNow := auth.TOTP(secret, time.Now().Unix()/30)
 	if code, b := d.do("POST", "/api/auth/login", map[string]string{"username": "d1", "password": pw["d1"], "duty": "dispatcher", "code": codeNow}, true); code != 200 {
 		t.Fatalf("first code: %d %s", code, b)
 	}
@@ -133,7 +137,7 @@ func TestMFA(t *testing.T) {
 	if code, _ := d2.do("POST", "/api/auth/login", map[string]string{"username": "d1", "password": pw["d1"], "duty": "dispatcher", "code": codeNow}, true); code != 401 {
 		t.Fatalf("a code reused: %d", code)
 	}
-	next := auth.TOTP(need.Need.Enrol.Secret, time.Now().Unix()/30+1)
+	next := auth.TOTP(secret, time.Now().Unix()/30+1)
 	if code, b := d2.do("POST", "/api/auth/login", map[string]string{"username": "d1", "password": pw["d1"], "duty": "dispatcher", "code": next}, true); code != 200 {
 		t.Fatalf("next code: %d %s", code, b)
 	}

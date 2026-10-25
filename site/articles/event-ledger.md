@@ -67,7 +67,7 @@ It is also open. The ledger format is in the source, so an agency can read, veri
 
 The Go test suite checks the ledger directly and checks that the live state rebuilt from the ledger equals the running state. The hash chain, append-and-sync, torn-line handling and verification are covered by unit tests, and the operations reports are tested to count from events.
 
-What has not been done: bitdispatcher is **not certified**, not CJIS-audited, and no FIPS 140-validated cryptographic module is used yet, so the SHA-256 implementation is Go's standard library, not a validated module. The sign-in, lock and audit records have not been reviewed against the CJIS Security Policy; what the software does toward each control, and the gaps, are written down in the compliance notes. bitdispatcher is version 0.0.0 and not yet in service anywhere.
+What has not been done: bitdispatcher is **not certified**, and not CJIS-audited. Its SHA-256 comes from the Go Cryptographic Module; built with `make fips`, that is the module version validated under FIPS 140-3 certificate #5247, which is a validation of the module, not of bitdispatcher. The sign-in, lock and audit records have not been reviewed against the CJIS Security Policy; what the software does toward each control, and the gaps, are written down in the compliance notes. bitdispatcher is version 0.0.0 and not yet in service anywhere.
 
 ## Try it
 

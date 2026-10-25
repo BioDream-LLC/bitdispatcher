@@ -52,7 +52,7 @@ The inquiry lives on the incident, so the plate or name and the result stay atta
 
 This is where care is required, and the limits are stated plainly. bitdispatcher's NCIC function has been **tested only against its own training simulator**; no outside NCIC or Nlets simulator was reachable for testing, and it has not been exercised against a live switch. bitdispatcher is version 0.0.0 and not yet in service anywhere.
 
-bitdispatcher makes **no compliance claim**. It is not CJIS-audited and holds no VCIN credential; there is no FBI approval for software, and no FIPS 140-validated cryptographic module is in use yet. The one-time codes, console lock, sign-in notice and audit records have not been reviewed against the CJIS Security Policy. What the software does toward each control area, and the gaps that remain, are written down honestly in the project's compliance notes. Connecting to any live state switch is the agency's undertaking, subject to that state's own authorization and audit.
+bitdispatcher makes **no compliance claim**. It is not CJIS-audited and holds no VCIN credential; there is no FBI approval for software. It can be built with a FIPS 140-3 validated cryptographic module (the Go Cryptographic Module, certificate #5247), but that does not make bitdispatcher itself certified. The one-time codes, console lock, sign-in notice and audit records have not been reviewed against the CJIS Security Policy. What the software does toward each control area, and the gaps that remain, are written down honestly in the project's compliance notes. Connecting to any live state switch is the agency's undertaking, subject to that state's own authorization and audit.
 
 ## Try it
 

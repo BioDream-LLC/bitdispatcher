@@ -8,6 +8,7 @@ package api
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/fips140"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -468,6 +469,8 @@ func (s *Server) goLiveCheck() cad.GoLiveResult {
 	} else {
 		add("mfa", "Administrators use an authenticator", "pass", "", "")
 	}
+	// FIPS 140-3: CJIS asks for validated cryptography protecting CJI.
+	add(fipsCheck())
 	if s.SelfSigned {
 		add("tls", "A trusted certificate", "warn", "The server uses its own self-signed certificate, so browsers warn until each one trusts it. A certificate from the agency's or a public authority is better (-tls-cert, -tls-key).", "")
 	} else {
@@ -560,6 +563,24 @@ func (s *Server) goLiveCheck() cad.GoLiveResult {
 		}
 	}
 	return g
+}
+
+// CertifiedFIPS is the Go Cryptographic Module version that holds FIPS 140-3 certificate #5247.
+const CertifiedFIPS = "v1.0.0"
+
+// fipsCheck says whether the server runs its cryptography in FIPS 140-3 mode, and with which module.
+func fipsCheck() (id, title, result, detail, fix string) {
+	id, title = "fips", "FIPS 140-3 cryptography"
+	switch v := fips140.Version(); {
+	case !fips140.Enabled():
+		return id, title, "warn", "Not in FIPS 140-3 mode. CJIS asks for FIPS-validated cryptography for criminal justice information: use the FIPS build (make fips), or a FIPS-validated proxy in front of the server.", ""
+	case v != CertifiedFIPS:
+		return id, title, "warn", "FIPS 140-3 mode with the Go Cryptographic Module " + v + ", which is not the validated one. Build with GOFIPS140=v1.0.0 (make fips) for the module under certificate #5247.", ""
+	case fips140.Enforced():
+		return id, title, "pass", "FIPS 140-only mode with the Go Cryptographic Module " + v + " (FIPS 140-3 certificate #5247): non-approved algorithms are refused. Authenticators use HMAC-SHA-256.", ""
+	default:
+		return id, title, "pass", "FIPS 140-3 mode with the Go Cryptographic Module " + v + " (FIPS 140-3 certificate #5247). The disks still need encrypting with a validated module.", ""
+	}
 }
 
 // restoreCheck copies the ledger, replays the copy on its own and compares it with the running system.
@@ -862,6 +883,7 @@ func (s *Server) supportBundle() ([]byte, []string, error) {
 		"now": now.Format(time.RFC3339), "timezone": now.Location().String(), "started": s.started.Format(time.RFC3339),
 		"uptime": now.Sub(s.started).Round(time.Second).String(), "ledgerEvents": seq, "ledgerBytes": ledgerSize,
 		"ledgerCheck": ledger.Verify(path), "site": s.Eng.Site(), "selfSignedCertificate": s.SelfSigned,
+		"fips140": map[string]any{"enabled": fips140.Enabled(), "enforced": fips140.Enforced(), "module": fips140.Version()},
 	}
 	if free, ok := freeBytes(s.DataDir); ok {
 		system["diskFreeGB"] = math.Round(float64(free)/(1<<30)*10) / 10

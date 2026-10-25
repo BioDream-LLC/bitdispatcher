@@ -2,6 +2,8 @@ module github.com/biodream-llc/bitdispatcher
 
 go 1.26.0
 
+toolchain go1.27.3
+
 require (
 	github.com/dop251/goja v0.0.0-20261019115134-f7f3edb84bee
 	github.com/ledongthuc/pdf v0.0.0-20261020125853-5e46805f718e
@@ -17,7 +19,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/parquet-go/bitpack v1.0.0 // indirect

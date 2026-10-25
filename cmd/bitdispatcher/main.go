@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"crypto/fips140"
 	"errors"
 	"flag"
 	"fmt"
@@ -173,6 +174,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 				log.Warn("http redirect", "err", err)
 			}
 		}()
+	}
+	if fips140.Enabled() {
+		log.Info("FIPS 140-3 mode", "module", fips140.Version(), "only", fips140.Enforced())
 	}
 	log.Info("bitdispatcher "+version+" serving", "addr", "https://"+displayAddr(ln.Addr().String()), "data", *dataDir, "certificate-sha256", fp)
 	go func() {

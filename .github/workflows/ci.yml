@@ -1,5 +1,6 @@
-# Every push and pull request: Go checks, the web build and unit tests, and the browser suite against a
-# real bitdispatcher with demo data and the BitVoice simulator.
+# Every push and pull request: Go checks, known vulnerabilities in the Go and web dependencies, the Go
+# tests in FIPS 140-only mode, the web build and unit tests, and the browser suite against a real
+# bitdispatcher with demo data and the BitVoice simulator.
 name: ci
 on: [push, pull_request]
 permissions:
@@ -17,7 +18,13 @@ jobs:
           node-version: 24
       - run: corepack enable
       - run: make check
+      - name: Known vulnerabilities in the Go code, its modules and the standard library
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && "$(go env GOPATH)/bin/govulncheck" ./...
+      - name: The Go tests in FIPS 140-only mode (the module under FIPS 140-3 certificate 5247)
+        run: make test-fips
       - run: make web
+      - name: Known vulnerabilities in the web interface's packages
+        run: cd web && corepack pnpm audit
       - name: The committed web build matches the source
         run: git diff --exit-code -- internal/web/dist
       - run: make web-test

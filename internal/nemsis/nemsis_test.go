@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -313,8 +314,9 @@ func TestUUIDLooksValid(t *testing.T) {
 	if len(parts) != 5 || len(parts[0]) != 8 || len(parts[1]) != 4 || len(parts[2]) != 4 || len(parts[3]) != 4 || len(parts[4]) != 12 {
 		t.Errorf("UUID shape wrong: %q", u)
 	}
-	if parts[2][0] != '5' {
-		t.Errorf("derived UUID should be version 5, got %q", u)
+	// The NEMSIS XSDs' pattern: version 1 to 5, variant 8, 9, a or b.
+	if !regexp.MustCompile(`^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[1-5][a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$`).MatchString(u) || parts[2][0] != '4' {
+		t.Errorf("derived UUID should be version 4 and match the NEMSIS pattern, got %q", u)
 	}
 	if !strings.ContainsRune("89ab", rune(parts[3][0])) {
 		t.Errorf("derived UUID variant nibble wrong: %q", u)

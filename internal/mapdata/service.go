@@ -3,6 +3,7 @@ package mapdata
 import (
 	"bytes"
 	"context"
+	"crypto/fips140"
 	"crypto/md5"
 	"embed"
 	"encoding/hex"
@@ -631,17 +632,22 @@ func (s *Service) download(ctx context.Context, j *Job, e Extract, path string, 
 	return os.Rename(tmp, path)
 }
 
-func md5File(p string) (string, error) {
+// md5File is the MD5 the extract's publisher lists beside it. It only catches a download cut short or
+// corrupted (the download itself is over HTTPS); it protects nothing, so it is allowed in FIPS 140-only
+// mode, where MD5 is otherwise refused.
+func md5File(p string) (sum string, err error) {
 	f, err := os.Open(p)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	fips140.WithoutEnforcement(func() {
+		h := md5.New()
+		if _, err = io.Copy(h, f); err == nil {
+			sum = hex.EncodeToString(h.Sum(nil))
+		}
+	})
+	return sum, err
 }
 
 type progressWriter struct {

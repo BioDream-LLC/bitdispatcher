@@ -26,7 +26,9 @@ make web build sim
     <li><b>Admin › Integrations:</b> BitVoice or another call-handling system; for the simulator,
       <code>https://127.0.0.1:9444</code> with the token <code>bv_simulated</code>, then <b>Read it</b> to pin its certificate</li>
   </ul>
-  <p>The program is pure Go with no C libraries, built for Linux, macOS and Windows on Intel and Arm.</p>
+  <p>The program is pure Go with no C libraries, built for Linux, macOS and Windows on Intel and Arm.
+    <code>make fips</code> builds it with the Go Cryptographic Module under FIPS 140-3 certificate #5247, for agencies whose
+    CJIS Systems Agency asks for validated cryptography.</p>
 
   <h2 style="margin-top:48px">Set it up yourself</h2>
   <p>Everything is configured on the admin screens, and nobody needs to come on site. <b>Admin › Setup checklist</b> shows

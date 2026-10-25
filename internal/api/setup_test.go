@@ -3,9 +3,11 @@ package api
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/fips140"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
 
@@ -134,6 +136,17 @@ func TestGoLiveCheck(t *testing.T) {
 		if res[id].Result != want {
 			t.Errorf("%s: %+v, want %s", id, res[id], want)
 		}
+	}
+	// FIPS 140-3: passes only in a FIPS build with the validated module (make test-fips runs this so).
+	want := "warn"
+	if fips140.Enabled() && fips140.Version() == CertifiedFIPS {
+		want = "pass"
+	}
+	if os.Getenv("GOFIPS140") == "v1.0.0" && want != "pass" {
+		t.Errorf("built with GOFIPS140=v1.0.0 but the module is %q (enabled %v)", fips140.Version(), fips140.Enabled())
+	}
+	if res["fips"].Result != want {
+		t.Errorf("fips: %+v, want %s", res["fips"], want)
 	}
 	if !strings.Contains(res["restore"].Detail, "replayed") {
 		t.Errorf("restore: %+v", res["restore"])

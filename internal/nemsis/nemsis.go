@@ -27,7 +27,7 @@ package nemsis
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -662,17 +662,19 @@ func pcrNumber(r Response) string {
 	return n
 }
 
-// responseUUID returns the given UUID when it is set, otherwise derives a stable RFC 4122 v5-shaped
-// UUID from the incident and unit so the same response always carries the same UUID.
+// responseUUID returns the given UUID when it is set, otherwise derives a stable UUID from the incident
+// and unit so the same response always carries the same UUID. The bits come from SHA-256, so it works in
+// FIPS 140-only mode, where SHA-1 (a version 5 UUID) is refused. It is marked version 4 (pseudo-random):
+// the NEMSIS XSDs accept versions 1 to 5 only, so RFC 9562's version 8 would not validate.
 func responseUUID(r Response) string {
 	if u := strings.TrimSpace(r.UUID); u != "" {
 		return u
 	}
 	seed := strings.TrimSpace(r.Incident) + "\x00" + valueOr(r.Unit, r.CallSign)
-	sum := sha1.Sum([]byte("bitdispatcher-nemsis\x00" + seed))
+	sum := sha256.Sum256([]byte("bitdispatcher-nemsis\x00" + seed))
 	var b [16]byte
 	copy(b[:], sum[:16])
-	b[6] = (b[6] & 0x0f) | 0x50 // version 5
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
 	b[8] = (b[8] & 0x3f) | 0x80 // variant RFC 4122
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }

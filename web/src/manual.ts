@@ -968,6 +968,7 @@ Each test passes, has something to look at, or fails:
 - **Room on the disk**: fails under 2 GB free, warns under 10 GB.
 - **No demonstration data**: no demo stations, premises, accounts or NCIC simulator.
 - **Administrators use an authenticator** (CJIS asks for a second factor).
+- **FIPS 140-3 cryptography**: passes when the server was built with \`make fips\` (the Go Cryptographic Module under FIPS 140-3 certificate #5247); warns otherwise. CJIS asks for validated cryptography for criminal justice information.
 - **A trusted certificate**: warns when the server uses its own self-signed one.
 - **The recorded map covers every station.**
 - **Test calls at every station**: every call type with a run card, at every station that has units. Each is worked out and thrown away: nothing is written to the ledger and no unit is touched. It warns when drive times are straight lines, when another station's unit comes before the station's own (a [response plan](#admin-plans) can be the reason), and when a run card asks for units the agency does not have available.
