@@ -31,11 +31,13 @@ type group struct {
 // groups orders the articles. Every article must be in exactly one; build fails otherwise.
 var groups = []group{
 	{"dispatch", "Dispatch", "The console, the command line and the decisions on the floor", []string{
-		"command-line-and-keys", "road-time-recommendation", "multi-monitor", "multi-agency", "messages-and-bolos", "search-and-recall"}},
+		"command-line-and-keys", "road-time-recommendation", "road-closures-and-traffic", "multi-monitor", "multi-agency", "messages-and-bolos", "search-and-recall"}},
 	{"calls", "Calls", "Where the caller is, what they said, and what the map shows", []string{
-		"nena-i3-eido", "caller-location", "transcripts-and-translation", "crash-and-drones", "offline-map", "aerial-and-oblique-imagery"}},
+		"nena-i3-eido", "caller-location", "location-links", "transcripts-and-translation", "alarms-and-permits", "cameras-near-an-incident",
+		"crash-and-drones", "offline-map", "aerial-and-oblique-imagery"}},
 	{"field", "Field", "Crews, stations and the public", []string{
-		"mobile-data-terminal", "staffing-and-qualifications", "station-alerting-and-paging", "public-alerting-cap-ipaws", "public-incident-feed"}},
+		"mobile-data-terminal", "staffing-and-qualifications", "station-alerting-and-paging", "non-emergency-intake", "public-alerting-cap-ipaws",
+		"public-incident-feed"}},
 	{"records", "Records", "Reports, inquiries and the record afterwards", []string{
 		"nibrs-reporting", "neris-and-nemsis", "ncic", "records-requests"}},
 	{"platform", "Platform", "What keeps it running, honest and changeable", []string{

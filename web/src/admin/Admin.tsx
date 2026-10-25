@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -30,6 +30,10 @@ import PublicAlerts from './PublicAlerts'
 import Tows from './Tows'
 import Directory from './Directory'
 import Geofences from './Geofences'
+import RoadsAdmin from './RoadsAdmin'
+import CamerasAdmin from './CamerasAdmin'
+import AlarmsAdmin from './AlarmsAdmin'
+import IntakeAdmin from './IntakeAdmin'
 import { Agencies } from './Agencies'
 import { OperationsRules } from './OperationsRules'
 import { Qualifications } from './Qualifications'
@@ -61,6 +65,10 @@ const PAGES = [
   { to: 'tows', label: 'Tow rotation', icon: TowIcon, admin: false },
   { to: 'directory', label: 'Contacts & on call', icon: BookUser, admin: false },
   { to: 'geofences', label: 'Areas (geofences)', icon: Hexagon, admin: false },
+  { to: 'roads', label: 'Road closures & traffic', icon: Ban, admin: false },
+  { to: 'cameras', label: 'Cameras', icon: Cctv, admin: false },
+  { to: 'alarms', label: 'Alarm companies & permits', icon: Siren, admin: true },
+  { to: 'intake', label: 'Non-emergency intake', icon: Bot, admin: true },
   { to: 'premises', label: 'Premises & hazards', icon: ShieldAlert, admin: false },
   { to: 'migrate', label: 'Migration', icon: FileInput, admin: true },
   { to: 'advisory', label: 'Advisory panel', icon: Lightbulb, admin: false },
@@ -132,6 +140,10 @@ export default function Admin() {
             <Route path="tows" element={<Tows view={view} />} />
             <Route path="directory" element={<Directory view={view} />} />
             <Route path="geofences" element={<Geofences view={view} />} />
+            <Route path="roads" element={<RoadsAdmin view={view} />} />
+            <Route path="cameras" element={<CamerasAdmin view={view} />} />
+            <Route path="alarms" element={<AlarmsAdmin view={view} />} />
+            <Route path="intake" element={<IntakeAdmin view={view} />} />
             <Route path="migrate" element={<Migrate />} />
             <Route path="quality" element={views && !views.has('quality') ? <NotGiven /> : <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Quality /></Suspense>} />
             <Route path="reports" element={views && !views.has('operations') ? <NotGiven /> : <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}><Reports view={view} /></Suspense>} />

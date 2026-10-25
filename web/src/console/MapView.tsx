@@ -4,12 +4,13 @@ import * as maplibregl from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import PlaceViews from '../views/PlaceViews'
 import { Modal } from '../ui'
-import { Box, Crosshair, Image as ImageIcon, Layers, MapPinPlus, Moon, Move, Search, Sun } from 'lucide-react'
+import { Ban, Box, Circle as CircleIcon, Crosshair, Image as ImageIcon, Layers, MapPinPlus, Moon, Move, Search, Sun, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
 import { avl, cx, hasPoint, mins, ms, prio, statusMeta, useNow, overdue } from '../util'
-import type { Recommendation, RouteView, SearchResult, View } from '../types'
+import type { Recommendation, RoadClosure, RouteView, SearchResult, View } from '../types'
+import { closureFeatures, ClosureCard, CloseRoad, drawnFeatures, trafficFeatures, useRoads } from './Roads'
 import { dispatchStyle, type Theme } from './mapStyle'
 import { alertAreas } from './PublicAlerts'
 
@@ -118,6 +119,15 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
   const cam = useRef<{ center: [number, number]; zoom: number } | null>(null)
   const [routes, setRoutes] = useState<Record<string, RouteView>>({})
   const [found, setFound] = useState<SearchResult | null>(null)
+  // Road closures: drawn on the map by a dispatcher; the closed roads and traffic drawn from the server.
+  const roads = useRoads(view)
+  const [draw, setDraw] = useState<[number, number][] | null>(null)
+  const drawRef = useRef(draw)
+  drawRef.current = draw
+  const [closeDraft, setCloseDraft] = useState<{ line?: [number, number][]; center?: [number, number]; radius?: number } | null>(null)
+  const [clicked, setClicked] = useState<RoadClosure | null>(null)
+  const roadsRef = useRef(roads)
+  roadsRef.current = roads
 
   // Create the map; again when its sources change (tiles on or off, a new recorded map, day or night).
   useEffect(() => {
@@ -145,7 +155,19 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
         .then((place) => setMenu((cur) => (cur && cur.lat === at.lat && cur.lon === at.lon ? { ...cur, place } : cur)))
         .catch(() => setMenu((cur) => (cur && cur.lat === at.lat && cur.lon === at.lon ? { ...cur, place: null } : cur)))
     })
-    m.on('click', () => setMenu(null))
+    m.on('click', (e) => {
+      setMenu(null)
+      if (drawRef.current) {
+        const pt: [number, number] = [e.lngLat.lng, e.lngLat.lat]
+        setDraw((cur) => (cur ? [...cur, pt] : cur))
+        return
+      }
+      // A closed road clicked: what closed it, and Lift.
+      const layers = ['closure-road', 'closure-area', 'closure-drawn'].filter((l) => m.getLayer(l))
+      const hit = layers.length ? m.queryRenderedFeatures(e.point, { layers })[0] : undefined
+      const c = hit && roadsRef.current?.closures.find((x) => x.id === hit.properties?.id)
+      setClicked(c ?? null)
+    })
     m.on('moveend', () => {
       const c = m.getCenter()
       cam.current = { center: [c.lng, c.lat], zoom: m.getZoom() }
@@ -215,7 +237,7 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
       // Positions rounded to about 50 m, so a moving unit is re-routed as it goes rather than every second.
       if (p) from.push(`${u.id}@${p.lat.toFixed(3)},${p.lon.toFixed(3)}`)
     }
-    return `${inc0.number}|${inc0.location.lat!.toFixed(5)},${inc0.location.lon!.toFixed(5)}|${from.sort().join(';')}`
+    return `${inc0.number}|${inc0.location.lat!.toFixed(5)},${inc0.location.lon!.toFixed(5)}|${from.sort().join(';')}|${view.next?.roads.version ?? 0}`
   })()
   useEffect(() => {
     if (!routeKey) {
@@ -274,6 +296,22 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
     ensure('palerts', { type: 'FeatureCollection', features: alertAreas(view.roadmap?.publicAlerts) }, () => {
       m.addLayer({ id: 'palert-fill', type: 'fill', source: 'palerts', paint: { 'fill-color': ['case', ['==', ['get', 'real'], 1], '#f43f5e', '#f59e0b'], 'fill-opacity': 0.12 } })
       m.addLayer({ id: 'palert-line', type: 'line', source: 'palerts', paint: { 'line-color': ['case', ['==', ['get', 'real'], 1], '#f43f5e', '#f59e0b'], 'line-width': 2, 'line-opacity': 0.8 } })
+    })
+    // Traffic slowdowns under the closures; closed roads in red over the streets.
+    ensure('traffic', trafficFeatures(roads), () => {
+      m.addLayer({ id: 'traffic', type: 'line', source: 'traffic', layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': ['step', ['get', 'factor'], '#facc15', 2, '#fb923c', 4, '#ef4444', 10, '#7f1d1d'], 'line-width': 4, 'line-opacity': 0.75 } })
+    })
+    ensure('closures', closureFeatures(roads), () => {
+      m.addLayer({ id: 'closure-area', type: 'fill', source: 'closures', filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#e11d48', 'fill-opacity': 0.12 } })
+      m.addLayer({ id: 'closure-casing', type: 'line', source: 'closures', filter: ['==', ['get', 'kind'], 'road'], layout: { 'line-cap': 'round' }, paint: { 'line-color': '#020617', 'line-width': 8, 'line-opacity': 0.7 } })
+      m.addLayer({ id: 'closure-road', type: 'line', source: 'closures', filter: ['==', ['get', 'kind'], 'road'], layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#f43f5e', 'line-width': 5, 'line-dasharray': [1.2, 0.8] } })
+      m.addLayer({ id: 'closure-drawn', type: 'line', source: 'closures', filter: ['==', ['get', 'kind'], 'drawn'], paint: { 'line-color': '#f43f5e', 'line-width': 2, 'line-dasharray': [2, 2] } })
+    })
+    ensure('drawing', drawnFeatures(draw ?? []), () => {
+      m.addLayer({ id: 'drawing-line', type: 'line', source: 'drawing', paint: { 'line-color': '#fda4af', 'line-width': 3, 'line-dasharray': [2, 1] } })
+      m.addLayer({ id: 'drawing-pt', type: 'circle', source: 'drawing', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#f43f5e', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } })
     })
     const circles: GeoJSON.Feature[] = []
     for (const c of view.calls) {
@@ -338,7 +376,7 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
         },
       })
     })
-  }, [view, ready, selected, selCall, rec, pick, now, tilesOn, show.calls, routes, found])
+  }, [view, ready, selected, selCall, rec, pick, now, tilesOn, show.calls, routes, found, roads, draw])
 
   // Markers: DOM elements, so labels need no font server.
   useEffect(() => {
@@ -610,6 +648,18 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
             </button>
           )}
           {inc && inc.status !== 'closed' && !hasPoint(inc.location) && <div className="px-3 pb-1 text-[10px] text-amber-300">{inc.number} has no map position yet</div>}
+          {recorded && (
+            <>
+              <button role="menuitem" className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-800"
+                onClick={() => { setDraw([[menu.lon, menu.lat]]); setClicked(null); setMenu(null) }}>
+                <Ban size={13} aria-hidden /> Close a road from here…
+              </button>
+              <button role="menuitem" className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-800"
+                onClick={() => { setCloseDraft({ center: [menu.lat, menu.lon], radius: 60 }); setMenu(null) }}>
+                <CircleIcon size={13} aria-hidden /> Close the roads around here…
+              </button>
+            </>
+          )}
           {view.placeViews && (
             <button role="menuitem" className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-800"
               onClick={() => { setViewsAt([menu.lat, menu.lon]); setMenu(null) }}>
@@ -618,6 +668,21 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
           )}
         </div>
       )}
+      {draw && (
+        <div className="absolute inset-x-0 top-11 z-20 mx-auto flex w-fit items-center gap-2 rounded-md bg-rose-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow-xl" role="status">
+          <Ban size={13} aria-hidden /> Click along the closed road · {draw.length} point{draw.length === 1 ? '' : 's'}
+          <button className="btn h-6 px-2 py-0 text-[11px]" disabled={draw.length < 2} onClick={() => { setCloseDraft({ line: draw }); setDraw(null) }}>Done</button>
+          <button className="btn h-6 px-2 py-0 text-[11px]" disabled={draw.length < 2} onClick={() => setDraw(draw.slice(0, -1))} aria-label="Undo the last point"><Undo2 size={11} aria-hidden /></button>
+          <button className="btn h-6 px-2 py-0 text-[11px]" onClick={() => setDraw(null)}>Cancel</button>
+        </div>
+      )}
+      {clicked && (
+        <div className="panel absolute left-2 top-11 z-20 w-72 rounded-md p-2 shadow-2xl">
+          <button className="absolute right-1 top-1 text-slate-500 hover:text-slate-200" onClick={() => setClicked(null)} aria-label="Close">×</button>
+          <ClosureCard c={clicked} canLift={can.dispatch(me)} onDone={() => setClicked(null)} />
+        </div>
+      )}
+      <CloseRoad draft={closeDraft} incident={inc && inc.status !== 'closed' ? inc.number : undefined} onClose={() => setCloseDraft(null)} />
       <Modal open={!!viewsAt} onClose={() => setViewsAt(null)} title="Views of this place" xl>
         {viewsAt && <PlaceViews lat={viewsAt[0]} lon={viewsAt[1]} big />}
       </Modal>

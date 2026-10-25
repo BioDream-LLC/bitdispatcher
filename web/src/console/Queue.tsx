@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { MapPin, MessageSquareText, Phone, PhoneIncoming, Plus, Video, Link2, AlertTriangle, Image as ImageIcon, Car, Languages, Layers, Repeat, PhoneOff, ShieldAlert, Siren, BellRing } from 'lucide-react'
@@ -8,6 +9,7 @@ import { Priority, StatusChip, Tip } from '../ui'
 import { ago, clock, cx, hasPoint, locText, locationStale, ms, phone, prio, typeName, uncertainty, useNow, overdue } from '../util'
 import type { Alert, Call, Incident, Recommendation, View } from '../types'
 import { dispatchUnits } from './ask'
+import { PhonedAlarm } from './Next'
 
 function CallCard({ c, view, now, onCreate, rep, grouped }: { c: Call; view: View; now: number; onCreate: (c: Call) => void; rep?: number; grouped?: boolean }) {
   const me = useStore((s) => s.me)
@@ -234,13 +236,20 @@ export default function Queue({ view, onCreateFromCall, onNew, callsOnly }: { vi
   const emergency = calls.filter((c) => !c.screen?.nonEmergency)
   const nonEmergency = calls.filter((c) => c.screen?.nonEmergency)
   const headed = new Set<string>()
+  const [alarmCard, setAlarmCard] = useState(false)
   return (
     <aside className="panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-label="Calls and incidents">
       <div className="panel-head">
         <Phone size={12} aria-hidden /> 911 calls
         <span className="font-mono text-slate-300">{calls.filter((c) => c.state !== 'ended').length}</span>
         <span className="ml-auto normal-case tracking-normal text-slate-500">{view.health.bitvoice.connected ? 'from BitVoice' : view.health.ali.listening ? 'from ALI' : 'no call feed'}</span>
+        {can.dispatch(me) && (
+          <button className="btn h-5 px-1.5 py-0 text-[10px] normal-case tracking-normal" onClick={() => setAlarmCard(true)} title="An alarm company is on the phone: type its alarm on the alarm card">
+            <Siren size={10} aria-hidden /> Phoned alarm
+          </button>
+        )}
       </div>
+      <PhonedAlarm open={alarmCard} onClose={() => setAlarmCard(false)} />
       <ul className={cx('overflow-y-auto divide-y divide-slate-800/70', callsOnly ? 'min-h-0 flex-1' : 'max-h-[42%] shrink-0')} aria-label="911 calls">
         {calls.length === 0 ? (
           <li className="px-3 py-2 text-[11px] text-slate-500">

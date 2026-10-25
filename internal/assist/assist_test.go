@@ -290,3 +290,50 @@ func TestTranslateCallerSentences(t *testing.T) {
 		}
 	}
 }
+
+// The twelve more phrasebooks: each language is recognised from a caller's line, the line becomes a
+// gist with its emergency words, and every ready phrase is said in each language.
+func TestMoreLanguages(t *testing.T) {
+	lines := map[string]string{
+		"zh": "救命！我的房子着火了",
+		"ja": "助けて！家が火事です",
+		"ko": "도와주세요! 집에 불이 났어요",
+		"vi": "Cứu tôi với! Nhà tôi bị cháy",
+		"ar": "ساعدوني! بيتي يحترق",
+		"ru": "Помогите! Мой дом горит",
+		"hi": "मदद करो! मेरे घर में आग लगी है",
+		"fr": "Au secours! Il y a le feu dans ma maison",
+		"pt": "Socorro! A minha casa está pegando fogo",
+		"pl": "Pomocy! Mój dom się pali",
+		"tl": "Tulong! Nasusunog ang bahay ko",
+		"ht": "Anmwe! Kay mwen ap boule",
+	}
+	for code, line := range lines {
+		if got := DetectLang(line); got != code {
+			t.Errorf("%s: %q detected as %q", code, line, got)
+		}
+		tr := Translate(line, code, "en")
+		if tr.Coverage == 0 || !strings.ContainsAny(strings.ToLower(tr.Text), "abcdefghijklmnopqrstuvwxyz") {
+			t.Errorf("%s: %q gave %+v", code, line, tr)
+		}
+		for _, p := range Phrases {
+			if ReadyIn(p.Key, code) == "" {
+				t.Errorf("%s has no ready phrase %s", code, p.Key)
+			}
+			if out := Translate(p.EN, "en", code); out.Coverage != 1 || out.Text != ReadyIn(p.Key, code) {
+				t.Errorf("%s: %q said as %+v", code, p.EN, out)
+			}
+		}
+		// Typed English that is not a ready phrase is not made up.
+		if out := Translate("the blue truck behind the hardware store", "en", code); out.Coverage != 0 || out.Text != "" {
+			t.Errorf("%s: free English was translated as %+v", code, out)
+		}
+	}
+	// English and Spanish still are.
+	if DetectLang("my husband is not breathing") != "en" || DetectLang("mi esposo no respira") != "es" {
+		t.Error("English or Spanish no longer detected")
+	}
+	if len(Languages()) != 14 {
+		t.Errorf("%d languages", len(Languages()))
+	}
+}

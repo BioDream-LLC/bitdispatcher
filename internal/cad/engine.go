@@ -230,6 +230,17 @@ func (e *Engine) SaveSettings(a Actor, s Settings) error {
 			return problem("priorityRules", "a priority is urgent, high, medium or low")
 		}
 	}
+	if n := s.Next; n.LocLinkMinutes < 0 || n.LocLinkMinutes > 1440 {
+		return problem("next", "a location link lasts up to a day (1440 minutes)")
+	} else if n.Cameras.Radius < 0 || n.Cameras.Radius > 5000 {
+		return problem("next", "cameras are offered within up to 5 km")
+	} else if n.Alarms.FalseLimit < 0 || n.Alarms.FalseLimit > 100 {
+		return problem("next", "the false-alarm limit is 0 to 100")
+	} else if len(n.LocLinkText) > 300 || n.LocLinkText != "" && !strings.Contains(n.LocLinkText, "{link}") {
+		return problem("next", "the location link's text holds {link}, under 300 characters")
+	} else if err := CheckIntake(n.Intake); err != nil {
+		return err
+	}
 	if s.RoadFactor < 1 || s.RoadFactor > 3 {
 		return problem("roadFactor", "road factor is between 1 and 3 (1.4 suits most road networks)")
 	}

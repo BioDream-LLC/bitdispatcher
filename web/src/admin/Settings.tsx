@@ -177,6 +177,12 @@ export default function SettingsPage({ view }: { view: View }) {
           <Field label="Reply to non-emergency callers" htmlFor="ner" hint="Offered as a one-press text, such as where to report online"><input id="ner" className="input" value={s.nonEmergencyReply ?? ''} onChange={(e) => up({ nonEmergencyReply: e.target.value })} /></Field>
         </section>
         <section className="panel space-y-3 rounded-lg p-4">
+          <h2 className="font-semibold text-slate-100">Calls: location links</h2>
+          <p className="text-xs text-slate-400">A call-taker sends a caller a link; the caller opens it and presses Share, and the phone's own location comes to the call until the link ends. The link uses the public address set in Paging groups.</p>
+          <Field label="A link lasts (minutes)" htmlFor="llm"><input id="llm" type="number" min={1} max={1440} className="input w-32 font-mono" value={s.next?.locLinkMinutes || 30} onChange={(e) => up({ next: { ...s.next, locLinkMinutes: Number(e.target.value) } })} /></Field>
+          <Field label="The text sent with it" htmlFor="llt" hint="{link} is replaced by the link; empty uses the default"><input id="llt" className="input" value={s.next?.locLinkText ?? ''} onChange={(e) => up({ next: { ...s.next, locLinkText: e.target.value } })} placeholder="911: to show us exactly where you are, open this link and press Share: {link}" /></Field>
+        </section>
+        <section className="panel space-y-3 rounded-lg p-4">
           <h2 className="font-semibold text-slate-100">People: critical calls and breaks</h2>
           <p className="text-xs text-slate-400">An incident of a call type marked critical, or where one of these words is said, puts everyone who worked it on the supervisor's care list, and tells them gently once it closes.</p>
           <Field label="Critical words" htmlFor="crw" hint="Separated by commas; empty uses the built-in list (not breathing, CPR, officer down, infant…)"><textarea id="crw" rows={2} className="input text-xs" key={'criticalWords' + (s.criticalWords ?? []).join()} defaultValue={(s.criticalWords ?? []).join(', ')} onBlur={(e) => up({ criticalWords: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>

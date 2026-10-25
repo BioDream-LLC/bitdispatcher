@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -99,7 +100,22 @@ func (s *Server) dreamRoutes() {
 	m.HandleFunc("POST /api/hooks/location", s.hook(s.hookLocation))
 
 	s.handle("GET /api/phrases", auth.Viewer, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
-		writeJSON(w, 200, map[string]any{"items": assist.Phrases})
+		type phrase struct {
+			assist.Phrase
+			Tr map[string]string `json:"tr"` // the phrase in each language the phrasebook has it in
+		}
+		langs := assist.Languages()
+		items := make([]phrase, 0, len(assist.Phrases))
+		for _, p := range assist.Phrases {
+			tr := map[string]string{}
+			for _, l := range langs {
+				if t := assist.ReadyIn(p.Key, l.Code); t != "" {
+					tr[l.Code] = t
+				}
+			}
+			items = append(items, phrase{p, tr})
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "languages": langs})
 	})
 	s.handle("POST /api/translate", auth.Dispatcher, s.translate)
 	s.handle("POST /api/calls/{id}/reply", auth.Dispatcher, s.reply)
@@ -344,10 +360,8 @@ func (s *Server) translateText(ctx context.Context, text, from, to string) (out,
 	return tr.Text, "phrasebook", tr.Coverage
 }
 
-var langNames = map[string]string{"en": "English", "es": "Spanish"}
-
 func modelTranslate(ctx context.Context, x Extra, text, from, to string) (string, error) {
-	name := func(l string) string { return firstNonEmptyStr(langNames[l], l) }
+	name := assist.LanguageName
 	body, _ := json.Marshal(map[string]any{"model": x.ModelName, "temperature": 0, "messages": []map[string]string{
 		{"role": "system", "content": "You translate for a 911 emergency call centre. Translate the user's words from " + name(from) +
 			" to " + name(to) + ". Keep addresses, names and numbers exactly. Reply with the translation only."},
@@ -431,6 +445,11 @@ func (s *Server) reply(w http.ResponseWriter, r *http.Request, se *auth.Session,
 	out, by, cov := b.Text, "", 1.0
 	if lang != "en" {
 		out, by, cov = s.translateText(r.Context(), b.Text, "en", lang)
+		if by == "phrasebook" && (cov == 0 || out == "") && lang != "es" {
+			fail(w, 422, "the phrasebook says only its ready phrases in "+assist.LanguageName(lang)+
+				": choose one, switch on the language model (Admin › Integrations), or bring in an interpreter")
+			return
+		}
 	}
 	line := cad.TranscriptLine{Speaker: "taker", Text: out, Lang: lang, By: by}
 	if lang != "en" {
@@ -579,7 +598,8 @@ func (s *Server) endDataCalls(ctx context.Context) {
 		var old []string
 		s.Eng.Read(func(st *cad.State) {
 			for id, c := range st.Calls {
-				if c.State == "data" && c.Incident == "" && now.Sub(c.Start) > 30*time.Minute {
+				// A non-emergency report waits for a person, however long that takes.
+				if c.State == "data" && c.Incident == "" && now.Sub(c.Start) > 30*time.Minute && !slices.Contains(c.Sources, "intake") {
 					old = append(old, id)
 				}
 			}

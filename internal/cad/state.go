@@ -185,15 +185,17 @@ type State struct {
 	TowCompanies map[string]*TowCompany `json:"towCompanies"`
 	Tows         []*Tow                 `json:"tows"`
 	towCount     int
-	Scheduled    map[string]*Scheduled  `json:"scheduled"`
-	Directory    map[string]*DirEntry   `json:"directory"`
-	OnCall       map[string]*OnCallList `json:"onCall"`
-	Geofences    map[string]*Geofence   `json:"geofences"`
-	FenceAlerts  []FenceAlert           `json:"fenceAlerts"`
-	inFence      map[string][]string
-	Papers       map[string]*Paper `json:"papers"`
-	paperCount   int
-	AlertLists   map[string]*AlertList `json:"alertLists"` // public alert subscriber lists
+	Scheduled    map[string]*Scheduled   `json:"scheduled"`
+	Directory    map[string]*DirEntry    `json:"directory"`
+	OnCall       map[string]*OnCallList  `json:"onCall"`
+	Geofences    map[string]*Geofence    `json:"geofences"`
+	Closures     map[string]*RoadClosure `json:"closures"` // closed roads (closures.go)
+	nextState
+	FenceAlerts []FenceAlert `json:"fenceAlerts"`
+	inFence     map[string][]string
+	Papers      map[string]*Paper `json:"papers"`
+	paperCount  int
+	AlertLists  map[string]*AlertList `json:"alertLists"` // public alert subscriber lists
 	// The operational wishes: agencies, people's profiles and coverage, saved presets (agency.go,
 	// presets.go).
 	Agencies map[string]*Agency       `json:"agencies"`

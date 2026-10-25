@@ -8,13 +8,13 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'working-agency', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'photos', 'views', 'messages', 'inbox', 'search', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
+    ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'working-agency', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'road-closures', 'cameras', 'photos', 'views', 'messages', 'inbox', 'search', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
-    ids: ['transcript', 'translation', 'caller-location', 'grouping', 'nonemergency', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
+    ids: ['transcript', 'translation', 'caller-location', 'location-link', 'grouping', 'nonemergency', 'admin-intake', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
   { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports, papers to serve and alerts to the public.',
-    ids: ['alarms', 'admin-personnel', 'staffing', 'admin-qualifications', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
+    ids: ['alarms', 'admin-personnel', 'staffing', 'admin-qualifications', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'admin-roads', 'admin-cameras', 'admin-alarms', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
     ids: ['admin-agencies', 'admin-operations', 'admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
@@ -193,6 +193,7 @@ The incident panel shows the recommendation, the units on it with their times, t
     body: `For the selected incident bitdispatcher builds a recommendation from its call type's run card: for each line (\"3 × engine\", \"1 × als\"), the available units with that capability, closest first. Units already on the incident fill lines first, and scarce capabilities are filled before common ones so a multi-role unit is not spent where another would do.
 
 - **Drive times** come from the recorded road network: posted or typical speeds, one-way streets obeyed, from the unit's fresh AVL position or its station. The reason says so: \"1.7 mi by road, 4 min via Franklin Road\".
+- **Closed roads and traffic** count at once: a drive goes around a [road closure](#road-closures), and a road live traffic reports slow takes longer. The source line under the recommendation says when they changed it (\"around 1 road closure, with live traffic\").
 - Outside the recorded map, or with no road between, the time is a straight-line estimate and is marked \`~\`.
 - A unit covering another station is ranked from where it is posted.
 - Notes warn when no unit has a capability (consider mutual aid) or when sending the units would leave a station empty.
@@ -240,10 +241,31 @@ Each status has a timer (Admin › Settings); a unit past its timer turns amber 
     body: `The map is drawn from bitdispatcher's own [recorded map](#admin-map): roads by class with route shields and one-way arrows, county and town lines, house numbers and hydrants at street level, fire, police, EMS and hospitals in their own colours.
 
 - **Search** (top right): an address (\`2001 Crystal Spring Ave\`), an intersection (\`Orange & Williamson\`, \`and\`, \`/\` or \`at\`), a street, or a place. Arrow keys and Enter; New incident from a result. A house number not on file offers the nearest numbers on the same street.
-- **Right-click** anywhere: what is here (the nearest address or road), New incident here, and [Views of this place](#views) when a provider is on.
+- **Right-click** anywhere: what is here (the nearest address or road), New incident here, **Close a road from here** and **Close the roads around here** ([Road closures](#road-closures)), and [Views of this place](#views) when a provider is on.
+- **Closed roads** are drawn in red dashes, and **traffic** slowdowns in yellow, orange and red under them; click a closed road for why, and Lift.
 - **Routes**: for the selected incident, the road route of each recommended, chosen and assigned unit, with its arrival time on the unit.
 - **Day / Night** switches the palette; **Photos** (\`F7\`) puts aerial photos under the streets; **3D** stands the buildings up (OpenStreetMap's storeys where mapped) and tilts the map, and right-drag turns it; **Fit all** shows every unit and incident; OOS and Stations show or hide those.
 - The dashed cyan line is the edge of the recorded map: beyond it the online map is shown, muted, and drive times are estimates.`,
+  },
+  {
+    id: 'road-closures', title: 'Road closures and traffic', keys: 'road closure closed road detour blocked flood crash traffic jam waze live traffic drive time routing lift',
+    body: `A closed road changes drive times and unit recommendations at once: the router goes around it, with no rebuild of the map.
+
+- **Close a stretch**: right-click the map on the road, **Close a road from here**, then click along the closed stretch and **Done**. Say why, until when (empty: until someone lifts it), the detour, and whether to note it on the selected incident.
+- **Close an area**: right-click, **Close the roads around here**, and give the radius: every road with any part in the circle closes (a flood, a fire, a scene).
+- The closed roads are drawn in red dashes. Click one for why and since when, and **Lift** to open it again. A closure with an end time lifts itself.
+- A unit can still be sent to a place on a closed road: where a drive starts and ends is never refused, only the roads in between.
+- Crews see the roads closed now, with the detours, on the [mobile terminal](#mdt).
+- **Live traffic**, when the agency has a feed ([Road closures & traffic](#admin-roads)), slows the roads it reports: a road's drive time is its recorded time times how much slower it is, up to ten times. The source line of a recommendation says when traffic and closures changed it.
+- Every closure, change and lift is an attributed event in the ledger.`,
+  },
+  {
+    id: 'cameras', title: 'Cameras near an incident', keys: 'camera cameras cctv traffic camera live view still picture near incident purpose audit',
+    body: `When the agency has switched cameras on ([Cameras](#admin-cameras)), an incident with a map position lists **Cameras near**: the agency's cameras within its radius, those looking toward the place first, with how far and whether they look this way.
+
+- Press one: it asks **why** (the incident, or a reason), then opens it. A camera with a still picture shows what it sees now, refreshed every 5 seconds; one with a live view opens it in the camera system, which signs you in itself.
+- Every opening is recorded with who, when, why and the incident, and goes on the incident's timeline. Supervisors see the record in [Admin › Cameras](#admin-cameras).
+- bitdispatcher keeps no video and records nothing from the camera; the still picture is fetched for the person who opened the camera, and only for half an hour.`,
   },
   {
     id: 'photos', title: 'Aerial photos', keys: 'photos aerial imagery satellite orthophoto rooftop vgin naip',
@@ -395,9 +417,11 @@ Press **Press to turn the sound on** once after the screen opens (browsers play 
 - Make the incident from it, or attach it to one, as from any call; the agency's own alarm and shots-fired types are suggested when they exist.
 - An update from the sender changes the same call; a **cancel** from an alarm company goes on the incident as a priority note.
 - Alarm companies are told what became of their alarm: accepted, dispatched, on scene, closed.
+- Each alarm is checked against the agency's **permit register**: *Alarm permit P-1: valid*, *EXPIRED*, *SUSPENDED*, or *none on the register*. Its address's false alarms in the last year are counted; at the agency's limit the note says **REPEAT FALSE ALARMS** ([Alarm companies & permits](#admin-alarms)).
+- **Phoned alarm** (above the 911 calls): when an alarm company's operator calls on the phone, type its alarm on the alarm card (company, operator, event number, alarm, zone, premise, address, permit, keyholder). It goes in the queue like a sent one, with the same checks, and says who typed it.
 - An alert nobody acts on leaves the queue after 30 minutes; it stays in the ledger.
 
-> ASAP over Nlets, the national standard for alarms, is not connected yet: it needs the standard's schema and the state's message switch.`,
+> ASAP over Nlets, the national standard for alarms, is not connected yet: it needs the standard's schema and the state's message switch. Until then each company can have its own address and token over HTTPS ([Alarm companies & permits](#admin-alarms)).`,
   },
   {
     id: 'messages', title: 'Messages to and from the crews', keys: 'message messages msg text chat silent dispatch terminal mdt unit to unit urgent read receipt self attach take it',
@@ -458,6 +482,7 @@ Browsers keep a page silent until someone has used it. After a reload, the first
 - **Photos** on the map, as on the console.
 - **Messages**: what dispatch (or another unit) writes to this unit, with a reply line and quick replies (Copy, Delayed, Need PD…). An urgent message fills the top of the screen and sounds until the crew presses Got it; see [Messages](#messages).
 - **Messages and BOLOs**: the communications addressed to this unit or its agency's terminals (messages, BOLOs, officer-safety notices), highest priority first, with the agency's tones, repeats and acknowledgement as on the console. An urgent or high one that needs acknowledging stays at the top until the crew presses **Acknowledge**; opening one shows every version, the plate and description, and the attachments. Opening and acknowledging are recorded against the unit's sign-on; see [Messages and BOLOs](#inbox).
+- **Roads closed**: every [road closure](#road-closures) in force, with why, the detour and until when, refreshed every 30 seconds; the route drawn goes around them.
 - **Take it**: where the agency allows crews to attach themselves (Settings › Roles), an available unit takes a waiting incident from the list in one press; it is recorded as a dispatch by the crew, self-attached.
 
 A crew acts only as its own unit. Dispatchers can open the terminal at #/mdt to see what a unit sees (the position names the unit).`,
@@ -912,10 +937,11 @@ Only approved text is shown, word for word; nothing is generated. Opening the ta
   },
   {
     id: 'translation', title: 'Callers in another language', keys: 'translation spanish language interpreter phrasebook reply speak model',
-    body: `A caller speaking Spanish is translated line by line on the transcript, marked **Spanish · translated**; **Show original** shows what was said.
+    body: `A caller speaking another language is translated line by line on the transcript, marked with the language (**Spanish · translated**); **Show original** shows what was said.
 
-- **The phrasebook** built into bitdispatcher translates the words of emergencies between Spanish and English, offline. When it knows too few of a line's words it says **gist only**: get an interpreter.
-- **Say it in Spanish**: press a ready phrase (Help is on the way, Is the person breathing?, Get out of the house now…) or type in English; the translation shows as you type. It is kept on the transcript, texted when **also text it** is ticked (BitVoice), and the speaker button says it aloud on this console.
+- **The phrasebook** built into bitdispatcher works offline. For **Spanish** it translates the words of emergencies both ways; when it knows too few of a line's words it says **gist only**: get an interpreter.
+- **Twelve more languages**: Arabic, Chinese (Mandarin), French, Haitian Creole, Hindi, Japanese, Korean, Polish, Portuguese, Russian, Tagalog and Vietnamese. The language is recognised from its script or its words. A caller's line becomes a **gist**: the emergency words found, in order, with … for the rest (\"fire · my house · … · please hurry\"). The call-taker's **ready phrases** are said in each of them; typed English is not, because the phrasebook will not make up a sentence it does not have. These phrasebooks were machine-written and have not been checked by native speakers.
+- **Say it in the caller's language**: press a ready phrase (Help is on the way, Is the person breathing?, Get out of the house now…) or, in Spanish or with the language model, type in English; the translation shows as you type. It is kept on the transcript, texted when **also text it** is ticked (BitVoice), and the speaker button says it aloud on this console in the browser's voice for the language.
 - **A language model** (optional, Admin › Integrations) translates what the phrasebook cannot, on an OpenAI-compatible chat API: one on your own server, or a service under your agency's agreement. What callers say is sent to it, so it is off until an administrator switches it on.`,
   },
   {
@@ -924,7 +950,17 @@ Only approved text is shown, word for word; nothing is generated. Opening the ta
 
 - **Floor**: a civic floor from call handling, and the **altitude** of a 3-D fix with its uncertainty, which tells which floor of a tall building.
 - **Trail**: a caller who moves leaves a dotted trail on the map of every position received, the selected call's brighter.
-- **Rebid** asks for a new position; **STALE** marks an old one (Admin › Settings).`,
+- **Rebid** asks for a new position; **STALE** marks an old one (Admin › Settings).
+- No good position? **Send location link** ([Location links](#location-link)) lets the caller's phone send its own.`,
+  },
+  {
+    id: 'location-link', title: 'Location links: the caller shares where they are', keys: 'location link share location gps caller phone browser text link here',
+    body: `When a call brings no usable position (a landline forwarded from a mobile, a caller who does not know where they are, a poor cell fix), **Send location link** on the call sends the caller a link: texted through BitVoice when the call can take a text, or shown to read out.
+
+- The caller opens it and presses **Share my location**; the phone asks to allow it. Its own position (GPS, a few metres outdoors) comes to the call, marked *Shared by the caller (phone's location, by link)*, and again as the caller moves, about every few seconds while the page is open.
+- The call shows the link's state; **end it** stops it. The caller can press **Stop sharing**. A link lasts 30 minutes (Admin › Settings › Calls: location links) and takes at most 900 positions.
+- The link holds a long random secret; only its hash is kept. It opens a small page with no sign-in and nothing else on it.
+- The link uses the public address in [Paging groups](#admin-paging): the caller's phone must be able to reach this server at it, with a certificate the phone trusts.`,
   },
   {
     id: 'grouping', title: 'Many callers, one incident', keys: 'duplicate callers group cluster attach all same fire',
@@ -941,7 +977,18 @@ Only approved text is shown, word for word; nothing is generated. Opening the ta
 - Anything urgent said on the call (a weapon, not breathing, fire) keeps it an emergency, whatever else was said; so does crash data.
 - **It is an emergency** moves it back; a person's decision always stands and is recorded.
 - **Send the usual reply** texts the reply set in Settings, such as where to report online.
-- Set the lines, the words and the reply in [Admin › Settings](#/admin/settings).`,
+- Set the lines, the words and the reply in [Admin › Settings](#/admin/settings).
+- Reports taken by the [non-emergency intake](#admin-intake) wait here too, marked *a report taken by the non-emergency intake*, with every answer; they do not time out of the list.`,
+  },
+  {
+    id: 'admin-intake', title: 'Non-emergency intake', route: '/admin/intake', keys: 'non-emergency intake bot ai receptionist report questions transfer emergency words token try',
+    body: `A voice or text bot on the non-emergency line (BitVoice's AI receptionist, or another) can take reports. The bot carries the voice; bitdispatcher decides what it asks.
+
+- **Questions**: asked in order, each with the kind of answer (words, an address, a phone number, yes or no). *needed* asks once more when the answer is empty. A yes/no question marked **yes = hand over** sends the caller to a person on yes, or when the answer is unclear. The keys \`where\`, \`phone\` and \`name\` fill the report's address (placed on the map when the recorded map finds it exactly), callback and caller.
+- **Handing over**: the moment a caller says one of the emergency words (by default: emergency, hurt, bleeding, fire, gun, breaking in, right now… and the agency's critical words), or anything the transcript reader marks urgent, the bot is told to say the hand-over line and transfer the caller to a call-taker. A word just after *no*, *not* or *nobody* (\"nobody is hurt\") does not count.
+- **A finished report** is a call in the [non-emergency list](#nonemergency) with every answer, the conversation and a report number the caller is told. Nothing is dispatched by it; a person makes an incident of it or closes it. A conversation handed over is a call marked emergency, with what was said.
+- **The bot's token**: **Make the token** (shown once). The bot calls \`POST /api/intake/sessions\` to start and \`POST /api/intake/sessions/<id>\` with each thing the caller says; each answer says what to say next and whether to hand over (docs/INTAKE.md).
+- **Try it** runs the saved script in a chat, as a caller would, and makes no report.`,
   },
   {
     id: 'crash', title: 'Vehicle crash data', keys: 'acn aacn crash telematics delta-v rollover airbag injury risk electric vehicle onstar',
@@ -1188,6 +1235,36 @@ Every request and answer is on the incident's timeline and in the ledger, so the
 - A **caution area** puts its note on every incident inside it (a school zone, a firing range, a block known for trouble), on the console and the crews' terminals.
 
 **Draw a new area**: click the corners on the map, then Finish. Areas show on the console map, dashed. Whether a unit is inside is worked out from its positions as they arrive, so an area drawn around a unit already there is not an arrival.`,
+  },
+  {
+    id: 'admin-roads', title: 'Road closures & traffic', route: '/admin/roads', keys: 'road closures traffic waze for cities geojson feed lift remove detour',
+    body: `Every road closed now, with why, the roads it takes, since when, until when, the detour and who closed it; and those ended in the last day.
+
+- **Lift** opens a road. **Remove** is for a closure entered by mistake (it stays in the ledger); a closure that was real should be lifted, so the record says it was closed.
+- A closure whose line or circle covers no recorded road says so: draw it again along the road.
+
+**Live traffic** (administrators):
+- **Waze for Cities** is Waze's free data-sharing programme for public agencies. Once the agency has joined, Waze gives it the address of its traffic feed (JSON); paste it here. Each jam's speed slows the roads under it; a road Waze reports closed is closed.
+- **GeoJSON**: any other source, a FeatureCollection of lines with \`speed_kmh\`, \`factor\` (times slower) or \`closed: true\`, and \`name\`.
+- Fetched every 2 minutes by default (30 seconds to an hour), with a token sent as Bearer when the feed needs one. The status says when it was last fetched, how many slowdowns it had, or why it failed. A feed that stops leaves the recorded drive times.`,
+  },
+  {
+    id: 'admin-cameras', title: 'Cameras', route: '/admin/cameras', keys: 'cameras cctv traffic cameras policy radius audit who looked live view still picture',
+    body: `The cameras dispatchers may open for an incident ([Cameras near an incident](#cameras)): traffic cameras, the agency's buildings, schools and partners that agreed to share.
+
+- **Offer cameras near incidents** is off until an administrator switches it on; the radius (400 m by default) says how far from an incident cameras are offered.
+- **Add a camera**: its name, owner, where it is, which way it looks (degrees from north; empty if it turns), how wide and how far it sees, and its **live view** address (opened in a new window in the camera system) and/or its **still picture** address (a JPEG of now, fetched through bitdispatcher). Only https addresses, or http on the agency's own network.
+- **Who looked, and why** lists every opening. Agree a policy before switching cameras on: which cameras, for which calls, and who reviews this record.`,
+  },
+  {
+    id: 'admin-alarms', title: 'Alarm companies & permits', route: '/admin/alarms', keys: 'alarm company central station token answer permit register false alarm repeat csv asap',
+    body: `**Companies**: each central station the agency works with gets its own address (\`/api/hooks/alarm/<company>\`) and token, shown once when it is made; its alarms arrive with its name, and what became of them goes to its own answer address. A new token stops the old one. Companies not on the list can still use the shared hook token (Admin › Integrations).
+
+**Permits**: load the agency's alarm permit register as CSV, with a heading row: number, address, holder, company, expires (YYYY-MM-DD), status (active, suspended, revoked). Loading replaces the register. Each alarm is matched by its permit number, else its street address.
+
+**False alarms**: an address's incidents in the last year whose disposition is a false alarm are counted (by default, dispositions with \"false\" in them); at the limit (3 by default) the alarm says **REPEAT FALSE ALARMS**.
+
+Phoned-in alarms are typed on the alarm card ([Alarms](#alerts)).`,
   },
   {
     id: 'unit-history', title: "A unit's status history", keys: 'unit status history day utilisation timeline committed time csv',

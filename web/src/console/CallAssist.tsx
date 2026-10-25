@@ -4,7 +4,7 @@ import { Car, Copy, Languages, Layers, MapPin, Mic, Send, ShieldAlert, Sparkles,
 import { api, errText } from '../api'
 import { can, useStore } from '../store'
 import { cx, hhmm } from '../util'
-import { floorText, kmh, langName, methodText } from '../dream'
+import { floorText, kmh, langName, methodText, speechLang } from '../dream'
 import type { Call, Detail, Phrase, SearchResult, View } from '../types'
 
 // What the call-taker no longer types: the live transcript (translated when it is not English), the
@@ -190,7 +190,7 @@ function Reply({ call, view }: { call: Call; view: View }) {
       </div>
       <div className="flex flex-wrap gap-1">
         {phrases.slice(0, 12).map((p) => (
-          <button key={p.key} className="rounded border border-slate-700 bg-slate-800/70 px-1.5 py-0.5 text-[10px] text-slate-200 hover:bg-slate-700" disabled={busy} onClick={() => go(p.en)} title={p.es}>{p.en}</button>
+          <button key={p.key} className="rounded border border-slate-700 bg-slate-800/70 px-1.5 py-0.5 text-[10px] text-slate-200 hover:bg-slate-700" disabled={busy} onClick={() => go(p.en)} title={p.tr?.[lang] ?? p.es}>{p.en}</button>
         ))}
       </div>
       <form className="mt-1 flex gap-1" onSubmit={(e) => { e.preventDefault(); if (text.trim()) go(text) }}>
@@ -199,6 +199,11 @@ function Reply({ call, view }: { call: Call; view: View }) {
       </form>
       {preview && <div className="mt-0.5 text-[11px] text-fuchsia-100">→ {preview}</div>}
       <div className="mt-0.5 text-[10px] text-slate-500">Read it to the caller, or press <Volume2 size={10} className="inline" aria-hidden /> to have this console say it. Kept on the transcript.</div>
+      {lang !== 'es' && (
+        <div className="mt-0.5 text-[10px] text-amber-300/90">
+          The phrasebook says only the ready phrases in {langName[lang] ?? lang}, and gives the gist of what the caller says. It was machine-written and not checked by a native speaker: for anything more, the language model (Admin › Integrations) or an interpreter.
+        </div>
+      )}
     </section>
   )
 }
@@ -207,7 +212,7 @@ function Reply({ call, view }: { call: Call; view: View }) {
 export function speak(text: string, lang: string) {
   if (typeof speechSynthesis === 'undefined') return
   const u = new SpeechSynthesisUtterance(text)
-  u.lang = lang === 'es' ? 'es-US' : lang
+  u.lang = speechLang[lang] ?? lang
   speechSynthesis.cancel()
   speechSynthesis.speak(u)
 }

@@ -277,9 +277,10 @@ func (s *State) mergeDream(c *Call, d CallData, at time.Time) {
 		if l.Lang == "" {
 			l.Lang = assist.DetectLang(l.Text)
 		}
-		if l.Lang != "" && l.Lang != "en" && l.English == "" && (l.Lang == "es") {
+		if l.Lang != "" && l.Lang != "en" && l.English == "" && assist.Knows(l.Lang) {
 			tr := assist.Translate(l.Text, l.Lang, "en")
-			l.English, l.By, l.Gist = tr.Text, "phrasebook", tr.Coverage < 0.6
+			// Only Spanish's phrasebook translates; the others give the emergency words: always a gist.
+			l.English, l.By, l.Gist = tr.Text, "phrasebook", tr.Coverage < 0.6 || l.Lang != "es"
 		}
 		if l.English != "" && l.By == "" {
 			l.By = "source"
@@ -401,6 +402,9 @@ func (s *State) screen(c *Call) *Screen {
 	}
 	if c.Crash != nil {
 		return &Screen{Reason: "crash data"}
+	}
+	if c.Line == IntakeLine {
+		return &Screen{NonEmergency: true, Reason: "a report taken by the non-emergency intake"}
 	}
 	if c.Line != "" {
 		for _, l := range s.Settings.NonEmergencyLines {

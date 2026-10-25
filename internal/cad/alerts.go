@@ -16,6 +16,10 @@ type Alert struct {
 	Event  string `json:"event"`            // what: burglary, fire, medical, panic, holdup, hotlist hit, gunfire…
 	Detail string `json:"detail,omitempty"` // free text from the sender
 	Status string `json:"status,omitempty"` // new, updated, cancelled (by the sender), verified
+	// Company is the alarm company's ID on the agency's list, when it sent this itself (its answers go
+	// back to it); Phoned is true when a call-taker typed it from the company's phone call.
+	Company string `json:"company,omitempty"`
+	Phoned  bool   `json:"phoned,omitempty"`
 
 	// Alarms.
 	Account   string `json:"account,omitempty"`   // the subscriber's account at the alarm company

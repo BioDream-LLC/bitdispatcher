@@ -48,3 +48,16 @@ func InPolygon(lat, lon float64, ring [][2]float64) bool {
 	}
 	return in
 }
+
+// Bearing is the initial compass bearing in degrees (0 north, 90 east) from the first point to the second.
+func Bearing(lat1, lon1, lat2, lon2 float64) float64 {
+	p1, p2 := lat1*math.Pi/180, lat2*math.Pi/180
+	dl := (lon2 - lon1) * math.Pi / 180
+	y := math.Sin(dl) * math.Cos(p2)
+	x := math.Cos(p1)*math.Sin(p2) - math.Sin(p1)*math.Cos(p2)*math.Cos(dl)
+	b := math.Atan2(y, x) * 180 / math.Pi
+	if b < 0 {
+		b += 360
+	}
+	return b
+}

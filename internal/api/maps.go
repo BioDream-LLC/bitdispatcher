@@ -48,9 +48,10 @@ func (s *Server) mapHealth() *MapHealth {
 // treeCache keeps recent searches backwards from a destination, so a recommendation and the route lines
 // drawn for it share one search.
 type treeCache struct {
-	mu    sync.Mutex
-	store *mapdata.Store
-	trees map[[2]int32]treeEntry
+	mu      sync.Mutex
+	store   *mapdata.Store
+	version uint64 // the road overlay's version the trees were made under (closures, traffic)
+	trees   map[[2]int32]treeEntry
 }
 
 type treeEntry struct {
@@ -68,8 +69,8 @@ func (c *treeCache) tree(st *mapdata.Store, lat, lon float64) (*mapdata.Tree, er
 	}
 	k := [2]int32{int32(math.Round(lat * 1e5)), int32(math.Round(lon * 1e5))}
 	c.mu.Lock()
-	if c.store != st {
-		c.store, c.trees = st, map[[2]int32]treeEntry{}
+	if v := r.OverlayVersion(); c.store != st || c.version != v {
+		c.store, c.version, c.trees = st, v, map[[2]int32]treeEntry{}
 	}
 	if e, ok := c.trees[k]; ok && time.Since(e.at) < 2*time.Minute {
 		c.mu.Unlock()
@@ -103,7 +104,7 @@ func (m mapRouter) TravelTo(lat, lon float64) (cad.TravelFunc, string) {
 		return nil, ""
 	}
 	label := fmt.Sprintf("Drive over the recorded road network (OpenStreetMap, recorded %s): posted or typical speeds, one-way streets obeyed",
-		st.Built.Local().Format("2 Jan 2006"))
+		st.Built.Local().Format("2 Jan 2006")) + m.s.roadsLabel()
 	return func(fl, fo float64) (float64, float64, []string, bool) {
 		rt, ok := t.From(fl, fo, true)
 		if !ok {
@@ -533,6 +534,9 @@ func (s *Server) mapEvents() {
 type mapGeocoder struct{ s *Server }
 
 func (m mapGeocoder) Geocode(text string) (float64, float64, string, bool) {
+	if m.s.Maps == nil {
+		return 0, 0, "", false
+	}
 	st := m.s.Maps.Store()
 	if st == nil {
 		return 0, 0, "", false

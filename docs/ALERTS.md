@@ -51,6 +51,38 @@ status, with the answer token as Bearer:
 `status` is `accepted` (an incident was made), `dispatched`, `onscene`, `closed` (with the disposition), or
 `ended` (the alert left the queue without an incident).
 
+## Each company its own address
+
+An administrator can list the alarm companies the agency works with (Admin › Alarm companies & permits).
+Each gets its own address and token, shown once when it is made:
+
+```
+POST /api/hooks/alarm/<company>
+Authorization: Bearer <the company's token>
+```
+
+The body is the same as above; `sender` is set to the company's name whatever the body says, and the
+company's operators' line is the callback when the body gives none. Answers for its alarms go to the
+company's own answer address (with its own token), not the shared one. A new token stops the old one. A
+company switched off is refused (404). Companies not on the list can still use `/api/hooks/alarm` with the
+shared hook token.
+
+## Permits and false alarms
+
+The agency's alarm permit register is loaded as CSV (`PUT /api/admin/alarms/permits`, administrators), with
+a heading row: `number,address,holder,company,expires,status` (`expires` as YYYY-MM-DD; `status` active,
+suspended or revoked). Each new alarm is matched by its `permit`, else by its street address, and gets a
+note: *Alarm permit P-1: valid until 2027-01-01*, *EXPIRED*, *SUSPENDED*, or *none on the register*. The
+address's incidents in the last year whose disposition is a false alarm (by default, any with "false" in
+it; Settings) are counted; at the agency's limit (3 by default) the note says **REPEAT FALSE ALARMS**.
+
+## Alarms phoned in
+
+When an operator phones the alarm in, the call-taker types it on the alarm card (Phoned alarm, above the
+911 calls), which posts to `POST /api/alarms/phoned` as the call-taker. It goes in the queue with the same
+checks and a note of who typed it. No answers are sent for a phoned alarm: the company is told by phone, as
+it told the centre.
+
 ## ASAP
 
 ASAP (APCO/CSAA ANS 2.101, the Automated Secure Alarm Protocol) is the national standard for alarm

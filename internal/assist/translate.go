@@ -6,16 +6,23 @@ import (
 	"unicode"
 )
 
-// DetectLang guesses whether text is Spanish ("es") or English ("en"); "" when it cannot tell (too
-// short or neither). It scores the text against small sets of marker words and characters, so it is a
-// cheap hint, not a certainty.
+// DetectLang guesses the language of text: English ("en"), Spanish ("es"), or one of the phrasebook's
+// other languages (phrasebooks.go) by its script or marker words; "" when it cannot tell (too short or
+// none of them). It scores the text against small sets of marker words and characters, so it is a cheap
+// hint, not a certainty.
 func DetectLang(text string) string {
+	if l := detectScript(text); l != "" {
+		return l
+	}
 	norm := fold(text)
 	words := strings.Fields(norm)
 	if len(words) == 0 {
 		return ""
 	}
 
+	if l := detectLatin(text); l != "" {
+		return l
+	}
 	var es, en int
 	for _, w := range words {
 		if esMarkers[w] {
@@ -66,6 +73,9 @@ var reColourAfter = regexp.MustCompile(`(?i)\b(car|truck|pickup|van|minivan|suv|
 func Translate(text, from, to string) Translation {
 	if len(text) > maxInput {
 		text = text[:maxInput]
+	}
+	if from != to && (books[from] != nil || books[to] != nil) {
+		return translateBook(text, from, to)
 	}
 	if from == to || (from != "es" && from != "en") || (to != "es" && to != "en") {
 		return Translation{Text: text, Coverage: 0}

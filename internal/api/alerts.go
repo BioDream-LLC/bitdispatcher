@@ -34,13 +34,27 @@ func (s *Server) alertRoutes() {
 }
 
 func (s *Server) hookAlert(kind string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) { s.takeAlert(w, r, kind, nil, nil) }
+}
+
+// takeAlert takes an outside alert: from the shared hook, from an alarm company's own address (company),
+// or typed by a call-taker (by) from an alarm company's phone call.
+func (s *Server) takeAlert(w http.ResponseWriter, r *http.Request, kind string, company *AlarmCompany, by *cad.Actor) {
+	{
 		var b alertBody
 		if !readJSON(w, r, &b) {
 			return
 		}
 		if kind != "" {
 			b.Kind = kind
+		}
+		phoned := by != nil
+		b.Alert.Company, b.Alert.Phoned = "", phoned
+		if company != nil {
+			b.Sender, b.Alert.Company = company.Name, company.ID
+			if b.Callback == "" {
+				b.Callback = company.Phone
+			}
 		}
 		if err := cad.CheckAlert(&b.Alert); err != nil {
 			writeErr(w, err)
@@ -49,6 +63,9 @@ func (s *Server) hookAlert(kind string) http.HandlerFunc {
 		al := b.Alert
 		id := al.CallID()
 		actor := cad.Actor{User: "alert:" + al.Kind}
+		if phoned {
+			actor = *by
+		}
 		var existing *cad.Call
 		s.Eng.Read(func(st *cad.State) {
 			if c, ok := st.Calls[id]; ok {
@@ -65,6 +82,12 @@ func (s *Server) hookAlert(kind string) http.HandlerFunc {
 		}
 		d := cad.CallData{Source: "alert", State: "data", Class: strings.ToUpper(al.Kind), Provider: al.Sender, Callback: al.Callback,
 			CallerName: firstNonEmptyStr(al.Premise, al.Sender), Emergency: true, Alert: &al, Notes: alertNotes(&al)}
+		if al.Kind == cad.AlertAlarm && existing == nil && !b.Cancel {
+			d.Notes = append(d.Notes, s.alarmChecks(&al, b.Address)...)
+		}
+		if phoned {
+			d.Notes = append(d.Notes, "Phoned in by the alarm company; typed by "+actor.User)
+		}
 		if existing != nil && existing.State == "ended" {
 			d.State = "" // an update to an ended alert does not ring it again
 		}
@@ -134,10 +157,17 @@ func (s *Server) alarmAnswers(ctx context.Context) {
 			return
 		case n := <-ch:
 			x := s.extra()
-			if x.AlertAnswerURL == "" || (n.Inc == "" && n.Call == "") {
+			companies := map[string]AlarmCompany{}
+			for _, c := range s.nextConfig().AlarmCompanies {
+				if !c.Off && c.AnswerURL != "" {
+					companies[c.ID] = c
+				}
+			}
+			if (x.AlertAnswerURL == "" && len(companies) == 0) || (n.Inc == "" && n.Call == "") {
 				continue
 			}
 			type answer struct {
+				company     string
 				Sender      string    `json:"sender"`
 				ID          string    `json:"id"`
 				Status      string    `json:"status"` // accepted, dispatched, onscene, closed, ended
@@ -152,7 +182,10 @@ func (s *Server) alarmAnswers(ctx context.Context) {
 					if c.Alert == nil || c.Alert.Kind != cad.AlertAlarm || (c.Incident != n.Inc && id != n.Call) {
 						continue
 					}
-					a := answer{Sender: c.Alert.Sender, ID: c.Alert.ID, Incident: c.Incident, At: s.Eng.Now().UTC()}
+					if c.Alert.Phoned {
+						continue // phoned in: the company is told by phone, as it told us
+					}
+					a := answer{company: c.Alert.Company, Sender: c.Alert.Sender, ID: c.Alert.ID, Incident: c.Incident, At: s.Eng.Now().UTC()}
 					in := st.Incidents[c.Incident]
 					switch {
 					case in == nil && c.State == "ended":
@@ -181,14 +214,23 @@ func (s *Server) alarmAnswers(ctx context.Context) {
 			})
 			for _, a := range out {
 				body, _ := json.Marshal(a)
+				to, tok := x.AlertAnswerURL, x.AlertAnswerToken
+				if c, ok := companies[a.company]; ok {
+					to, tok = c.AnswerURL, c.AnswerToken
+				} else if a.company != "" {
+					continue // a company on the list without an answer address
+				}
+				if to == "" {
+					continue
+				}
 				go func() {
-					req, err := http.NewRequestWithContext(ctx, "POST", x.AlertAnswerURL, bytes.NewReader(body))
+					req, err := http.NewRequestWithContext(ctx, "POST", to, bytes.NewReader(body))
 					if err != nil {
 						return
 					}
 					req.Header.Set("Content-Type", "application/json")
-					if x.AlertAnswerToken != "" {
-						req.Header.Set("Authorization", "Bearer "+x.AlertAnswerToken)
+					if tok != "" {
+						req.Header.Set("Authorization", "Bearer "+tok)
 					}
 					resp, err := client.Do(req)
 					if err != nil {

@@ -136,7 +136,7 @@ export type CareCase = { incident: string; reason: string; at: string; people: s
 export type Break = { on: boolean; since?: string; lastEnd?: string; count: number }
 export type TDoS = { active: boolean; since?: string; last?: string; reasons: string[] | null; perMin: number; baseline: number; repeats?: string[]; ackedBy?: string; ackedAt?: string }
 export type TrainingView = { scenario?: string; name?: string; started?: string; steps: number; played: number }
-export type Phrase = { key: string; en: string; es: string }
+export type Phrase = { key: string; en: string; es: string; tr?: Record<string, string> }
 export type Workload = {
   username: string; name: string; role: string; console: string; signedIn: string; calls: number; incidents: number; actions: number
   critical: string[]; onBreak: boolean; sinceBreak: number; level: 'ok' | 'watch' | 'relieve'; reasons: string[]
@@ -162,6 +162,7 @@ export type Settings = {
   qualifications?: string[]; capNeeds?: CapNeed[] | null; parMinutes?: number; benchmarks?: Benchmark[]; towClasses?: string[]; towZones?: string[]
   views?: ViewRule[]; staffing?: StaffingRules; commKinds?: CommKind[]; priorityRules?: PriorityRule[]; commFileTypes?: string[]; commFileMB?: number
   multiCall?: MultiCall; commands?: CommandRules
+  next?: NextSettings
 }
 
 export type Failure = { at: string; what: string; call?: string; error: string }
@@ -216,7 +217,24 @@ export type View = { placeViews?: boolean; messages?: UnitMessage[]; stationAler
   summaries?: Record<string, string>; drones?: Drone[]; radio?: RadioLine[]; care?: CareCase[]; breaks?: Record<string, Break>; tdos?: TDoS; training?: TrainingView
   entry?: EntryView
   roadmap?: RoadmapView
+  next?: NextView
 }
+
+/** The October 2026 features: road closures and traffic, cameras, location links, more languages. */
+export type RoadClosure = {
+  id: string; reason: string; line?: [number, number][]; center?: [number, number]; radius?: number; from: string; until?: string
+  detour?: string; incident?: string; by: string; at: string; lifted?: string; liftedBy?: string
+  segments?: number; shapes?: [number, number][][] | null; roads?: string[]
+}
+export type TrafficJam = { line: [number, number][]; kmh: number; closed?: boolean; street?: string; delay?: number; factor: number }
+export type TrafficStatus = { on: boolean; kind?: string; at?: string; error?: string; jams: TrafficJam[] }
+export type RoadsView = { version: number; closures: RoadClosure[]; traffic: TrafficStatus; lifted?: RoadClosure[]; jams?: number }
+export type LocationLink = { id: string; call: string; expires: string; by: string; at: string; sent?: string; ended?: string; why?: string }
+export type Language = { code: string; name: string; english: string; dir: 'ltr' | 'rtl'; full?: boolean }
+export type NextView = { roads: RoadsView; cameras: boolean; locLinks: Record<string, LocationLink[]>; intake: boolean; languages: Language[] }
+export type CameraNear = { id: string; name: string; owner?: string; lat: number; lon: number; heading?: number; metres: number; facing?: boolean; live: boolean; still: boolean; note?: string }
+export type Camera = { id: string; name: string; owner?: string; lat: number; lon: number; heading?: number | null; fov?: number; range?: number; live?: string; still?: string; note?: string; off?: boolean }
+export type CameraLook = { at: string; user: string; camera: string; name: string; incident?: string; purpose: string }
 
 export type Premise = { id: string; name?: string; address: string; lat: number; lon: number; hazards?: string[]; notes?: string; contacts?: string[]; expires?: string; source?: string; photos?: PremisePhoto[]; updated: string; by: string }
 export type PremisePhoto = { id: string; caption?: string; facing?: '' | 'N' | 'E' | 'S' | 'W'; type: string; sha256: string; size: number; added: string; by: string }
@@ -425,3 +443,12 @@ export type KeyProfile = { id: string; name: string; bindings: KeyBinding[] }
 export type CommandRules = { delim?: string; fieldInitiate?: string[]; fiType?: string; twoPass?: boolean; fiMarkOut?: string; autoQuery?: boolean
   unitStatus?: string[]; multiUnit?: boolean; statusCodes?: StatusCode[]; keyProfiles?: KeyProfile[]; keys?: Record<string, string> }
 export type CommandResult = { ok: boolean; message: string; incident?: string; refused?: boolean; form?: '' | 'unit-status' | 'field-initiate'; unit?: string; plate?: string; plateState?: string }
+
+export type IntakeQuestion = { key: string; ask: string; kind: 'text' | 'address' | 'phone' | 'yesno'; required?: boolean; danger?: boolean }
+export type IntakeScript = { on?: boolean; greeting?: string; questions?: IntakeQuestion[]; closing?: string; transfer?: string; emergencyWords?: string[] }
+export type NextSettings = {
+  cameras?: { on?: boolean; radius?: number }
+  locLinkMinutes?: number; locLinkText?: string
+  alarms?: { falseLimit?: number; falseWords?: string[] }
+  intake?: IntakeScript
+}

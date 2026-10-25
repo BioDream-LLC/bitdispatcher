@@ -11,6 +11,7 @@ import { AdvisoryCards, useAdvisory } from './Advisory'
 import PremiseBox from './PremiseBox'
 import { ViewsButton } from '../views/PlaceViews'
 import CallAssist from './CallAssist'
+import { CamerasBox, LocationLinkBox } from './Next'
 import HandlingBox, { CallerIDChip } from './Handling'
 import { SummaryBox, DroneBox } from './Dream'
 import { openMarkOut } from './MarkOut'
@@ -168,6 +169,7 @@ export function CallBox({ call, view, now }: { call: Call; view: View; now: numb
           </button>
         </div>
       )}
+      <LocationLinkBox call={call} view={view} now={now} />
       {call.video?.viewUrl && <CallerVideo call={call} />}
       {photos.length > 0 && (
         <div className="flex gap-1 overflow-x-auto">
@@ -532,6 +534,7 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
         {!closed && view.summaries?.[inc.number] && <SummaryBox inc={inc} text={view.summaries[inc.number]} />}
         <PremiseBox premises={view.premises?.[inc.number]} prior={view.prior?.[inc.number]} />
         <DroneBox inc={inc} view={view} />
+        <CamerasBox inc={inc} view={view} />
         {calls.map((c) => <CallBox key={c.id} call={c} view={view} now={now} />)}
         <FiregroundBox inc={inc} view={view} />
         <AlarmBar inc={inc} view={view} reload={reloadRec} />

@@ -88,7 +88,15 @@ export function kmh(v?: number): string {
   return `${Math.round(v)} km/h (${Math.round(v / 1.609)} mph)`
 }
 
-export const langName: Record<string, string> = { es: 'Spanish', en: 'English' }
+export const langName: Record<string, string> = {
+  en: 'English', es: 'Spanish', ar: 'Arabic', zh: 'Chinese', fr: 'French', ht: 'Haitian Creole', hi: 'Hindi', ja: 'Japanese',
+  ko: 'Korean', pl: 'Polish', pt: 'Portuguese', ru: 'Russian', tl: 'Tagalog', vi: 'Vietnamese',
+}
+
+/** speechLang is the voice a browser reads a language in. */
+export const speechLang: Record<string, string> = {
+  es: 'es-US', ar: 'ar-SA', zh: 'zh-CN', fr: 'fr-FR', ht: 'fr-HT', hi: 'hi-IN', ja: 'ja-JP', ko: 'ko-KR', pl: 'pl-PL', pt: 'pt-BR', ru: 'ru-RU', tl: 'fil-PH', vi: 'vi-VN',
+}
 
 /** minutes is a number of minutes as h:mm when an hour or more. */
 export function minutes(m: number): string {

@@ -49,6 +49,7 @@ type Integrations struct {
 	Paging     Paging            `json:"paging"`       // pages to volunteer and off-duty responders
 	NEMSIS     nemsis.Config     `json:"nemsis"`       // EMS responses to the patient-care report system
 	Alerting   Alerting          `json:"alerting"`     // public alerts (mass notification)
+	Next       NextConfig        `json:"next"`         // live traffic, alarm companies, the intake bots' token (next.go)
 }
 
 // Server is the API.
@@ -73,6 +74,7 @@ type Server struct {
 	GIS            *gis.Service      // the county's GIS layers
 	Views          *views.Service    // oblique and street-level pictures of a place
 	trees          treeCache
+	next           nextRuntime // closures and traffic, location links, intake sessions (next.go)
 	sites          sites
 	TLSFingerprint string // this site's certificate, for other sites to pin
 	photoStats     statsCache
@@ -368,6 +370,7 @@ func (s *Server) routes() {
 	s.viewRoutes()
 	s.messageRoutes()
 	s.alertRoutes()
+	s.nextRoutes()
 	s.nerisRoutes()
 	s.stationRoutes()
 	s.partnerRoutes()
@@ -646,6 +649,7 @@ type View struct {
 	Training  *TrainingView         `json:"training,omitempty"`
 	Entry     EntryView             `json:"entry"`
 	Roadmap   RoadmapView           `json:"roadmap"`
+	Next      NextView              `json:"next"` // closures, cameras, location links, languages (next_people.go)
 }
 
 // HealthView is every interface's health.
@@ -701,6 +705,7 @@ func (s *Server) viewFor(sc cad.Scope) ([]byte, error) {
 	vc := s.Views.Config()
 	now := s.Eng.Now()
 	h := s.health()
+	roads := s.roadsBriefView()
 	var out []byte
 	var err error
 	s.Eng.Read(func(st *cad.State) {
@@ -761,6 +766,8 @@ func (s *Server) viewFor(sc cad.Scope) ([]byte, error) {
 		v.Training = s.trainingView()
 		v.Entry = s.entryView(st, now)
 		v.Roadmap = s.roadmapView(st, now, v.Incidents)
+		v.Next = s.nextView(st, v.Calls)
+		v.Next.Roads = roads
 		v.Summaries, v.Drones, v.Care, v.Breaks, v.TDoS = map[string]string{}, []*cad.Drone{}, []*cad.CareCase{}, st.Breaks, st.TDoS
 		for _, in := range v.Incidents {
 			if in.Status != cad.Closed {
@@ -1841,6 +1848,9 @@ func (s *Server) Run(ctx context.Context) {
 	go s.droneRule(ctx)
 	go s.endDataCalls(ctx)
 	go s.alarmAnswers(ctx)
+	go s.runRoads(ctx)
+	go s.runTraffic(ctx)
+	go s.sweepIntake(ctx)
 	go s.nerisAuto(ctx)
 	go s.stationAlerter(ctx)
 	go s.publicFeedPusher(ctx)

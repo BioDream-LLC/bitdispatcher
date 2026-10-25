@@ -470,7 +470,31 @@ type Settings struct {
 	MultiCall MultiCall `json:"multiCall,omitzero"`
 	// Commands are the command-line grammar, status codes and key profiles (fieldcmd.go).
 	Commands CommandRules `json:"commands,omitzero"`
+	// Next are the cameras, location links, alarm and intake policies (next.go, cameras.go, intake.go).
+	Next NextSettings `json:"next,omitzero"`
 }
+
+// NextSettings are the settings of the features added after the October 2026 competitor review.
+type NextSettings struct {
+	Cameras CameraPolicy `json:"cameras,omitzero"`
+	// LocLinkMinutes is how long a location link takes positions (0: 30 minutes).
+	LocLinkMinutes int `json:"locLinkMinutes,omitempty"`
+	// LocLinkText is the text sent with the link; {link} is replaced by it (empty: the default).
+	LocLinkText string       `json:"locLinkText,omitempty"`
+	Alarms      AlarmPolicy  `json:"alarms,omitzero"`
+	Intake      IntakeScript `json:"intake,omitzero"`
+}
+
+// AlarmPolicy is what an agency checks of an alarm before sending.
+type AlarmPolicy struct {
+	// FalseLimit is how many false alarms at one premise in a year are flagged (0: 3).
+	FalseLimit int `json:"falseLimit,omitempty"`
+	// FalseWords are the dispositions that count as a false alarm (empty: those with "false" in them).
+	FalseWords []string `json:"falseWords,omitempty"`
+}
+
+// DefaultLocLinkText is the text a location link is sent with.
+const DefaultLocLinkText = "911: to show us exactly where you are, open this link and press Share: {link}"
 
 // MarkOutType finds a mark-out type by its code, in any case.
 func (s Settings) MarkOutType(code string) (MarkOutType, bool) {

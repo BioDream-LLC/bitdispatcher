@@ -56,7 +56,7 @@ func (s *State) applyRoadmap(e ledger.Event) (bool, error) {
 		}
 		return true, nil
 	}
-	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts, s.applyAgencies, s.applyPresets, s.applyQuals, s.applyStaffing, s.applyComms, s.applyDrafts, s.applyScope} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyCrew, s.applyFireground, s.applyPages, s.applyTows, s.applySchedule, s.applyDirectory, s.applyGeofences, s.applyPapers, s.applyAlerts, s.applyAgencies, s.applyPresets, s.applyQuals, s.applyStaffing, s.applyComms, s.applyDrafts, s.applyScope, s.applyClosures, s.applyNext} {
 		if ok, err := f(e); ok {
 			return true, err
 		}
@@ -81,6 +81,7 @@ func (s *State) initRoadmap() {
 	s.reminded = map[string]bool{}
 	s.Comms, s.CommDrafts, s.CommFiles, s.commIdx = []*Comm{}, map[string]*CommDraft{}, map[string]*CommFile{}, map[string]int{}
 	s.CallDrafts = map[string]*CallDraft{}
+	s.initNext()
 }
 
 // now is the time for what is computed rather than recorded (a credential's expiry): the engine's clock,

@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"sync/atomic"
 )
 
 // Router finds driving times over the recorded road network.
@@ -14,6 +15,7 @@ type Router struct {
 	grid  map[[2]int32][]uint32
 	cell  float64
 	pool  sync.Pool
+	over  atomic.Pointer[overlay] // closures and traffic (overlay.go)
 }
 
 const revBit = 1 << 31
@@ -183,17 +185,19 @@ func (r *Router) To(lat, lon, maxSecs float64) *Tree {
 		return t
 	}
 	var h heap
+	f := r.factors()
 	s := r.g.Segs[d.Seg]
+	ds := cost(f, d.Seg, s.Secs, true)
 	frac := 0.0
 	if s.Metres > 0 {
 		frac = d.Along / float64(s.Metres)
 	}
 	if s.Fwd { // from U, drive along the segment to the point
-		t.secs[s.U], t.metres[s.U], t.term[s.U] = float32(frac*float64(s.Secs)), float32(d.Along), true
+		t.secs[s.U], t.metres[s.U], t.term[s.U] = float32(frac*float64(ds)), float32(d.Along), true
 		h.push(t.secs[s.U], s.U)
 	}
 	if s.Bwd {
-		c := float32((1 - frac) * float64(s.Secs))
+		c := float32((1 - frac) * float64(ds))
 		if c < t.secs[s.V] {
 			t.secs[s.V], t.metres[s.V], t.term[s.V] = c, float32(float64(s.Metres)-d.Along), true
 			h.push(c, s.V)
@@ -210,7 +214,11 @@ func (r *Router) To(lat, lon, maxSecs float64) *Tree {
 			if e&revBit != 0 {
 				from = sg.V
 			}
-			nc := c + sg.Secs
+			sc := cost(f, e&^revBit, sg.Secs, false)
+			if sc == inf {
+				continue
+			}
+			nc := c + sc
 			if nc < t.secs[from] {
 				t.secs[from], t.metres[from], t.next[from], t.term[from] = nc, t.metres[v]+sg.Metres, e, false
 				h.push(nc, from)
@@ -239,6 +247,7 @@ func (t *Tree) From(lat, lon float64, withPath bool) (Route, bool) {
 	}
 	g := t.r.g
 	s := g.Segs[o.Seg]
+	s.Secs = cost(t.r.factors(), o.Seg, s.Secs, true) // where the drive starts is never refused
 	frac := 0.0
 	if s.Metres > 0 {
 		frac = o.Along / float64(s.Metres)
