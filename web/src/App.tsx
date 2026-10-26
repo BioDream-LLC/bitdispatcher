@@ -11,6 +11,8 @@ import Mdt from './mdt/Mdt'
 import { Help } from './Help'
 import Rms from './rms/Rms'
 import { useViews } from './access'
+import { KeyTestHost } from './keys'
+import { SignOffBlocked } from './SignOff'
 
 /** A supervisory screen only for people the agency gave it; a direct link shows why not. */
 function Given({ id, children }: { id: string; children: React.ReactNode }) {
@@ -29,6 +31,8 @@ const Station = lazy(() => import('./Station'))
 const Papers = lazy(() => import('./records/Papers'))
 const PageReply = lazy(() => import('./PageReply'))
 const Staffing = lazy(() => import('./console/Staffing'))
+const Supervisor = lazy(() => import('./super/Supervisor'))
+const Requests = lazy(() => import('./requests/Requests'))
 
 const wait = (what: string) => <div className="grid h-full place-items-center text-sm text-slate-500">Loading {what}…</div>
 
@@ -65,6 +69,8 @@ export default function App() {
     <Tooltip.Provider delayDuration={300}>
       <Toaster theme="dark" position="bottom-right" richColors closeButton toastOptions={{ className: 'text-sm' }} />
       <LockGuard />
+      {me && <KeyTestHost />}
+      {me && <SignOffBlocked />}
       {me?.role === 'field' ? (
         <Routes>
           <Route path="/rms" element={<Rms />} />
@@ -89,6 +95,8 @@ export default function App() {
           <Route path="/screen/incident" element={<Console key="incident" screen="incident" />} />
           <Route path="/board" element={<Given id="board"><Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading the board…</div>}><Board /></Suspense></Given>} />
           <Route path="/staffing" element={<Suspense fallback={wait('staffing')}><Staffing /></Suspense>} />
+          <Route path="/supervisor" element={<Suspense fallback={wait('the supervisor review')}><Supervisor /></Suspense>} />
+          <Route path="/requests" element={<Suspense fallback={wait('the requests')}><Requests /></Suspense>} />
           <Route path="/review/:number" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading the review…</div>}><Review /></Suspense>} />
           <Route path="/records" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />
           <Route path="/records/:id" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />

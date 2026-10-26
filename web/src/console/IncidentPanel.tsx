@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { AdvisoryCards, useAdvisory } from './Advisory'
 import PremiseBox from './PremiseBox'
+import { DispatcherResources, IncidentFlags, PlaceLine } from './IncidentExtras'
 import { ViewsButton } from '../views/PlaceViews'
 import CallAssist from './CallAssist'
 import { CamerasBox, LocationLinkBox } from './Next'
@@ -510,6 +511,7 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
               <ViewsButton lat={inc.location.lat} lon={inc.location.lon} premises={view.premises?.[inc.number]} className="ml-auto shrink-0" />
             )}
           </div>
+          <PlaceLine inc={inc} />
           {inc.caller && (inc.caller.name || inc.caller.callback) && (
             <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-300">
               <Phone size={11} aria-hidden /> {inc.caller.name} <span className="font-mono">{phone(inc.caller.callback)}</span>
@@ -530,9 +532,11 @@ export default function IncidentPanel({ view, inc, rec, reloadRec }: { view: Vie
           </div>
         </div>
         <SafetyFlags inc={inc} view={view} />
+        <IncidentFlags inc={inc} />
         <EntryFacts inc={inc} view={view} />
         {!closed && view.summaries?.[inc.number] && <SummaryBox inc={inc} text={view.summaries[inc.number]} />}
         <PremiseBox premises={view.premises?.[inc.number]} prior={view.prior?.[inc.number]} />
+        {!closed && <DispatcherResources view={view} inc={inc} />}
         <DroneBox inc={inc} view={view} />
         <CamerasBox inc={inc} view={view} />
         {calls.map((c) => <CallBox key={c.id} call={c} view={view} now={now} />)}

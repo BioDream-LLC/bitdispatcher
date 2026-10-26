@@ -20,6 +20,7 @@ import { clock, cx, mi, prio, statusMeta, useNow } from '../util'
 import { CrewDialog } from '../console/Roadmap'
 import type { MemberBrief, PaperFlag, BOLO, MarkOutType, Incident, Position, Premise, RouteView, Station, Unit, UnitMessage, View } from '../types'
 import { dispatchStyle } from '../console/mapStyle'
+import { IncidentFlags, PlaceLine } from '../console/IncidentExtras'
 
 maplibregl.setWorkerUrl(workerUrl)
 
@@ -195,6 +196,8 @@ export default function Mdt() {
                 <div className="mt-2 flex items-start gap-2 text-2xl font-bold leading-tight text-amber-200">
                   <MapPin size={22} className="mt-1 shrink-0" aria-hidden /> {inc.location?.address || (inc.location?.lat != null ? `${inc.location.lat.toFixed(5)}, ${inc.location.lon!.toFixed(5)}` : 'No location yet')}
                 </div>
+                <div className="text-sm"><PlaceLine inc={inc} /></div>
+                <div className="mt-1"><IncidentFlags inc={inc} /></div>
                 {route && (
                   <div className="mt-1 flex items-center gap-2 text-sm text-sky-200">
                     <Navigation size={14} aria-hidden /> {Math.max(1, Math.round((route.seconds ?? 0) / 60))} min · {mi(route.metres ?? 0)}{route.via?.length ? ` via ${route.via.join(', ')}` : ''}

@@ -191,6 +191,7 @@ type State struct {
 	Geofences    map[string]*Geofence    `json:"geofences"`
 	Closures     map[string]*RoadClosure `json:"closures"` // closed roads (closures.go)
 	nextState
+	finalState
 	FenceAlerts []FenceAlert `json:"fenceAlerts"`
 	inFence     map[string][]string
 	Papers      map[string]*Paper `json:"papers"`

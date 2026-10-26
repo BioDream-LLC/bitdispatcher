@@ -9,6 +9,8 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
     ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'working-agency', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'road-closures', 'cameras', 'photos', 'views', 'messages', 'inbox', 'search', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
+  { title: 'Locations, people, requests and review', intro: 'The place and how a location is settled, flags, persons and vehicles, NCIC requests, Street View, key tests, and the supervisor\u2019s review.',
+    ids: ['place', 'flags', 'persons-vehicles', 'requests', 'streetview', 'keytest', 'supervisor', 'admin-callentry', 'admin-critical', 'admin-pip'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
@@ -20,6 +22,154 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
 ]
 
 export const manual: Article[] = [
+  {
+    id: 'place', title: 'Locations and the place', keys: 'location address verified estimated forced unverified map point caller place building floor apartment unit suite complex gate exception',
+    body: `The incident location is the place responders go to, not only its street address.
+
+## How the location is settled
+| Choice | Means |
+|---|---|
+| Verified address point | Picked from the agency's address data and confirmed with the caller |
+| Estimated (address range) | The address search placed it along a block range |
+| The caller's device location | The phone's position, with no exact address |
+| A point I placed on the map | Right-click the map |
+| Forced for this incident | Not in the address data: new construction, a rural place, the data is wrong |
+| Not verified yet | Typed and not checked |
+
+**Forced for this incident** needs a point on the map and a reason from the agency's list (and a note when the agency asks). The address is kept exactly as typed with the map point, the nearest verified address or cross streets and the alternatives offered. It is never replaced by a nearby address. The call is sent at once.
+
+Every location that is not a verified address point is labelled in capitals (**FORCED LOCATION**, **ESTIMATED LOCATION**) on call entry, the dispatcher's incident, the mobile terminal and in print, until the agency verifies it. Only duties the agency allows may force a location; a refused attempt is recorded on the incident and the call information stays as it was.
+
+## The place
+Business or building name, complex or campus, building, floor, apartment or room (the kind and the number) and entrance, gate or access detail are separate fields. They are searchable and they decide which flags apply. A change here never changes the agency's master address records.
+
+## What happens next
+Each such location opens a **location exception** and alerts the on-duty supervisor at once (see [Supervisor review](#supervisor)). When the agency later verifies or merges the address, the incident links to the master point; what was entered and what responders were shown stay on record.`,
+  },
+  {
+    id: 'flags', title: 'Premise and safety flags', route: '/admin/flags', keys: 'flags premise hazard officer safety medical business keyholder unsafe structure domestic violence dangerous animal polling place evacuation scope version restricted',
+    body: `A flag is the agency's warning about a verified address or a person: **premise, location, hazard, officer safety, medical, business, keyholder or maintenance, unsafe structure, domestic violence, dangerous animal, polling place, evacuation location** (the agency can rename, add or turn off categories).
+
+- **Scope**: each flag is put at the narrowest correct place: the whole property, a complex, a named business, a building, a floor or one apartment. An apartment's warning is never shown for the rest of the complex.
+- **When it shows**: as soon as the call-taker verifies the address, before the call is sent, as a line on every tab, then on the dispatcher's incident and the mobile terminal. Critical and high flags are in that line; the Hazards tab lists every one with what responders should do.
+- **What it says**: severity and category in words, a title, what the concern is and why, and what responders should do. Open it for the source and details.
+- **Restricted categories** (medical, domestic violence, officer safety, keyholder): those the agency does not allow see the warning and what to do, not the reason or source. Opening the detail is recorded; a refused request is too.
+- **Versions**: changing, renewing, retiring or restoring a flag makes a new version. Each incident keeps the version it showed, so later changes never rewrite what dispatchers saw.
+- **Unverified locations** never get a permanent flag. Flags near an unverified point show only as **POSSIBLE MATCH NEARBY**; an incident-only note can be kept instead.
+- **Who may**: each category says which duties create, approve and see it. Others (and trainees) propose; a supervisor approves or rejects. Two flags of one category on one scope are shown for a decision rather than one overwriting the other.
+
+Add a flag from call entry (Hazards, **Add a flag or a note for this place**) or here in Admin, where proposed flags wait for approval. [Open Flags](#/admin/flags)`,
+  },
+  {
+    id: 'persons-vehicles', title: 'Persons and vehicles', keys: 'persons vehicles first middle last name suffix alias phone description ssn social security licence date of birth age officer safety plate state vin owner driver return dmv ncic tow',
+    body: `## Persons, top to bottom
+Role (more than one when it fits), then **First, Middle and Last name** in separate fields, suffix and aliases; where the person is (the incident, somewhere else with its building, floor and unit, unknown, transient); telephone numbers (several, with type, extension, source and whether verified); the description together (sex, race, ethnicity, height, weight, build, hair, eyes, clothing, scars, marks and tattoos, with the approved codes); then the identifiers: Social Security number, operator's licence and state, other identification, the date of birth and, separately, a reported approximate age. Age is worked out from the date of birth. Notes last.
+
+**Officer-safety concern** opens a required section: a short alert title, what happened and why it is a concern, weapons or threat, what responders should do, the source and its reliability. It cannot be saved without them. Choose **This incident only** or **Propose a permanent warning**: a proposal goes to the agency's review as a person flag. Everywhere the alert shows as **OFFICER SAFETY:** and its title, and opens to the reason, source and instruction.
+
+**Search** each name part on its own (First name **John** finds every John), with the date of birth, approximate age, phone, address, licence, sex, race, a linked plate, sounds-like and partial matching. **Possible same person** shows while you type a name and never blocks saving.
+
+Social Security and licence numbers show masked on every shared screen. **Open (recorded)** shows them to the duties the agency allows, with the purpose recorded.
+
+## Vehicles, top to bottom
+Roles (suspect, victim, stolen, recovered, traffic stop, evidence, towed and more), the plate with the agency's state first, the plate type and condition (temporary, partial, unreadable, none, several), the VIN (checked as you type; a partial VIN is kept with a note), then **Run DMV** or **Run NCIC** once the plate and state or a full VIN are in. The return attaches to that vehicle with its time, who ran it and who asked. Official values show **beside** what was reported and a difference is named; nothing reported is overwritten. A run again is a new version.
+
+Link drivers, owners, lessees, passengers and occupants to people on the call; each person shows their vehicles too. A possible stolen or wanted hit shows as **POSSIBLE HIT: not confirmed** until a hit confirmation is answered (see [NCIC and state requests](#requests)).
+
+**Tow** on a vehicle opens the tow for that vehicle: the next company on the agency's rotation at the top with its phone and last turn, then Accepted, Declined (with why) or No answer, each step's time, the driver, truck, storage lot, impound number, hold and release restriction. A declined company loses its turn and the next is offered. Each vehicle keeps its own tows. On the command line \`SE.AD6\` then F10 opens the same tow for AD6 on the selected incident and asks which vehicle.`,
+  },
+  {
+    id: 'requests', title: 'NCIC and state requests', route: '/requests', keys: 'ncic vcic dmv nlets request queue hit confirmation ori extradite handoff sign off shift change overdue',
+    body: `One working queue for every DMV, VCIC, NCIC, Nlets and other-state transaction about people, vehicles, plates, VINs, articles, guns, boats and securities.
+
+- The queue shows **metadata only**: the request type, incident, record, who asked (unit or officer), when, the responsible dispatcher, who sent it and where (ORI), who received the answer and when, the status and the disposition. The return itself is opened from the person or vehicle record by those allowed.
+- Statuses: New, Assigned, Sent, Awaiting return, Possible hit, Hit confirmation sent, Confirmed valid, Not valid, Will not extradite, Extradition limited, Pending further information, No record, Error, Cancelled, Reassigned, Complete (the agency may rename them).
+- **Nearly due** and **OVERDUE** show in words. An overdue request tells its owner and the on-duty supervisor once.
+
+## Hit confirmation
+From the exact person or vehicle record (or the queue): the record and return being confirmed, the requester, the entering agency's ORI, the method, **urgent (10 minutes)** or **routine (one hour)**, as NCIC policy sets, and notes. Record the answer with who answered and when: Confirmed valid, Not valid, Will not extradite, Extradition limited, Cancelled or Pending further information, with notes for extradition limits, pickup radius, caution and reference numbers. Sending a confirmation never makes a hit confirmed.
+
+## At shift change
+Every open request has one responsible dispatcher. **Signing off is refused** while you own open requests: finish each one, or hand it to another dispatcher (who accepts it) or to a queue, with a note of what is outstanding. The whole chain of owners stays on the request. [Open the requests](#/requests)
+
+> In the demonstration the switch is the training simulator: a plate or name starting with TEST answers as a possible hit, and every answer is marked simulated.`,
+  },
+  {
+    id: 'streetview', title: 'Street View beside the call', keys: 'street view google imagery views north east south west blank page',
+    body: `The Hazards tab docks Street View for the incident's current location, with the address, coordinates and the imagery date. It never leaves you on a blank page and never touches the call.
+
+- With a Google Maps key (Admin › Integrations › Views, restricted to this site) bitdispatcher first asks Google whether there is imagery within 50 m, then shows it docked.
+- When there is none, it times out after 10 seconds, or no key is set, it says so and offers **Retry**, **Aerial photos on the map**, **Open the map** in another window and **Return to call**.
+- When the location changes (corrected, forced, rebid, moved on the map) it shows the new place and says the location changed.
+- The **N, E, S, W** views of the place show the agency's or provider's pictures for each side, and say which sides have none.`,
+  },
+  {
+    id: 'keytest', title: 'Testing the keys on a workstation', keys: 'key test function keys fn lock laptop volume microphone f2 f4 shortcut workstation',
+    body: `Before a position goes into service, test that each function key in the duty's key profile reaches bitdispatcher. Open the key map (**Ctrl+/**) and press **Test the keys here**, then press each key it asks for.
+
+- A key that arrives is marked as working.
+- A key the laptop keeps for itself (F2 as volume, F4 as the microphone) is recorded with the fix: hold **Fn**, or turn on Fn Lock (often Fn+Esc), or use the agency's alternate key.
+- After the test, buttons and the key map show the combination that works on this workstation (for example **Fn+F4**).
+- The result is kept on the workstation and on the server; supervisors see every workstation's latest test in Supervisor review.`,
+  },
+  {
+    id: 'supervisor', title: 'Supervisor review', route: '/supervisor', keys: 'supervisor location exception critical incident review qa phrase alert shift intelligence report handoff individual workload follow-up',
+    body: `One screen for the supervisor's review work, in tabs. Each item stays until it is dealt with.
+
+## Location exceptions
+Every forced, estimated or otherwise unverified incident location alerts the on-duty supervisor at once (an urgent or high message) and waits here with what was typed, the accepted location and map point, the source and confidence, the nearest verified alternatives, the caller's coordinates, who entered it at which position, the reason, the units and the incident status. Opening the incident does not clear it. **Acknowledge** it, then answer two separate questions:
+
+1. **Was the best available location information used?** Yes, or no with what was better.
+2. **Does the agency's address source or workflow need follow-up?** No further action, Submit address or GIS update, Correct or merge master record, Refer to another jurisdiction, Training or workflow review, System defect or Pending follow-up, each with an owner and a due date, then **done**.
+
+The address queue moves it through New, Under review, Verified, Rejected or Merged; verifying or merging links the incident to the master address (an active incident's dispatchers and units see the change) and keeps what was entered.
+
+## Critical incidents
+The agency says which call types, modifiers, priorities, events (a unit emergency) and phrases make an incident critical (Admin › Critical incidents). A trigger alerts the supervisor and opens **one** review per incident; more triggers add to it. A supervisor can also mark an incident critical, or remove it, with a reason; the triggers stay on record.
+
+**Open full review** assembles it when asked: the source inventory, the people and their duties, call-handling milestones with the event each comes from, every unit's times, tagged radio traffic (machine tags, an aid only), requests (metadata), the QA matrix and the evidence limitations. Each calculated time shows the events it was measured between. Answer each QA measure Met, Not met, Not applicable, Unable to determine or Needs follow-up with a comment and the evidence it rests on. Choose an evidence cutoff and **Issue** a version (its hash is kept); later evidence makes a new version. **Records-request copy** and **Accreditation copy** apply the agency's disclosure rules to a separate copy with a redaction log; the review itself is never changed. **Offer support** and **Open after-action** record operational actions only; no clinical or wellness detail goes in CAD.
+
+## Phrase alerts
+Configured phrases heard in call or radio transcripts or written in the narrative alert the supervisor with the context, source, channel, speaker and time. A negated phrase ("no shots fired") is labelled **NEGATED** for review, and a low-confidence one **UNCERTAIN**. Dispose of each: Reviewed no action, Critical incident opened, Linked to existing review, False positive or Follow-up required.
+
+## Shift Intelligence
+A report for each operational period (Admin › Call entry rules sets the periods), assembled from the records: major and open incidents, location exceptions and their review, critical incidents, new and critical flags, BOLOs and urgent messages, units short of staff, overdue status checks, open requests and the follow-up owed, each with its source, time, status, owner, due date and next action. Run it for the current period, an earlier one or a custom range. Add the supervisor's summary and handoff notes (kept apart from the facts) and **Finalize**; later changes are addenda with a reason. The incoming supervisor **acknowledges** it and accepts or reassigns each open follow-up, which carries forward, one item per source, until done. Restricted detail shows only to those allowed.
+
+## People
+Each person's period: duties and positions, sign-ons, calls answered and their times, incidents made, dispatches, status changes, requests, critical incidents and their part in them, **formal breaks** and, apart from them, **console locks** (a lock is not a break). A possible workload-sharing gap shows as a review prompt with the context that explains it, never as a score or a ranking. People add context or corrections to their own record.
+
+## Follow-up and key tests
+Every tracked follow-up, with its history, owner and due date; and every workstation's latest [key test](#keytest).`,
+  },
+  {
+    id: 'admin-callentry', title: 'Admin: Call entry rules', route: '/admin/callentry', keys: 'force location reasons duties dispositions identifiers vehicle codes plate state requests hit confirmation minutes operational periods shift report',
+    body: `The rules behind call entry and the supervisor's review, each section saved on its own:
+
+- **Unverified locations**: which duties may force a location (and whether trainees may), the reasons offered, whether a note is always needed, whether the supervisor is alerted as urgent, the follow-up dispositions, the default follow-up days and the sublocation kinds.
+- **Protected identifiers**: the duties that may open full Social Security and licence numbers.
+- **Vehicles**: the plate state offered first and the agency's additions to the code lists (states, plate types, colours, makes, bodies, hair and eye colours).
+- **NCIC requests**: the names of the statuses, the handoff queues, the hit-confirmation minutes (NCIC policy: 10 minutes urgent, 1 hour routine), how long an ordinary request may stay open, when it shows as nearly due, and the sign-off check.
+- **Operational periods**: the periods and their start times, the time zone, the report's sections, what counts as a major incident, whether a summary is required, who may read the report, and the workload prompt's ratio. [Open Call entry rules](#/admin/callentry)`,
+  },
+  {
+    id: 'admin-critical', title: 'Admin: Critical incidents', route: '/admin/critical', keys: 'critical rules phrases negation radio tags qa template measures standards',
+    body: `- **Rules**: a call type, a modifier, a priority (this one or more urgent), an event (a unit emergency) or an alert phrase makes an incident critical.
+- **Alert phrases**: the words, their variants (a trailing * matches the start of a word), the negation words looked for before them in the same sentence, the sources (call, radio, text, narrative), the call types, a confidence floor and the severity. **Testing** keeps a phrase from alerting while it is tried. **Try it** checks any text without alerting anyone. The starter phrases arrive in testing.
+- **Radio tags** mark descriptions, weapons, direction of travel, threats, use of force, CPR, hazards, requests, transports and location changes in radio traffic for the review.
+- **QA templates**: per call type, the measures (an interval between two moments with its standard, or a check), whether each is scored, the not-applicable reasons allowed and which need a supervisor or QA specialist.
+
+Saving makes a new policy version; a review opened earlier keeps the version in force when it opened. [Open Critical incidents](#/admin/critical)`,
+  },
+  {
+    id: 'admin-pip', title: 'Admin: PSC PIP connection', route: '/admin/pip', keys: 'psc pip cede arc roc reset wellness connection metadata pseudonym',
+    body: `An optional connection that sends PSC PIP operational metadata and source references only: the period's counts for CEDE, location exceptions as context, critical incidents (and, when the agency marks one as qualifying, to RESET), after-action workflows a supervisor opened (ARC), documented missed breaks (ROC) and support offers (RESET), with versioned corrections.
+
+- The agency chooses which event classes cross, whether people are named or sent as a stable pseudonym, and whether only period totals are sent. **Preview** shows exactly what would be sent.
+- No caller, patient or victim details, narratives, transcripts, exact addresses, wellness or clinical content, and no scores. PSC PIP's own logic stays in PSC PIP. Each transfer is recorded in the ledger without the people in plain text.
+- With the connection off, every supervisor alert, review and report works the same.
+
+The contract is in docs/PSC-PIP.md. It has been tested against a local test receiver only, not a real PSC PIP system. [Open PSC PIP](#/admin/pip)`,
+  },
   {
     id: 'start', title: 'Getting started', keys: 'overview first steps install begin introduction',
     body: `bitdispatcher is a computer-aided dispatch (CAD) system for 911 centres: one program with its own web interface. It creates and tracks incidents, recommends units by drive time over the road network, shows units, calls and incidents on a dispatch map with aerial photos, gives field crews a mobile terminal, and records every action in a tamper-evident ledger that reports are built from.
@@ -861,36 +1011,40 @@ A supervisor covering a position keeps supervisory rights. You are never asked w
 > Before relying on these for criminal justice information, confirm your state's CJIS and access requirements.`,
   },
   {
-    id: 'taker', title: 'Call entry: the call-taker\u2019s workspace', route: '/taker', keys: 'call taker call entry tabs persons vehicles previous hazards search comments history resources submit f4 f2 rebid f6 modifiers duplicate',
-    body: `A calm workspace for one call: the call list on the left, nine tabs across the top with only the chosen one shown, and the call (its location, transcript and what was heard) with the **narrative** always on the right.
+    id: 'taker', title: 'Call entry: the call-taker\u2019s workspace', route: '/taker', keys: 'call taker call entry tabs persons vehicles previous hazards search comments history resources requests send submit f4 f2 f5 rebid f6 modifiers duplicate close call',
+    body: `A calm workspace for calls: the call list on the left, the working calls beside it, ten tabs across the top with only the chosen one shown, and the call (its location, transcript and what was heard) with the **narrative** always on the right.
+
+## Top to bottom, in the order a call is handled
+1. **The call attaches itself.** A call answered at your position opens on call entry at once with its ANI, ALI and any supplementary location, each with its source. No second choice of the call is needed. A walk-in or a radio report is typed without a call.
+2. **The incident location first** (see [Locations and the place](#place)): the address, its point on the map, how it is settled (a verified address point, an estimated range, the caller's device, a map point, or forced for this incident) and the place within it: business or building name, complex, building, floor, apartment or room, and entrance or gate detail. Flags at a verified place show at once, before the call is sent, on every tab.
+3. **The caller and the callback**, read back and ticked as confirmed.
+4. **The call type** (type a code or a word; arrows and Enter choose), the priority and the **modifiers** (some raise the priority, some add people to notify; officer-safety ones show red).
+5. **Send** (F4 or Ctrl+Enter). The narrative on the right takes comments all along: **Enter adds a comment with its time**, there is no second button. Comments written before sending go with the call.
+
+When something the call needs is missing, the message names it and the cursor goes to that field. The only thing a call must have to be sent is its type; an unverified or forced location never holds it up.
 
 ## Several working calls
-To the left of call entry, **Working calls** holds each call in progress in its own tab: up to the number the agency allows for the duty (three for a call-taker unless it says otherwise; a trainee gets the agency's number, locked). Each keeps its own caller, location, callback, type, people, vehicles, comments, searches and checks; moving between them changes nothing in the others.
+To the left of call entry, **Working calls** holds each call in progress in its own screen, up to the number the agency allows for the duty (three for a call-taker unless it says otherwise). Each keeps its own caller, location, type, people, vehicles and comments.
 
-- **New working call** (or **Next call / F2** while one is under way and a tab is free) starts another without clearing the first. A call chosen from the list while one is being written opens in a new tab.
-- Each tab shows its number, the type or incident, the place, how long it has been open, **ACTIVE** for the one you are in, **SENT** once submitted, and **!** when it still needs a type or address. Keys and Submit act only on the active tab.
-- **Submit** turns only that tab into its incident; the others stay exactly as they were.
-- Closing a tab with information in it asks first and asks why; the ledger records each working call opened, moved, submitted or discarded.
-- They are kept on the server with you: after a reload, a lock or a lost connection they come back at any console you sign in to. A supervisor can see who holds which and give one left behind to someone else (with a reason), for the agencies they work.
+- **Next call** (F2 or F5) opens a new call-entry screen and keeps the current one exactly as it is, sent or not. When the agency's limit is reached it asks whether to close out a sent call to make room.
+- A sent call **stays open** for more comments and caller updates until you press **Close call**. Sending, choosing another call or opening another screen never closes it.
+- Each screen shows its number, the type or incident, the place, how long it has been open, **ACTIVE**, **SENT**, and **!** when it still needs a type or address.
+- Closing an unsent screen with information in it asks first and asks why; the ledger records each one opened, moved, sent, closed or discarded. They come back after a reload or at another console.
 
 | Key | Does |
 |---|---|
-| F4 or Ctrl+Enter | Submit the incident; after it, save changes to it |
-| F2 | Clear for the next call (asks first if anything is unsubmitted) |
+| F4 or Ctrl+Enter | Send the call; after it, save changes |
+| F2 or F5 | Next call: a new call-entry screen, this one kept |
 | F6 | Rebid the caller's location |
 | F8 | Write in the narrative |
 | F3 | CAD search |
-| Alt+1 … Alt+9 | Change tab |
+| Alt+1 \u2026 Alt+9, Alt+0 | Change tab (Alt+0: NCIC Requests) |
 
-**Call Entry.** Type a code or a word for the call type (hundreds are fine; arrows and Enter choose), the priority (the type's, or another), **modifiers** (weapons, in progress, entrapment…: some raise the priority, some add people to notify, officer-safety ones show red), the incident's location (pick a suggestion, right-click the map, or use the caller's ALI position; **Verify** when the caller confirms it), the caller and callback, and where the caller is when not at the incident. The call's ANI/ALI is beside it.
+A laptop that uses F2 for volume or F4 for the microphone shows **Fn+F2** on the button once the [key test](#keytest) has found it. The keys are the agency's profile for the duty (Ctrl+/ shows them).
 
-**Before a second incident.** F4 first looks for open incidents at the same address, nearby or from the same callback. If there are any you see them: **Add this call to it** puts the call (and what you wrote) on that incident; F4 again makes a new one.
+**Before a second incident.** Send first looks for open incidents at the same address, nearby or from the same callback. **Add this call to it** puts the call (and what you wrote) on that incident; Send again makes a new one.
 
-**After submission** the workspace stays on the incident. Dispatch has it at once; keep typing: comments go straight on it, and F4 saves changes to the type, priority, location or caller. A newer caller location (a rebid, a location provider) shows at the top: **Use it** changes the incident's location (the old one stays in the timeline, dispatchers and units are told); **Keep** leaves it.
-
-**The other tabs.** **Persons** and **Vehicles** (several of each, with their role; what the caller said is offered to fill them), **Previous** (earlier incidents linked by address, phone, names, plates and VINs, confirmed or possible), **Hazards** (premises at and near the place, officer-safety people and modifiers, BOLO matches: the critical ones also show as one red line on every tab), **CAD Search**, **Comments** (every note in order, and logging mutual aid and resource requests, transfers, referrals, outbound calls and instructions given), **History** (units and their times, radio, the response recommended) and **Resources** (the agency's [approved guidance](#resources)).
-
-Notes written before submission keep their own time. Nothing is lost on a lock or a reload: the entry is kept in the browser tab until it is submitted or cleared.`,
+**The other tabs.** **Persons** and **Vehicles** (see [Persons and vehicles](#persons-vehicles)), **Previous**, **Hazards** (flags, premises, officer-safety people, BOLO matches and docked [Street View](#streetview)), **CAD Search**, **Comments**, **History**, **Resources** (the agency's [approved guidance](#resources)) and **NCIC Requests** for the call (see [NCIC and state requests](#requests)).`,
   },
   {
     id: 'resources', title: 'Resources: approved guidance with the call', keys: 'resources guidance policy procedure call taking guide checklist prompts citation version effective',

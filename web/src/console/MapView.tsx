@@ -211,6 +211,12 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
     }
   }, [photos, ready])
 
+  // Another screen (Street View's fallback) can ask for the aerial photos.
+  useEffect(() => {
+    const on = () => { if (photosOK) { localStorage.setItem(PHOTOS_KEY, '1'); setPhotosOn(true) } }
+    window.addEventListener('bd:photos-on', on)
+    return () => window.removeEventListener('bd:photos-on', on)
+  }, [photosOK])
   // F7 switches photos on and off (letters belong to the command line).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

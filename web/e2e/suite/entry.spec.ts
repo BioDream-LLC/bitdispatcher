@@ -23,8 +23,9 @@ test('call entry: a call-taker enters, submits and keeps working the incident; a
   // The workspace stays on it: a person on the Persons tab, a comment, the History tab.
   await page.getByRole('tab', { name: /Persons/ }).click()
   await page.getByRole('button', { name: 'Add a person' }).click()
-  await page.getByLabel('New person').getByLabel('Name').fill('DOE, JOHN')
-  await page.getByLabel('New person').getByRole('radio', { name: 'suspect' }).click()
+  await page.getByLabel('New person').getByLabel('First name').fill('John')
+  await page.getByLabel('New person').getByLabel('Last name').fill('Doe')
+  await page.getByLabel('New person').getByRole('button', { name: 'suspect', exact: true }).click()
   await page.getByLabel('New person').getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('DOE, JOHN').first()).toBeVisible()
   await page.getByLabel('Add to the narrative').fill('Suspect left on foot')

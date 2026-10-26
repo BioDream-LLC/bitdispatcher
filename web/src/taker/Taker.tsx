@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { AlertTriangle, BookOpen, Car, ClipboardList, History as HistoryIcon, MessageSquare, Search, ShieldAlert, Users, FileClock, PhoneCall, Eraser, Send, Crosshair, Plus, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Car, ClipboardList, History as HistoryIcon, MessageSquare, Search, ShieldAlert, Users, FileClock, PhoneCall, Eraser, Send, Crosshair, Plus, X, FileSearch, CircleX } from 'lucide-react'
 import { api, errText } from '../api'
 import { store, useStore } from '../store'
 import { cx, clock, ms, phone, prio, typeName, useNow } from '../util'
@@ -12,16 +12,33 @@ import Queue from '../console/Queue'
 import { CallBox } from '../console/IncidentPanel'
 import Boundary from '../Boundary'
 import { applyLens } from '../lens'
-import { callerAt, dirty, dupKey, emptyDraft, fromCall, fromIncident, loadDraft, location, noteText, saveDraft, type Draft } from './draft'
+import { callerAt, dirty, dupKey, emptyDraft, fromCall, fromIncident, hasPlace, loadDraft, location, noteText, place, saveDraft, type Draft } from './draft'
+import { AddFlag, FlagsBox, useFlags } from './Flags'
+import StreetViewDock from '../views/StreetView'
+import { RequestsTab } from '../requests/RequestsTab'
+import { ApiError } from '../api'
 import EntryTab from './EntryTab'
 import { PersonsTab, VehiclesTab } from './People'
 import { HazardsTab, PreviousList, SearchTab, useAlerts } from './Lookup'
 import PlaceViews from '../views/PlaceViews'
 import { CommentsTab, HistoryTab } from './Narrative'
 import ResourcesTab, { useResources } from './Resources'
-import { KeyMapHost } from '../keys'
+import { KeyMapHost, keyTestResult } from '../keys'
 
 const MapView = lazy(() => import('../console/MapView'))
+
+/** focusField puts the cursor in the field a refusal names, so the call-taker sees exactly what is missing. */
+export function focusField(e: unknown, setTab?: (t: TabId) => void) {
+  const field = e instanceof ApiError ? e.field : undefined
+  if (!field) return
+  const onEntry = ['type', 'reason', 'reasonNote', 'map', 'entered', 'verify', 'callback', 'callerName', 'place']
+  if (setTab && onEntry.includes(field)) setTab('entry')
+  setTimeout(() => {
+    const el = document.querySelector<HTMLElement>(`[data-field="${field}"]`) ?? (field === 'type' ? document.getElementById('ct-taker') : null)
+    el?.focus()
+    el?.scrollIntoView({ block: 'center' })
+  }, 50)
+}
 
 export const TABS = [
   { id: 'entry', label: 'Call Entry', icon: PhoneCall },
@@ -33,6 +50,7 @@ export const TABS = [
   { id: 'comments', label: 'Comments', icon: MessageSquare },
   { id: 'history', label: 'History', icon: HistoryIcon },
   { id: 'resources', label: 'Resources', icon: BookOpen },
+  { id: 'requests', label: 'NCIC Requests', icon: FileSearch },
 ] as const
 export type TabId = (typeof TABS)[number]['id']
 
@@ -183,6 +201,20 @@ export default function Taker() {
       }
     }
   }, [slots, active, d, newCall])
+  /** Close call: the call-taker's own close-out of a sent call (sending never closes the screen). */
+  const closeOut = useCallback(() => {
+    if (!d.number) return
+    if (!confirm(`Close out the call-entry screen for ${d.number}? The incident stays with dispatch; you can still add to it from the console. This is not Send.`)) return
+    if (slots.length > 0) {
+      submittedRef.current.add(active)
+      closeSlot(active)
+    } else {
+      update(() => emptyDraft())
+      store.selectCall(null)
+      store.select(null)
+    }
+    setTab('entry')
+  }, [d.number, slots.length, active, update]) // eslint-disable-line react-hooks/exhaustive-deps
   const free = slots.length < maxSlots
   const inc = raw?.incidents.find((i) => i.number === d.number)
   const call = raw?.calls.find((c) => c.id === (d.call ?? inc?.calls[0]))
@@ -217,16 +249,17 @@ export default function Taker() {
   }, [d.number])
 
   const clear = useCallback(() => {
-    // Next call never silently clears a working call: with a tab free it opens a new one.
-    if (slots.length > 0 && (submittedRef.current.has(active) || dirty(d) && free)) {
-      if (submittedRef.current.has(active)) {
+    // Next call never clears or closes a working call: with room it opens a new call-entry screen and
+    // leaves this one exactly as it is (a sent call stays open until the call-taker closes it out).
+    if (slots.length > 0 && (submittedRef.current.has(active) || !!d.number || dirty(d))) {
+      if (free) {
+        newCall()
+        return
+      }
+      if (submittedRef.current.has(active) || d.number) {
+        if (!confirm(`There is no room for another call-entry screen (the agency allows ${maxSlots}). Close out ${d.number ?? 'this sent call'} to start the next one? Closing does not change the incident.`)) return
         const id = active
-        if (slots.length - 1 < maxSlots) {
-          setSlots((ss) => ss.filter((x) => x.id !== id))
-          newCall()
-          return
-        }
-      } else {
+        setSlots((ss) => ss.filter((x) => x.id !== id))
         newCall()
         return
       }
@@ -258,9 +291,11 @@ export default function Taker() {
         await api.put(`/incidents/${d.number}/modifiers`, { modifiers: d.modifiers })
         if (d.callerElsewhere) await api.put(`/incidents/${d.number}/caller-location`, { location: callerAt(d) })
         if (d.verified && inc && !inc.locVerified) await api.post(`/incidents/${d.number}/verify`)
+        if (hasPlace(d)) await api.put(`/incidents/${d.number}/place`, place(d))
         toast.success(`${d.number} updated`)
       } catch (e) {
         toast.error(errText(e))
+        focusField(e, setTab)
       } finally {
         setBusy(false)
       }
@@ -268,8 +303,14 @@ export default function Taker() {
     }
     if (!d.type) {
       setTab('entry')
-      toast.error('Choose the call type first')
+      toast.error('Choose the call type: it is the one thing a call needs before it is sent')
       document.getElementById('ct-taker')?.focus()
+      return
+    }
+    if (d.placeVerify === 'forced' && !d.forceReason) {
+      setTab('entry')
+      toast.error('Choose why the location is forced')
+      setTimeout(() => document.getElementById('fr-taker')?.focus(), 50)
       return
     }
     setBusy(true)
@@ -297,6 +338,16 @@ export default function Taker() {
       for (const p of d.persons) await api.post(`/incidents/${n}/persons`, { ...p, id: '' })
       for (const v of d.vehicles) await api.post(`/incidents/${n}/vehicles`, { ...v, id: '' })
       for (const c of d.contacts) await api.post(`/incidents/${n}/contacts`, { ...c, id: '' })
+      // The place and how the location was settled: a forced or unverified one alerts the supervisor.
+      if (hasPlace(d)) {
+        try {
+          const px = await api.put<{ exception?: string }>(`/incidents/${n}/place`, place(d))
+          if (px?.exception) toast.message(`Location ${String(d.placeVerify || 'unverified').toUpperCase()}: the supervisor is alerted (${px.exception})`)
+        } catch (e) {
+          toast.error(`${n} is sent; its place was not saved: ${errText(e)}`)
+          focusField(e, setTab)
+        }
+      }
       update({ number: n, notes: [], persons: [], vehicles: [], contacts: [] })
       setDups([])
       // The working call is now the incident: only its own tab changes.
@@ -304,10 +355,11 @@ export default function Taker() {
         submittedRef.current.add(active)
         api.post(`/drafts/${active}/close`, { how: 'submitted', incident: n, populated: true }).catch(() => {})
       }
-      toast.success(`${n} submitted: dispatch has it. Keep typing; F2 clears for the next call.`)
+      toast.success(`${n} submitted: dispatch has it. This call stays open for more comments until you close it out.`)
       comment.current?.focus()
     } catch (e) {
       toast.error(errText(e))
+      focusField(e, setTab)
     } finally {
       setBusy(false)
     }
@@ -341,7 +393,8 @@ export default function Taker() {
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (document.querySelector('[role=dialog]')) return
-      if (e.key === 'F2') { e.preventDefault(); clear() }
+      if (e.key === 'F2' || e.key === 'F5') { e.preventDefault(); clear() }
+      else if (e.altKey && e.key === '0') { e.preventDefault(); setTab('requests') }
       else if (e.key === 'F4' || (e.ctrlKey && e.key === 'Enter')) { e.preventDefault(); submit() }
       else if (e.key === 'F6') { e.preventDefault(); rebid() }
       else if (e.key === 'F8') { e.preventDefault(); comment.current?.focus() }
@@ -353,6 +406,27 @@ export default function Taker() {
   }, [clear, submit, rebid])
 
   const alerts = useAlerts(view, d, inc)
+  const flags = useFlags(d, inc)
+  const flagAlerts = flags.flags.filter((f) => f.severity === 'critical' || f.severity === 'high').map((f) => `${f.severity.toUpperCase()} ${f.category.replace(/-/g, ' ')}: ${f.title}`)
+  // An answered call at this position is taken at once: no second choice of the call before entry.
+  const me = useStore((s) => s.me)
+  const taken = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!raw || !me?.console) return
+    const mine = raw.calls.find((c) => c.state === 'answered' && !c.incident && c.position === me.console && !taken.current.has(c.id)
+      && c.id !== d.call && !slots.some((x) => x.draft.call === c.id))
+    if (!mine) return
+    taken.current.add(mine.id)
+    if (!dirty(d) && !d.number) {
+      update(() => fromCall(mine))
+      store.selectCall(mine.id)
+      setTab('entry')
+      toast.message(`Call ${phone(mine.callback)} answered at ${me.console}: it is on call entry`)
+    } else if (free) {
+      newCall(fromCall(mine))
+      toast.message(`Call ${phone(mine.callback)} answered: opened in a new call-entry screen; the one you had is kept`)
+    }
+  }, [raw?.calls, me?.console]) // eslint-disable-line react-hooks/exhaustive-deps
   const placeAt: [number, number] | null = inc?.location?.lat != null && inc.location.lon != null ? [inc.location.lat, inc.location.lon]
     : d.lat && d.lon && !isNaN(+d.lat) && !isNaN(+d.lon) ? [+d.lat, +d.lon] : null
   const res = useResources(view, d, inc, call, tab === 'resources')
@@ -361,9 +435,9 @@ export default function Taker() {
     persons: (inc?.persons ?? d.persons).filter((p) => !p.removed).length || undefined,
     vehicles: (inc?.vehicles ?? d.vehicles).filter((v) => !v.removed).length || undefined,
     previous: alerts.prev.length || undefined,
-    hazards: alerts.count || undefined,
     comments: (inc ? inc.timeline.filter((t) => t.kind === 'note' || t.kind === 'priority-note').length : d.notes.length) || undefined,
     resources: res.fresh ? 'new' : res.count || undefined,
+    hazards: (alerts.count + flags.flags.length) || undefined,
   }
   return (
     <div className="flex h-full min-h-[600px] flex-col overflow-hidden bg-slate-950">
@@ -379,7 +453,7 @@ export default function Taker() {
         comments: () => setTab('comments'), audit: () => setTab('history'), email: () => window.dispatchEvent(new CustomEvent('bd:open-comm', { detail: '' })),
         initiate: () => newCall(), nextPage: () => { const i = slots.findIndex((x) => x.id === active); if (slots.length > 1) switchTo(slots[(i + 1) % slots.length].id) },
         prevPage: () => { const i = slots.findIndex((x) => x.id === active); if (slots.length > 1) switchTo(slots[(i - 1 + slots.length) % slots.length].id) },
-        display911: () => setTab('entry'),
+        display911: () => setTab('entry'), newCall: () => clear(), closeCall: closeOut, requests: () => setTab('requests'),
       }} />
       <main className="grid min-h-0 flex-1 grid-cols-[minmax(300px,20%)_1fr_minmax(340px,25%)] gap-px bg-slate-800">
         <div className="flex min-h-0 flex-col bg-slate-950">
@@ -392,7 +466,7 @@ export default function Taker() {
             onPick={switchTo} onNew={() => newCall()} onClose={closeSlot} />
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Call entry" role="region">
-          <Header view={raw} d={d} inc={inc} call={call} now={now} busy={busy} onSubmit={submit} onClear={clear} onRebid={rebid} alerts={alerts.critical} onAlerts={() => setTab('hazards')} />
+          <Header view={raw} d={d} inc={inc} call={call} now={now} busy={busy} onSubmit={submit} onClear={clear} onRebid={rebid} onClose={closeOut} alerts={[...flagAlerts, ...alerts.critical]} onAlerts={() => setTab('hazards')} />
           <div role="tablist" aria-label="Call entry tabs" className="flex shrink-0 gap-px overflow-x-auto border-b border-slate-800 bg-slate-900/70 px-1">
             {TABS.map((t, i) => (
               <button key={t.id} role="tab" aria-selected={tab === t.id} aria-controls={'tab-' + t.id} id={'tabbtn-' + t.id} onClick={() => setTab(t.id)}
@@ -414,10 +488,18 @@ export default function Taker() {
               {tab === 'persons' && <PersonsTab view={raw} d={d} inc={inc} call={call} update={update} />}
               {tab === 'vehicles' && <VehiclesTab view={raw} d={d} inc={inc} call={call} update={update} />}
               {tab === 'previous' && <PreviousList alerts={alerts} />}
+              {tab === 'hazards' && <div className="mb-3 space-y-2"><FlagsBox set={flags} /><AddFlag d={d} inc={inc} /></div>}
               {tab === 'hazards' && <HazardsTab alerts={alerts} />}
-              {tab === 'hazards' && placeAt && (raw?.placeViews || alerts.premises.some((p) => p.photos?.length)) && (
-                <section className="mt-4"><h3 className="label">Views of the place</h3><PlaceViews lat={placeAt[0]} lon={placeAt[1]} premises={alerts.premises} /></section>
+              {tab === 'hazards' && (
+                <section className="mt-4">
+                  <StreetViewDock lat={placeAt?.[0]} lon={placeAt?.[1]} address={inc?.location?.address ?? d.address} onReturn={() => setTab('entry')}
+                    onAerial={() => { setTab('entry'); setTimeout(() => window.dispatchEvent(new Event('bd:photos-on')), 300) }} />
+                </section>
               )}
+              {tab === 'hazards' && placeAt && (raw?.placeViews || alerts.premises.some((p) => p.photos?.length)) && (
+                <section className="mt-4"><h3 className="label">Views of the place</h3><PlaceViews lat={placeAt[0]} lon={placeAt[1]} premises={alerts.premises} noGoogle /></section>
+              )}
+              {tab === 'requests' && <RequestsTab incident={inc?.number} />}
               {tab === 'search' && <SearchTab />}
               {tab === 'comments' && <CommentsTab view={raw} d={d} inc={inc} update={update} />}
               {tab === 'history' && <HistoryTab view={raw} inc={inc} />}
@@ -437,9 +519,12 @@ export default function Taker() {
   )
 }
 
-function Header({ view, d, inc, call, now, busy, onSubmit, onClear, onRebid, alerts, onAlerts }: {
-  view: View; d: Draft; inc?: Incident; call?: Call; now: number; busy: boolean; onSubmit: () => void; onClear: () => void; onRebid: () => void; alerts: string[]; onAlerts: () => void
+function Header({ view, d, inc, call, now, busy, onSubmit, onClear, onRebid, onClose, alerts, onAlerts }: {
+  view: View; d: Draft; inc?: Incident; call?: Call; now: number; busy: boolean; onSubmit: () => void; onClear: () => void; onRebid: () => void; onClose: () => void; alerts: string[]; onAlerts: () => void
 }) {
+  const pv = inc?.place?.verify || d.placeVerify || ''
+  const placeLine = [inc?.place?.name ?? d.placeName, inc?.place?.complex ?? d.complex, (inc?.place?.building ?? d.building) && 'Bldg ' + (inc?.place?.building ?? d.building),
+    (inc?.place?.floor ?? d.floor) && 'Floor ' + (inc?.place?.floor ?? d.floor), (inc?.place?.unit ?? d.unit) && ((inc?.place?.unitKind ?? d.unitKind) || 'Unit') + ' ' + (inc?.place?.unit ?? d.unit)].filter(Boolean).join(', ')
   const units = (inc?.units ?? []).filter((a) => !a.cleared)
   return (
     <div className="shrink-0 border-b border-slate-800 bg-slate-900/40 px-3 py-1.5">
@@ -459,16 +544,24 @@ function Header({ view, d, inc, call, now, busy, onSubmit, onClear, onRebid, ale
         {call && <span className="font-mono text-slate-400"><PhoneCall size={11} className="mr-0.5 inline" aria-hidden />{phone(call.callback)} {clock(call.start, call.end ? ms(call.end) : now)}</span>}
         <span className="ml-auto flex items-center gap-1">
           {call && <button className="btn h-7 text-xs" onClick={onRebid} disabled={!call.canRebid} title="Ask for the caller's location again"><Crosshair size={12} aria-hidden /> Rebid <span className="kbd">F6</span></button>}
-          <button className="btn h-7 text-xs" onClick={onClear}><Eraser size={12} aria-hidden /> Next call <span className="kbd">F2</span></button>
+          <button className="btn h-7 text-xs" onClick={onClear} title="Opens a new call-entry screen and keeps this one as it is (F2 or F5)"><Eraser size={12} aria-hidden /> Next call <KeyLabel k="F2" /></button>
           <button className="btn btn-go h-7 text-xs" onClick={onSubmit} disabled={busy}>
-            <Send size={12} aria-hidden /> {inc ? 'Update' : 'Submit'} <span className="kbd">F4</span>
+            <Send size={12} aria-hidden /> {inc ? 'Update' : 'Send'} <KeyLabel k="F4" alt="Ctrl+Enter" />
           </button>
+          {inc && <button className="btn h-7 text-xs" onClick={onClose} title="Close out this call-entry screen (the incident stays with dispatch)"><CircleX size={12} aria-hidden /> Close call</button>}
         </span>
       </div>
       {alerts.length > 0 && (
         <button className="mt-1 flex w-full items-center gap-1.5 rounded border border-rose-800 bg-rose-950/50 px-2 py-0.5 text-left text-[11px] font-semibold text-rose-100" onClick={onAlerts}>
           <AlertTriangle size={12} className="shrink-0 text-rose-300" aria-hidden /> <span className="truncate">{alerts.join(' · ')}</span> <span className="ml-auto shrink-0 text-rose-300">Hazards ›</span>
         </button>
+      )}
+      {(placeLine || (pv && pv !== 'verified')) && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-300">
+          {pv && pv !== 'verified' && <span className={cx('chip h-4 px-1 text-[10px] font-bold', pv === 'forced' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-black')}>{pv.toUpperCase()} LOCATION</span>}
+          {placeLine && <span>{placeLine}</span>}
+          {(inc?.place?.detail ?? d.detail) && <span className="text-slate-400">· {inc?.place?.detail ?? d.detail}</span>}
+        </div>
       )}
       {inc?.newLocation && <NewLocation inc={inc} />}
       {!inc && d.type && location(d)?.lat == null && <p className="mt-0.5 text-[11px] text-amber-300">No map position yet: units cannot be ranked by distance.</p>}
@@ -601,4 +694,13 @@ function WorkingCalls({ view, slots, active, max, now, submitted, onPick, onNew,
       </button>
     </nav>
   )
+}
+
+/** KeyLabel shows the key a button answers to, as this workstation's key test found it: a key the
+ * laptop takes for itself (volume, microphone) shows with Fn, or the agency's alternate. */
+function KeyLabel({ k, alt }: { k: string; alt?: string }) {
+  const me = useStore((s) => s.me)
+  const r = keyTestResult(me?.duty, k)
+  if (r && !r.ok) return <span className="kbd" title={r.fix}>{r.fix?.startsWith('Fn') ? 'Fn+' + k : alt ?? 'Fn+' + k}</span>
+  return <span className="kbd" title={alt ? `or ${alt}` : undefined}>{k}</span>
 }

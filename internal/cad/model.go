@@ -278,6 +278,10 @@ type Incident struct {
 	// also keeps its own home agency).
 	Agency    string   `json:"agency,omitempty"`
 	Assisting []string `json:"assisting,omitempty"`
+	// Place is the structured place and how the location was settled (places.go); Flags the flag versions
+	// the incident has shown (flags.go).
+	Place *Place      `json:"place,omitempty"`
+	Flags []FlagShown `json:"flags,omitempty"`
 }
 
 // TextLine is one line of a text conversation with a caller.
@@ -472,6 +476,16 @@ type Settings struct {
 	Commands CommandRules `json:"commands,omitzero"`
 	// Next are the cameras, location links, alarm and intake policies (next.go, cameras.go, intake.go).
 	Next NextSettings `json:"next,omitzero"`
+	// The final round: unverified locations and their review, flags, people's identifiers, vehicle codes,
+	// the NCIC request queue, operational periods and Shift Intelligence, critical incidents (places.go,
+	// flags.go, persons.go, vehicles.go, requests.go, shift.go, critical.go).
+	Places   PlacePolicy    `json:"places,omitzero"`
+	Flags    FlagPolicy     `json:"flags,omitzero"`
+	Persons  PersonPolicy   `json:"persons,omitzero"`
+	Vehicles VehiclePolicy  `json:"vehicles,omitzero"`
+	Requests RequestPolicy  `json:"requests,omitzero"`
+	Shift    ShiftPolicy    `json:"shift,omitzero"`
+	Critical CriticalPolicy `json:"critical,omitzero"`
 }
 
 // NextSettings are the settings of the features added after the October 2026 competitor review.

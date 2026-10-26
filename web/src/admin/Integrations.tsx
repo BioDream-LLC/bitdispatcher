@@ -433,17 +433,21 @@ function ViewsSettings() {
   const [c, setC] = useState<ViewsConfig | null>(null)
   const [secret, setSecret] = useState('')
   const [token, setToken] = useState('')
+  const [googleKey, setGoogleKey] = useState('')
   const [test, setTest] = useState<Record<string, string> | null>(null)
   useEffect(() => {
     api.get<ViewsConfig>('/admin/views').then(setC).catch((e) => toast.error(errText(e)))
   }, [])
   if (!c) return null
+  // googleKeySet comes back from the server (GET returns it); the shared ViewsConfig type may not name it yet.
+  const googleKeySet = !!(c as { googleKeySet?: boolean }).googleKeySet
   const set = (p: Partial<ViewsConfig>) => setC({ ...c, ...p })
   const save = async () => {
     try {
-      setC(await api.put<ViewsConfig>('/admin/views', { ...c, eagleviewSecret: secret, mapillaryToken: token }))
+      setC(await api.put<ViewsConfig>('/admin/views', { ...c, eagleviewSecret: secret, mapillaryToken: token, googleKey }))
       setSecret('')
       setToken('')
+      setGoogleKey('')
       toast.success('Views saved')
     } catch (e) {
       toast.error(errText(e))
@@ -478,6 +482,9 @@ function ViewsSettings() {
             <input id="mlt" type="password" className="input font-mono" value={token} onChange={(e) => setToken(e.target.value)} placeholder={c.mapillaryTokenSet ? '••••••••' : 'MLY|…'} autoComplete="new-password" />
           </Field>
           <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={c.googleLink} onChange={(e) => set({ googleLink: e.target.checked })} /> Offer a link to Google Street View (opens Google in a new tab; nothing is fetched here)</label>
+          <Field label={`Google Maps key ${googleKeySet ? '(set)' : ''}`} htmlFor="gmk" hint="With a key restricted to this site, Street View docks in call entry and the server checks first whether Google has imagery there (Street View metadata and Maps Embed API). Without one, only the open street photos show.">
+            <input id="gmk" type="password" className="input font-mono" value={googleKey} onChange={(e) => setGoogleKey(e.target.value)} placeholder={googleKeySet ? '••••••••' : 'AIza…'} autoComplete="new-password" />
+          </Field>
         </div>
       </div>
       {test && <ul className="space-y-0.5 text-xs" aria-label="Test results">{Object.entries(test).map(([k, v]) => <li key={k}><b>{k}</b>: {v}</li>)}{!Object.keys(test).length && <li>No provider is on.</li>}</ul>}

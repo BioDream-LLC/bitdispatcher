@@ -66,6 +66,9 @@ type Engine struct {
 	lastPos  map[string]Position
 	router   Router
 	geocoder Geocoder
+	// KnownUser says whether a username is a person who can sign in (set by the server from its user
+	// store; nil: the users the ledger knows).
+	KnownUser func(string) bool
 
 	// Several sites (site.go): this site's name and incident number prefix, the other sites' ledgers, and
 	// the newest event time applied.
@@ -448,7 +451,7 @@ func (e *Engine) Record(a Actor, typ string, data any) error {
 		EvPhotosRecording, EvPhotosRecorded, EvPhotosFailed,
 		EvAdvisorySuggested, EvAdvisoryDecided, EvAdvisoryWithdrawn, EvGISImporting, EvGISImported, EvGISFailed, EvJusticeQuery, EvIBRExported,
 		EvLocked, EvUnlocked, EvReviewExported, EvConfigStaged, EvWorkstationCode, EvUserDuties, EvUserMFAReset, EvRecordsViewed, EvTrainingInject,
-		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused, EvSupportBundle:
+		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused, EvSupportBundle, EvPIPSent:
 	default:
 		return fmt.Errorf("cad: %s is not a record event", typ)
 	}

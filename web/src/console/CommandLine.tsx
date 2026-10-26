@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { ChevronRight, Terminal } from 'lucide-react'
+import { TowDialog } from '../requests/Tow'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
 import { cx, statusMeta } from '../util'
@@ -39,6 +40,7 @@ const CommandLine = forwardRef<CommandLineHandle, { view: View }>(function Comma
   else if (v && !['N', 'NOTE', 'PN', 'NEW', 'I', 'P', 'PRI', 'RO', 'REOPEN', 'ACK', 'HELP'].includes(verb)) options = view.units.map((u) => u.id).filter((id) => id.startsWith(last1) && !words.slice(1, -1).includes(id))
   options = options.slice(0, 12)
   const [form, setForm] = useState<{ unit: string } | null>(null)
+  const [tow, setTow] = useState<{ unit: string; incident: string } | null>(null)
   const run = async (prefix = '') => {
     let text = line.trim()
     // A function key supplies the command (F7 field initiate, F11 unit status) and processes the line.
@@ -54,6 +56,8 @@ const CommandLine = forwardRef<CommandLineHandle, { view: View }>(function Comma
         if (r.incident !== undefined && r.incident !== selected) store.select(r.incident || null)
       }
       if (r.form === 'unit-status' && r.unit) setForm({ unit: r.unit })
+      // SE.<unit> then F10: the tow workflow for a vehicle on the selected incident, the unit asking.
+      if (r.form === 'tow' && r.unit && (r.incident || selected)) setTow({ unit: r.unit, incident: r.incident || selected || '' })
       const h = [text, ...hist.filter((x) => x !== text)].slice(0, 50)
       setHist(h)
       sessionStorage.setItem('bd-hist', JSON.stringify(h))
@@ -139,6 +143,7 @@ const CommandLine = forwardRef<CommandLineHandle, { view: View }>(function Comma
         ) : null}
       </div>
       {form && <UnitStatusForm view={view} unit={form.unit} onClose={() => setForm(null)} />}
+      {tow && <TowDialog incident={tow.incident} requester={tow.unit} open onClose={() => setTow(null)} />}
     </div>
   )
 })

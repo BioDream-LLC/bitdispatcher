@@ -68,6 +68,7 @@ func (s *State) applyRoadmap(e ledger.Event) (bool, error) {
 func (s *State) roadmapAfter(e ledger.Event) {
 	s.fireAfter(e)
 	s.fenceAfter(e)
+	s.finalAfter(e)
 }
 
 // initRoadmap makes the roadmap features' maps.

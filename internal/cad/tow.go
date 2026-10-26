@@ -52,6 +52,20 @@ type Tow struct {
 	Result   string    `json:"result"` // called, accepted, declined, no-answer, cancelled, arrived
 	ResultAt time.Time `json:"resultAt,omitzero"`
 	Note     string    `json:"note,omitempty"`
+	// A tow for one vehicle on the incident (vehicles.go): who asked and why, the request number, the
+	// times of each step, the wrecker and where the vehicle went, and any hold on it.
+	Requester   string               `json:"requester,omitempty"`
+	Reason      string               `json:"reason,omitempty"`
+	RequestNo   string               `json:"requestNo,omitempty"`
+	Override    string               `json:"override,omitempty"` // a supervisor-approved rotation override, with why
+	Times       map[string]time.Time `json:"times,omitempty"`
+	Driver      string               `json:"driver,omitempty"`
+	Truck       string               `json:"truck,omitempty"`
+	Destination string               `json:"destination,omitempty"`
+	Impound     string               `json:"impound,omitempty"` // impound or inventory number
+	Hold        string               `json:"hold,omitempty"`    // police or evidence hold
+	Release     string               `json:"release,omitempty"` // release restriction
+	Contacted   string               `json:"contacted,omitempty"`
 }
 
 // Tow kinds and results.
@@ -174,11 +188,15 @@ func (s *State) TowRotationFor(class, zone string) (eligible, passed []TowTurn) 
 // RequestTow asks for a tow. Kind rotation takes the next company for the class and zone; owner and police
 // name a company and take no turn.
 func (e *Engine) RequestTow(a Actor, incident, class, zone, kind, company, vehicle, note string) (Tow, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.requestTow(a, incident, class, zone, kind, company, vehicle, note, nil)
+}
+
+func (e *Engine) requestTow(a Actor, incident, class, zone, kind, company, vehicle, note string, more *TowAsk) (Tow, error) {
 	if kind == "" {
 		kind = TowRotation
 	}
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	if incident != "" && e.st.Incidents[incident] == nil {
 		return Tow{}, problem("incident", "no incident %s", incident)
 	}
@@ -213,6 +231,10 @@ func (e *Engine) RequestTow(a Actor, incident, class, zone, kind, company, vehic
 	}
 	c := e.st.TowCompanies[t.Company]
 	t.Name, t.Phone = c.Name, c.Phone
+	if more != nil {
+		t.Requester, t.Reason, t.RequestNo, t.Override = more.Requester, more.Reason, more.RequestNo, more.Override
+		t.Times = map[string]time.Time{"requested": e.now()}
+	}
 	t.ID = fmt.Sprintf("TW%s%d", e.sitePrefix, e.st.towCount+1)
 	_, err := e.write(a, EvTowRequested, refs{Incident: incident}, t)
 	return t, err

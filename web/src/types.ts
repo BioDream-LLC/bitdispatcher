@@ -63,6 +63,7 @@ export type Incident = { files?: IncidentFile[]; protocol?: ProtocolRun; neris?:
   changed?: { from?: Location; to: Location; at: string; by: string; why?: string }
   alarm?: number; fireground?: Fireground; epcr?: Record<string, EPCRRecord>
   agency?: string; assisting?: string[]
+  place?: Place; flags?: FlagShown[]
 }
 
 export type Person = {
@@ -442,7 +443,7 @@ export type KeyBinding = { key: string; screen?: '' | 'console' | 'taker' | 'mdt
 export type KeyProfile = { id: string; name: string; bindings: KeyBinding[] }
 export type CommandRules = { delim?: string; fieldInitiate?: string[]; fiType?: string; twoPass?: boolean; fiMarkOut?: string; autoQuery?: boolean
   unitStatus?: string[]; multiUnit?: boolean; statusCodes?: StatusCode[]; keyProfiles?: KeyProfile[]; keys?: Record<string, string> }
-export type CommandResult = { ok: boolean; message: string; incident?: string; refused?: boolean; form?: '' | 'unit-status' | 'field-initiate'; unit?: string; plate?: string; plateState?: string }
+export type CommandResult = { ok: boolean; message: string; incident?: string; refused?: boolean; form?: '' | 'unit-status' | 'field-initiate' | 'tow'; unit?: string; plate?: string; plateState?: string }
 
 export type IntakeQuestion = { key: string; ask: string; kind: 'text' | 'address' | 'phone' | 'yesno'; required?: boolean; danger?: boolean }
 export type IntakeScript = { on?: boolean; greeting?: string; questions?: IntakeQuestion[]; closing?: string; transfer?: string; emergencyWords?: string[] }
@@ -459,3 +460,24 @@ export type SetupStep = { id: string; title: string; why: string; need: 'require
 export type GoLiveItem = { id: string; title: string; result: 'pass' | 'warn' | 'fail'; detail?: string; fix?: string }
 export type GoLiveResult = { at: string; by: string; pass: number; warn: number; fail: number; checks: GoLiveItem[] }
 export type SetupView = { steps: SetupStep[]; done: number; required: number; left: number; goLive?: GoLiveResult; support: string }
+
+/** The structured place of an incident and how its location was settled (cad/places.go). */
+export type Place = {
+  name?: string; complex?: string; building?: string; floor?: string; unitKind?: string; unit?: string; detail?: string
+  verify: 'verified' | 'estimated' | 'map' | 'caller' | 'forced' | 'unverified' | ''
+  entered?: string; source?: string; confidence?: string; reason?: string; reasonNote?: string; nearest?: string; alternatives?: string[]
+  lat?: number; lon?: number; addrKey?: string
+  linked?: { how: string; address: string; lat?: number; lon?: number; at: string; by: string }
+  at?: string; by?: string
+}
+
+/** A flag version an incident showed (cad/flags.go). */
+export type FlagShown = { id: string; version: number; category: string; title: string; severity: string; scope: string; person?: string; at: string }
+
+/** A premise or safety flag as one person may see it (restricted detail left out for those not allowed). */
+export type Flag = {
+  id: string; version: number; category: string; title: string; warning: string; instruction: string; severity: string
+  source?: string; reliability?: string; state: string; incident?: string; note?: string; expires?: string; review?: string
+  scope: { addrKey?: string; address?: string; lat?: number; lon?: number; business?: string; complex?: string; building?: string; floor?: string; unit?: string; person?: string; personName?: string }
+  details?: Record<string, string>; creator: string; changed: string; changedBy: string
+}

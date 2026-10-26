@@ -200,3 +200,21 @@ if [ "$(api GET /state | jq '[.settings.markOuts[] | select(.maxMinutes)] | leng
 fi
 api POST /auth/logout '{}' >/dev/null || true
 echo "demo ready"
+# The final round, seeded once: operational periods in the demo's time zone, critical-incident rules and
+# alert phrases (live, so visitors see an alert), and two flags at a demo address (one for the whole
+# complex, one for a single apartment).
+if [ "$(api GET /state | jq -r '.settings.shift.timeZone // ""')" = "" ]; then
+  EX=$(api GET /admin/phrases/examples)
+  S=$(api GET /state | jq -c --argjson ex "$EX" '.settings
+    | .shift = {"timeZone":"America/New_York","periods":[{"name":"Day","start":"07:00"},{"name":"Night","start":"19:00"}]}
+    | .critical = {"version":1,"phrases":[$ex.phrases[] | .testing = false],"rules":[
+        {"id":"r-sf","name":"Structure fire","kind":"calltype","match":"SF"},
+        {"id":"r-p1","name":"Priority 1","kind":"priority","match":"1"},
+        {"id":"r-em","name":"Unit emergency","kind":"event","match":"unit-emergency"},
+        {"id":"r-shots","name":"Shots fired heard","kind":"phrase","match":"shots-fired"},
+        {"id":"r-down","name":"Officer down heard","kind":"phrase","match":"officer-down"}]}')
+  api PUT /admin/settings "$S" >/dev/null || true
+  api PUT /flags '{"category":"hazard","title":"Oxygen in use in the leasing office","warning":"Demo: home oxygen tanks stored in the leasing office","instruction":"No open flame; ventilate before entry","severity":"high","source":"demo data","scope":{"address":"1210 WILLIAMSON RD NE","lat":37.2885,"lon":-79.9395,"verified":true,"complex":"Williamson Court (demo)"},"conflictOk":true}' >/dev/null || true
+  api PUT /flags '{"category":"dangerous-animal","title":"Two large dogs in apartment 204","warning":"Demo: two large dogs, aggressive with strangers","instruction":"Ask the caller to secure the dogs before entry","severity":"high","source":"demo data","scope":{"address":"1210 WILLIAMSON RD NE","lat":37.2885,"lon":-79.9395,"verified":true,"complex":"Williamson Court (demo)","building":"B","unit":"204"},"conflictOk":true}' >/dev/null || true
+  echo "seeded shift periods, critical rules and phrases, and demo flags"
+fi

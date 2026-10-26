@@ -30,6 +30,8 @@ type Kind struct {
 var Kinds = []Kind{
 	{Key: "QW", Name: "Wanted person", Fields: []string{"NAM", "SEX", "RAC", "DOB", "OLN", "OLS"}, Need: [][]string{{"NAM", "DOB"}, {"NAM", "SEX", "RAC"}, {"OLN", "OLS"}}},
 	{Key: "QV", Name: "Vehicle", Fields: []string{"LIC", "LIS", "LIY", "LIT", "VIN"}, Need: [][]string{{"LIC", "LIS"}, {"VIN"}}},
+	{Key: "RQ", Name: "Registration (state DMV, through Nlets)", Fields: []string{"LIC", "LIS", "LIT", "VIN"}, Need: [][]string{{"LIC", "LIS"}, {"VIN"}}},
+	{Key: "DQ", Name: "Driver's licence (state DMV, through Nlets)", Fields: []string{"NAM", "DOB", "SEX", "OLN", "OLS"}, Need: [][]string{{"NAM", "DOB"}, {"OLN", "OLS"}}},
 	{Key: "QG", Name: "Gun", Fields: []string{"SER", "MAK", "CAL"}, Need: [][]string{{"SER"}}},
 	{Key: "QA", Name: "Article", Fields: []string{"SER", "TYP"}, Need: [][]string{{"SER"}}},
 }
@@ -166,6 +168,17 @@ func (Sim) Send(ctx context.Context, msg string) (string, error) {
 		hit = hit || strings.HasPrefix(v, "TEST")
 	}
 	head := "*** SIMULATED: TRAINING ANSWER, NOT FROM NCIC ***\n"
+	switch key {
+	case "RQ":
+		// A registration answers with the owner whatever the plate; a TEST plate also shows as stolen.
+		ans := head + "REG/VALID EXP/20270630\nLIC/" + val["LIC"] + " LIS/" + val["LIS"] + " LIT/PC\nVYR/2019 VMA/TOYT VMO/CAM VST/4D VCO/GRY VIN/4T1B11HK5KU000001\nOWN/DOE, JANE A\nADR/100 TEST AVE ROANOKE VA 24011"
+		if hit {
+			ans += "\nNCIC: MKE/STOLEN VEHICLE ORI/VA0000000 TEST PD\nIMMEDIATE CONFIRMATION REQUIRED WITH ENTERING AGENCY BEFORE ANY ACTION"
+		}
+		return ans, nil
+	case "DQ":
+		return head + "OLN/T00000000 OLS/VA STATUS/VALID CLASS/C EXP/20280115\nNAM/" + val["NAM"] + " DOB/" + val["DOB"] + " SEX/M\nADR/100 TEST AVE ROANOKE VA 24011", nil
+	}
 	if !hit {
 		switch key {
 		case "QV":
@@ -219,4 +232,27 @@ func (l Line) Send(ctx context.Context, msg string) (string, error) {
 func IsHit(text string) bool {
 	t := strings.ToUpper(text)
 	return strings.Contains(t, "MKE/") && !strings.Contains(t, "NO NCIC")
+}
+
+var reKey = regexp.MustCompile(`(?:^|[\s])([A-Z]{2,4})/`)
+
+// Fields reads an answer's KEY/value pairs (MKE/STOLEN VEHICLE ORI/VA0000000 TEST PD): the value runs to
+// the next key or the end of the line. A key seen twice keeps the first value.
+func Fields(text string) map[string]string {
+	out := map[string]string{}
+	for _, line := range strings.Split(text, "\n") {
+		idx := reKey.FindAllStringSubmatchIndex(line, -1)
+		for i, m := range idx {
+			key := line[m[2]:m[3]]
+			end := len(line)
+			if i+1 < len(idx) {
+				end = idx[i+1][0]
+			}
+			v := strings.TrimSpace(line[m[1]:end])
+			if _, ok := out[key]; !ok {
+				out[key] = v
+			}
+		}
+	}
+	return out
 }

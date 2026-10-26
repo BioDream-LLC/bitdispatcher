@@ -99,53 +99,92 @@ type Security struct {
 
 // Person is someone on an incident: the caller, a victim, a suspect, a witness.
 type Person struct {
-	ID       string    `json:"id"`
-	Role     string    `json:"role"` // caller, victim, suspect, witness, complainant, subject, patient, other
-	Name     string    `json:"name,omitempty"`
-	Aliases  []string  `json:"aliases,omitempty"`
-	DOB      string    `json:"dob,omitempty"` // as given: 1988-03-14, or an age
-	Sex      string    `json:"sex,omitempty"`
-	Race     string    `json:"race,omitempty"`
-	Height   string    `json:"height,omitempty"`
-	Weight   string    `json:"weight,omitempty"`
-	Hair     string    `json:"hair,omitempty"`
-	Eyes     string    `json:"eyes,omitempty"`
-	Clothing string    `json:"clothing,omitempty"`
-	Address  string    `json:"address,omitempty"`
-	Phone    string    `json:"phone,omitempty"`
-	IDType   string    `json:"idType,omitempty"` // DL, state ID, passport
-	IDNumber string    `json:"idNumber,omitempty"`
-	IDState  string    `json:"idState,omitempty"`
-	Notes    string    `json:"notes,omitempty"`
-	Safety   bool      `json:"safety,omitempty"` // an officer-safety concern about this person
-	Added    time.Time `json:"added"`
-	AddedBy  string    `json:"addedBy"`
-	Updated  time.Time `json:"updated,omitzero"`
-	Removed  bool      `json:"removed,omitempty"`
+	ID   string `json:"id"`
+	Role string `json:"role"` // caller, victim, suspect, witness, complainant, subject, patient, other
+	// Roles are every role the person has on the incident (Role is the first).
+	Roles []string `json:"roles,omitempty"`
+	// Name is "LAST, FIRST MIDDLE SUFFIX", made from the separate parts when they are given.
+	Name   string `json:"name,omitempty"`
+	First  string `json:"first,omitempty"`
+	Middle string `json:"middle,omitempty"`
+	Last   string `json:"last,omitempty"`
+	Suffix string `json:"suffix,omitempty"`
+	// Where the person is: at the incident, somewhere else (Address and the sublocation), unknown or transient.
+	LocKind  string        `json:"locKind,omitempty"` // incident, other, unknown, transient
+	Building string        `json:"building,omitempty"`
+	Floor    string        `json:"floor,omitempty"`
+	Unit     string        `json:"unit,omitempty"`
+	Phones   []PersonPhone `json:"phones,omitempty"`
+	// Description beyond the basics.
+	Ethnicity string `json:"ethnicity,omitempty"`
+	SMT       string `json:"smt,omitempty"` // scars, marks and tattoos
+	Build     string `json:"build,omitempty"`
+	// Identifiers: the Social Security number is kept and shown masked (persons.go), the operator's
+	// licence with its state, other identification, a verified date of birth and a reported approximate age.
+	SSN       string `json:"ssn,omitempty"`
+	DL        string `json:"dl,omitempty"`
+	DLState   string `json:"dlState,omitempty"`
+	ApproxAge string `json:"approxAge,omitempty"`
+	// SafetyNote explains an officer-safety concern: what it is, why it applies, the source and what to do.
+	SafetyNote *SafetyConcern `json:"safetyNote,omitempty"`
+	// Returns are the inquiry returns run on the person, newest last (requests.go).
+	Returns  []InqReturn `json:"returns,omitempty"`
+	Aliases  []string    `json:"aliases,omitempty"`
+	DOB      string      `json:"dob,omitempty"` // as given: 1988-03-14, or an age
+	Sex      string      `json:"sex,omitempty"`
+	Race     string      `json:"race,omitempty"`
+	Height   string      `json:"height,omitempty"`
+	Weight   string      `json:"weight,omitempty"`
+	Hair     string      `json:"hair,omitempty"`
+	Eyes     string      `json:"eyes,omitempty"`
+	Clothing string      `json:"clothing,omitempty"`
+	Address  string      `json:"address,omitempty"`
+	Phone    string      `json:"phone,omitempty"`
+	IDType   string      `json:"idType,omitempty"` // DL, state ID, passport
+	IDNumber string      `json:"idNumber,omitempty"`
+	IDState  string      `json:"idState,omitempty"`
+	Notes    string      `json:"notes,omitempty"`
+	Safety   bool        `json:"safety,omitempty"` // an officer-safety concern about this person
+	Added    time.Time   `json:"added"`
+	AddedBy  string      `json:"addedBy"`
+	Updated  time.Time   `json:"updated,omitzero"`
+	Removed  bool        `json:"removed,omitempty"`
 }
 
 // Vehicle is a vehicle on an incident.
 type Vehicle struct {
-	ID          string    `json:"id"`
-	Role        string    `json:"role"` // suspect, victim, involved, witness, abandoned, other
-	Plate       string    `json:"plate,omitempty"`
-	State       string    `json:"state,omitempty"`
-	VIN         string    `json:"vin,omitempty"`
-	Year        string    `json:"year,omitempty"`
-	Make        string    `json:"make,omitempty"`
-	Model       string    `json:"model,omitempty"`
-	Color       string    `json:"color,omitempty"`
-	Body        string    `json:"body,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Driver      string    `json:"driver,omitempty"`
-	Owner       string    `json:"owner,omitempty"`
-	Contact     string    `json:"contact,omitempty"`
-	Direction   string    `json:"direction,omitempty"` // direction of travel
-	Notes       string    `json:"notes,omitempty"`
-	Added       time.Time `json:"added"`
-	AddedBy     string    `json:"addedBy"`
-	Updated     time.Time `json:"updated,omitzero"`
-	Removed     bool      `json:"removed,omitempty"`
+	ID          string `json:"id"`
+	Role        string `json:"role"` // suspect, victim, involved, witness, abandoned, other
+	Plate       string `json:"plate,omitempty"`
+	State       string `json:"state,omitempty"`
+	VIN         string `json:"vin,omitempty"`
+	Year        string `json:"year,omitempty"`
+	Make        string `json:"make,omitempty"`
+	Model       string `json:"model,omitempty"`
+	Color       string `json:"color,omitempty"`
+	Body        string `json:"body,omitempty"`
+	Description string `json:"description,omitempty"`
+	// Roles are every role the vehicle has (Role is the first); PlateType is the NCIC plate type code and
+	// PlateCondition says when there is no readable plate (temporary, partial, unreadable, none, multiple).
+	Roles          []string `json:"roles,omitempty"`
+	PlateType      string   `json:"plateType,omitempty"`
+	PlateCondition string   `json:"plateCondition,omitempty"`
+	VINNote        string   `json:"vinNote,omitempty"` // what the VIN check said (partial, check digit)
+	Damage         string   `json:"damage,omitempty"`
+	// Links are the incident's people related to the vehicle: driver, owner, lessee, passenger, occupant.
+	Links []VehicleLink `json:"links,omitempty"`
+	// Returns are the DMV or NCIC returns run on the vehicle, newest last; the caller-reported fields above
+	// are never overwritten by them (requests.go).
+	Returns   []InqReturn `json:"returns,omitempty"`
+	Driver    string      `json:"driver,omitempty"`
+	Owner     string      `json:"owner,omitempty"`
+	Contact   string      `json:"contact,omitempty"`
+	Direction string      `json:"direction,omitempty"` // direction of travel
+	Notes     string      `json:"notes,omitempty"`
+	Added     time.Time   `json:"added"`
+	AddedBy   string      `json:"addedBy"`
+	Updated   time.Time   `json:"updated,omitzero"`
+	Removed   bool        `json:"removed,omitempty"`
 }
 
 // Contact is a notification, a mutual-aid or resource request, a transfer or referral, an outbound call or
@@ -534,8 +573,11 @@ func (e *Engine) SavePerson(a Actor, number string, p Person) (string, error) {
 	if p.Role == "" {
 		p.Role = "other"
 	}
+	if err := e.normPerson(&p); err != nil {
+		return "", err
+	}
 	if p.Name == "" && p.Clothing == "" && p.Notes == "" && !p.Removed {
-		return "", problem("name", "give a name, or a description in the clothing or notes")
+		return "", problem("first", "give a name, or a description in the clothing or notes")
 	}
 	now := e.now()
 	if p.ID == "" {
@@ -547,8 +589,13 @@ func (e *Engine) SavePerson(a Actor, number string, p Person) (string, error) {
 			return "", problem("person", "no person %s on %s", p.ID, number)
 		}
 		p.Added, p.AddedBy, p.Updated = in.Persons[i].Added, in.Persons[i].AddedBy, now
+		p.Returns = in.Persons[i].Returns // returns are attached by inquiries, never by the form
+		if o := in.Persons[i].SafetyNote; o != nil && p.SafetyNote != nil && p.SafetyNote.Flag == "" {
+			p.SafetyNote.Flag = o.Flag
+		}
 	}
 	p.Aliases = cleanList(p.Aliases)
+	e.proposePersonFlag(a, number, &p)
 	_, err := e.write(a, EvIncPerson, refs{Incident: number}, personData{Person: p})
 	return p.ID, err
 }
@@ -584,6 +631,10 @@ func (e *Engine) SaveVehicle(a Actor, number string, v Vehicle) (string, error) 
 			return "", problem("vehicle", "no vehicle %s on %s", v.ID, number)
 		}
 		v.Added, v.AddedBy, v.Updated = in.Vehicles[i].Added, in.Vehicles[i].AddedBy, now
+		v.Returns = in.Vehicles[i].Returns
+	}
+	if err := e.normVehicle(in, &v); err != nil {
+		return "", err
 	}
 	_, err := e.write(a, EvIncVehicle, refs{Incident: number}, vehicleData{Vehicle: v})
 	return v.ID, err
@@ -1007,7 +1058,15 @@ func (s *State) applyEntry(e ledger.Event) (bool, error) {
 			if p.Removed {
 				verb = "Removed"
 			}
-			in.add(e, "person", fmt.Sprintf("%s %s %s", verb, p.Role, firstNonEmpty(p.Name, p.Clothing, p.ID)))
+			in.add(e, "person", fmt.Sprintf("%s %s %s", verb, strings.Join(append([]string{p.Role}, without(p.Roles, p.Role)...), "/"), firstNonEmpty(p.Name, p.Clothing, p.ID)))
+			if n := p.SafetyNote; p.Safety && n != nil && !p.Removed {
+				scope := "this incident"
+				if n.Scope == "permanent" {
+					scope = "proposed as a permanent warning " + n.Flag
+				}
+				in.add(e, "safety", fmt.Sprintf("OFFICER SAFETY (%s): %s. %s. Source: %s. Responders: %s", scope, n.Title, n.Reason, n.Source, n.Instruction))
+			}
+			s.noteFlagsShown(e, in)
 		}
 	case EvIncVehicle:
 		v, err := decode[vehicleData](e)

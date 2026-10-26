@@ -28,6 +28,22 @@ export type Draft = {
   contacts: Contact[]
   started: string
   dupsSeen?: string // the duplicates the call-taker has looked at (a key), so submit goes ahead
+  // The structured place (cad/places.go): the business or complex, building, floor and unit, response
+  // detail, and how the location was settled (verified, estimated, caller, map, forced) with why.
+  placeName?: string
+  complex?: string
+  building?: string
+  floor?: string
+  unitKind?: string
+  unit?: string
+  detail?: string
+  placeVerify?: '' | 'verified' | 'estimated' | 'map' | 'caller' | 'forced' | 'unverified'
+  forceReason?: string
+  forceNote?: string
+  nearest?: string
+  entered?: string // the address as first typed, kept when a location is forced
+  callbackVerified?: boolean
+  closed?: boolean // the call-taker closed this call out (it was sent earlier)
 }
 
 export const emptyDraft = (): Draft => ({
@@ -79,11 +95,35 @@ export function fromIncident(inc: Incident): Draft {
     ...emptyDraft(), number: inc.number, call: inc.calls[0], type: inc.type, priority: inc.priority, modifiers: inc.modifiers ?? [],
     address: inc.location?.address ?? '', lat: inc.location?.lat?.toFixed(6) ?? '', lon: inc.location?.lon?.toFixed(6) ?? '', verified: !!inc.locVerified,
     callerName: inc.caller?.name ?? '', callback: inc.caller?.callback ?? '', callerElsewhere: !!inc.callerAt, callerAddress: inc.callerAt?.address ?? '',
+    placeName: inc.place?.name ?? '', complex: inc.place?.complex ?? '', building: inc.place?.building ?? '', floor: inc.place?.floor ?? '',
+    unitKind: inc.place?.unitKind ?? '', unit: inc.place?.unit ?? '', detail: inc.place?.detail ?? '', placeVerify: inc.place?.verify ?? (inc.locVerified ? 'verified' : ''),
+    forceReason: inc.place?.reason ?? '', forceNote: inc.place?.reasonNote ?? '', nearest: inc.place?.nearest ?? '', entered: inc.place?.entered ?? '',
+  }
+}
+
+/** hasPlace says the draft has a structured place or a settled location to send. */
+export function hasPlace(d: Draft): boolean {
+  return !!(d.placeName || d.complex || d.building || d.floor || d.unit || d.detail || d.placeVerify)
+}
+
+/** place is the structured place to send (PUT /incidents/{n}/place). */
+export function place(d: Draft) {
+  const lat = num(d.lat)
+  const lon = num(d.lon)
+  const verify = d.placeVerify || (d.verified ? 'verified' : 'unverified')
+  return {
+    name: d.placeName || undefined, complex: d.complex || undefined, building: d.building || undefined, floor: d.floor || undefined,
+    unitKind: d.unitKind || undefined, unit: d.unit || undefined, detail: d.detail || undefined, verify,
+    entered: (d.entered || d.address).trim() || undefined, reason: verify === 'forced' ? d.forceReason : undefined, reasonNote: verify === 'forced' ? d.forceNote : undefined,
+    nearest: d.nearest || undefined, lat: lat != null && !Number.isNaN(lat) ? lat : undefined, lon: lon != null && !Number.isNaN(lon) ? lon : undefined,
+    source: verify === 'verified' ? 'gis' : verify === 'caller' ? 'caller' : verify === 'map' ? 'map' : verify === 'estimated' ? 'range' : 'typed',
+    confidence: verify === 'verified' ? 'exact' : verify === 'estimated' ? 'range' : verify === 'forced' || verify === 'unverified' ? 'none' : 'approximate',
   }
 }
 
 export function pickAddress(d: Draft, r: SearchResult): Draft {
-  return { ...d, address: r.label, lat: r.lat.toFixed(6), lon: r.lon.toFixed(6), verified: r.exact }
+  // An exact address point is verified; a range estimate says so.
+  return { ...d, address: r.label, lat: r.lat.toFixed(6), lon: r.lon.toFixed(6), verified: r.exact, placeVerify: r.exact ? 'verified' : r.ranged ? 'estimated' : '', entered: d.entered || d.address }
 }
 
 /** rankTypes orders call types for what was typed: exact code, code prefix, a word of the name, anywhere. */

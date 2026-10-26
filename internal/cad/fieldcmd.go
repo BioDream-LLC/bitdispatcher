@@ -90,6 +90,7 @@ var KeyActions = map[string]string{
 	"display911": "The 911 call's information", "submit": "Submit the form", "plates": "Previous plates", "search": "Search",
 	"aerial": "Aerial imagery", "ncic": "NCIC inquiry for the incident", "palette": "Command palette", "rebid": "Rebid the caller's location",
 	"narrative": "Go to the narrative", "markout": "Mark the unit out",
+	"newCall": "New call-entry screen (keeps this call as it is)", "closeCall": "Close out this call (after it was sent)", "requests": "NCIC requests",
 }
 
 // ClassicKeys is the PremierOne-style layout (the manual's defaults, which agencies customise).
@@ -110,7 +111,8 @@ func StandardKeys() KeyProfile {
 		return KeyBinding{Key: key, Screen: screen, Action: action}
 	}
 	return KeyProfile{ID: "standard", Name: "bitdispatcher standard", Bindings: []KeyBinding{
-		k("F2", "taker", "clear"), k("F3", "taker", "search"), k("F4", "taker", "submit"), k("F6", "taker", "rebid"), k("F8", "taker", "narrative"),
+		k("F2", "taker", "clear"), k("F3", "taker", "search"), k("F4", "taker", "submit"), k("F5", "taker", "newCall"), k("F6", "taker", "rebid"), k("F8", "taker", "narrative"),
+		k("Ctrl+Enter", "taker", "submit"), k("Alt+N", "taker", "newCall"),
 		k("F2", "console", "initiate"), k("F7", "console", "aerial"), k("F9", "console", "ncic"), k("Ctrl+K", "", "palette"),
 		k("Shift+F3", "", "recall"), k("Shift+F6", "", "email"), k("Shift+F7", "console", "fieldInitiate"), k("Shift+F11", "console", "unitStatus"),
 	}}

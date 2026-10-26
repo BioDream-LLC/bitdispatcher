@@ -51,7 +51,7 @@ export function usePlaceViews(lat?: number, lon?: number, on = true) {
 /** PlaceViews shows a place from every side: the four oblique aerial photos as a compass (arrow keys turn
  * it), street photos that look at the place, and the agency's own pre-plan photos. Each says where it came
  * from and when it was taken, so an old picture is never taken for today. */
-export default function PlaceViews({ lat, lon, premises = [], big, onChanged }: { lat?: number; lon?: number; premises?: Premise[]; big?: boolean; onChanged?: () => void }) {
+export default function PlaceViews({ lat, lon, premises = [], big, onChanged, noGoogle }: { lat?: number; lon?: number; premises?: Premise[]; big?: boolean; onChanged?: () => void; noGoogle?: boolean }) {
   const { found, err, loading } = usePlaceViews(lat, lon)
   const me = useStore((s) => s.me)
   const shots = useMemo(() => {
@@ -88,7 +88,11 @@ export default function PlaceViews({ lat, lon, premises = [], big, onChanged }: 
           )
         })}
         {obliques.length > 0 && <span className="text-[11px] text-slate-500"><Compass size={11} className="inline" aria-hidden /> ← → to turn</span>}
-        {found?.google && <a className="btn btn-ghost ml-auto h-7 text-xs" href={found.google} target="_blank" rel="noreferrer noopener"><ExternalLink size={12} aria-hidden /> Google Street View</a>}
+        {found && (() => {
+          const none = (['N', 'E', 'S', 'W'] as const).filter((f) => !obliques.some((o) => o.facing === f)).map((f) => WORD[f])
+          return none.length > 0 ? <span className="text-[11px] text-slate-400">{none.length === 4 ? 'No aerial picture from any side' : `No aerial picture looking ${none.join(', ')}`}</span> : null
+        })()}
+        {found?.google && !noGoogle && <a className="btn btn-ghost ml-auto h-7 text-xs" href={found.google} target="_blank" rel="noreferrer noopener" title="Opens in another tab; Google may show nothing where it has no imagery"><ExternalLink size={12} aria-hidden /> Google Street View</a>}
       </div>
 
       {loading && <div className={cx('animate-pulse rounded-md bg-slate-800', big ? 'h-[52vh]' : 'h-48')} aria-label="Looking the place up" />}

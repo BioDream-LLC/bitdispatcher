@@ -19,10 +19,11 @@ func (s *State) initNext() {
 	s.Closures = map[string]*RoadClosure{}
 	s.Cameras, s.CameraLooks, s.LocLinks = map[string]*Camera{}, []CameraLook{}, map[string]*LocationLink{}
 	s.SetupTicks = map[string]SetupTick{}
+	s.initFinal()
 }
 
 func (s *State) applyNext(e ledger.Event) (bool, error) {
-	for _, f := range []func(ledger.Event) (bool, error){s.applyCameras, s.applyLocLinks, s.applySetup} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyCameras, s.applyLocLinks, s.applySetup, s.applyFinal} {
 		if ok, err := f(e); ok {
 			return true, err
 		}

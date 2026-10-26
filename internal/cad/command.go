@@ -46,6 +46,7 @@ var Verbs = []Verb{
 	{[]string{"N", "NOTE"}, "N <text>", "Add a note to the selected incident"},
 	{[]string{"PN"}, "PN <text>", "Add a priority note every dispatcher and unit sees"},
 	{[]string{"NEW", "I"}, "NEW <type> [P1-5] <address>", "Create an incident"},
+	{[]string{"SE"}, "SE.<unit>  (then F10)", "Tow for a vehicle on the selected incident, the unit asking"},
 	{[]string{"P", "PRI"}, "P <1-5>", "Change the selected incident's priority"},
 	{[]string{"T", "TYPE"}, "T <type>", "Change the selected incident's call type"},
 	{[]string{"CL", "CLOSE"}, "CL <disposition> [text]", "Close the selected incident"},
@@ -73,6 +74,14 @@ func (e *Engine) Execute(a Actor, line, selected string) CommandResult {
 	f := strings.Fields(line)
 	if len(f) == 0 {
 		return CommandResult{Message: "Type a command; HELP lists them"}
+	}
+	// SE.<unit> (with the agency's delimiter): a service request (tow) for a unit: open the tow form for
+	// a vehicle on the selected incident, the unit as the requester (vehicles.go).
+	if u, ok := serviceRequest(line, e.delim()); ok {
+		if selected == "" {
+			return CommandResult{Message: "select the incident first: the tow is for one of its vehicles"}
+		}
+		return CommandResult{OK: true, Form: "tow", Unit: u, Incident: selected, Message: "Tow for " + u + ": choose the vehicle"}
 	}
 	verb := strings.ToUpper(f[0])
 	args := f[1:]
@@ -562,4 +571,24 @@ func (e *Engine) isUnitOrGroup(w string) bool {
 	ok := false
 	e.Read(func(st *State) { _, ok = st.Units[w] })
 	return ok
+}
+
+// serviceRequest reads SE.<unit> or SE <unit>.
+func serviceRequest(line, delim string) (string, bool) {
+	l := strings.ToUpper(strings.TrimSpace(line))
+	for _, sep := range []string{delim, " "} {
+		if rest, ok := strings.CutPrefix(l, "SE"+sep); ok {
+			rest = strings.TrimSpace(rest)
+			if rest != "" && !strings.ContainsAny(rest, " ") {
+				return rest, true
+			}
+		}
+	}
+	return "", false
+}
+
+func (e *Engine) delim() string {
+	d := "."
+	e.Read(func(s *State) { d = s.Settings.Commands.delim() })
+	return d
 }

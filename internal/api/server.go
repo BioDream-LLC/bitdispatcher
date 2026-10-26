@@ -32,6 +32,7 @@ import (
 	"github.com/biodream-llc/bitdispatcher/internal/ncic"
 	"github.com/biodream-llc/bitdispatcher/internal/neris"
 	"github.com/biodream-llc/bitdispatcher/internal/ng911"
+	"github.com/biodream-llc/bitdispatcher/internal/pip"
 	"github.com/biodream-llc/bitdispatcher/internal/views"
 )
 
@@ -50,6 +51,7 @@ type Integrations struct {
 	NEMSIS     nemsis.Config     `json:"nemsis"`       // EMS responses to the patient-care report system
 	Alerting   Alerting          `json:"alerting"`     // public alerts (mass notification)
 	Next       NextConfig        `json:"next"`         // live traffic, alarm companies, the intake bots' token (next.go)
+	PIP        pip.Config        `json:"pip"`          // the optional PSC PIP connection (final.go, docs/PSC-PIP.md)
 }
 
 // Server is the API.
@@ -119,6 +121,11 @@ func New(s *Server) (*Server, error) {
 	}
 	if err := s.loadIntegrations(); err != nil {
 		return nil, err
+	}
+	if s.Auth != nil && s.Eng != nil {
+		s.Eng.KnownUser = func(name string) bool {
+			return slices.ContainsFunc(s.Auth.List(), func(u auth.Public) bool { return u.Username == name && !u.Disabled })
+		}
 	}
 	if err := s.LoadSites(); err != nil {
 		return nil, err
@@ -375,6 +382,7 @@ func (s *Server) routes() {
 	s.messageRoutes()
 	s.alertRoutes()
 	s.nextRoutes()
+	s.finalRoutes()
 	s.nerisRoutes()
 	s.stationRoutes()
 	s.partnerRoutes()
@@ -576,6 +584,16 @@ func (s *Server) loginDemo(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
+		// Nobody signs off with an NCIC or state request silently left behind: finish it or hand it over.
+		demo, _ := s.Auth.Demo()
+		if se, ok := s.Auth.Session(c.Value); ok && se.Username != demo.Username && !se.Training {
+			var open []*cad.Request
+			s.Eng.Read(func(st *cad.State) { open = st.SignOffBlockers(se.Username) })
+			if len(open) > 0 {
+				writeJSON(w, http.StatusConflict, map[string]any{"message": fmt.Sprintf("you own %d open request(s): finish each one or hand it to another dispatcher before signing off", len(open)), "requests": open})
+				return
+			}
+		}
 		if se, ok := s.Auth.Logout(c.Value); ok {
 			s.Eng.Record(actorOf(se), cad.EvSignOut, nil)
 		}
@@ -740,7 +758,7 @@ func (s *Server) viewFor(sc cad.Scope) ([]byte, error) {
 		sort.Slice(v.CallTypes, func(i, j int) bool { return v.CallTypes[i].Name < v.CallTypes[j].Name })
 		for _, in := range st.Incidents {
 			if (in.Status != cad.Closed || now.Sub(in.Closed) < 12*time.Hour) && st.IncidentIn(sc, in) {
-				v.Incidents = append(v.Incidents, in)
+				v.Incidents = append(v.Incidents, maskIncident(in))
 			}
 		}
 		sort.Slice(v.Incidents, func(i, j int) bool { return v.Incidents[i].Number > v.Incidents[j].Number })
@@ -1870,6 +1888,8 @@ func (s *Server) Run(ctx context.Context) {
 	go s.scheduler(ctx)
 	go s.epcrAuto(ctx)
 	go s.translator(ctx)
+	go s.requestsWatch(ctx)
+	go s.criticalWatch(ctx)
 	if s.Advisory != nil {
 		go s.Advisory.Run(ctx)
 	}

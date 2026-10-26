@@ -1,0 +1,1 @@
+import{j as t}from"./index-UfEW-YlE.js";import{Q as e}from"./Queue-XfkUfzcL.js";import"./react-BhHG1pnQ.js";import"./map-Db0YBc6U.js";function a(){return t.jsx("div",{className:"h-full overflow-y-auto bg-slate-950 p-4",children:t.jsx(e,{})})}export{a as default};

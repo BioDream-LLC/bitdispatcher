@@ -65,7 +65,8 @@ func TestCallEntryRecords(t *testing.T) {
 	num, err := e.CreateIncident(dispatcher, NewIncident{Type: "FALL", Call: "c1", Modifiers: []string{"ELDERLY"}, LocVerified: true})
 	must(err)
 	must(e.SetModifiers(dispatcher, num, []string{"WEAPONS", "MENTAL"}))
-	pid, err := e.SavePerson(dispatcher, num, Person{Role: "Suspect", Name: "DOE, JOHN", Clothing: "black hoodie", Safety: true})
+	pid, err := e.SavePerson(dispatcher, num, Person{Role: "Suspect", Name: "DOE, JOHN", Clothing: "black hoodie", Safety: true,
+		SafetyNote: &SafetyConcern{Title: "Armed with a knife", Reason: "Caller saw a knife in his waistband", Source: "caller", Instruction: "Stage until police arrive"}})
 	must(err)
 	_, err = e.SavePerson(dispatcher, num, Person{ID: pid, Role: "suspect", Name: "DOE, JOHN Q"})
 	must(err)

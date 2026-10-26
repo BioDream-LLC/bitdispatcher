@@ -73,6 +73,7 @@ type ViewsConfigView struct {
 	MapillaryOn       bool   `json:"mapillaryOn"`
 	MapillaryToken    bool   `json:"mapillaryTokenSet"`
 	GoogleLink        bool   `json:"googleLink"`
+	GoogleKey         bool   `json:"googleKeySet"`
 }
 
 func (s *Server) viewsConfigView() ViewsConfigView {
@@ -81,7 +82,7 @@ func (s *Server) viewsConfigView() ViewsConfigView {
 	c := s.integ.Views
 	return ViewsConfigView{EagleViewOn: c.EagleView.On, EagleViewClientID: c.EagleView.ClientID, EagleViewSecret: c.EagleView.ClientSecret != "",
 		EagleViewSandbox: c.EagleView.Sandbox, PanoramaxOn: c.Panoramax.On, PanoramaxURL: c.Panoramax.URL,
-		MapillaryOn: c.Mapillary.On, MapillaryToken: c.Mapillary.Token != "", GoogleLink: c.GoogleLink}
+		MapillaryOn: c.Mapillary.On, MapillaryToken: c.Mapillary.Token != "", GoogleLink: c.GoogleLink, GoogleKey: c.GoogleKey != ""}
 }
 
 // saveViewsConfig changes the providers. A secret left empty keeps the current one; "-" clears it.
@@ -96,6 +97,7 @@ func (s *Server) saveViewsConfig(w http.ResponseWriter, r *http.Request, se *aut
 		MapillaryOn       bool   `json:"mapillaryOn"`
 		MapillaryToken    string `json:"mapillaryToken"`
 		GoogleLink        bool   `json:"googleLink"`
+		GoogleKey         string `json:"googleKey"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -123,6 +125,7 @@ func (s *Server) saveViewsConfig(w http.ResponseWriter, r *http.Request, se *aut
 	v.Mapillary.On = b.MapillaryOn
 	keep(&v.Mapillary.Token, b.MapillaryToken)
 	v.GoogleLink = b.GoogleLink
+	keep(&v.GoogleKey, b.GoogleKey)
 	if v.EagleView.On && (v.EagleView.ClientID == "" || v.EagleView.ClientSecret == "") {
 		s.mu.Unlock()
 		fail(w, 422, "EagleView needs the application's client ID and secret")

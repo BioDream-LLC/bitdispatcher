@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy, Flag, ShieldQuestion, PhoneIncoming, Waypoints } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -40,6 +40,7 @@ import Support from './Support'
 import { Agencies } from './Agencies'
 import { OperationsRules } from './OperationsRules'
 import { Qualifications } from './Qualifications'
+import { CallEntryRules, CriticalAdmin, FlagsAdmin, PipAdmin } from './FinalAdmin'
 import { useViews, VIEW_OF_PAGE } from '../access'
 
 // Charts are large; they load when the report is opened.
@@ -76,6 +77,10 @@ const PAGES = [
   { to: 'alarms', label: 'Alarm companies & permits', icon: Siren, admin: true },
   { to: 'intake', label: 'Non-emergency intake', icon: Bot, admin: true },
   { to: 'premises', label: 'Premises & hazards', icon: ShieldAlert, admin: false },
+  { to: 'flags', label: 'Premise & safety flags', icon: Flag, admin: false },
+  { to: 'callentry', label: 'Call entry rules', icon: PhoneIncoming, admin: true },
+  { to: 'critical', label: 'Critical incidents', icon: ShieldQuestion, admin: true },
+  { to: 'pip', label: 'PSC PIP connection', icon: Waypoints, admin: true },
   { to: 'migrate', label: 'Migration', icon: FileInput, admin: true },
   { to: 'advisory', label: 'Advisory panel', icon: Lightbulb, admin: false },
   { to: 'guidance', label: 'Approved guidance', icon: BookOpen, admin: true },
@@ -143,6 +148,10 @@ export default function Admin() {
             <Route path="gis" element={<GisAdmin />} />
             <Route path="sites" element={<Sites />} />
             <Route path="premises" element={<Premises />} />
+            <Route path="flags" element={<FlagsAdmin />} />
+            <Route path="callentry" element={<CallEntryRules />} />
+            <Route path="critical" element={<CriticalAdmin />} />
+            <Route path="pip" element={<PipAdmin />} />
             <Route path="personnel" element={<Personnel view={view} />} />
             <Route path="paging" element={<Paging view={view} />} />
             <Route path="publicalerts" element={<PublicAlerts view={view} />} />

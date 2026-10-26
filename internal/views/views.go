@@ -40,6 +40,10 @@ type Config struct {
 	Mapillary MapillaryConfig `json:"mapillary"`
 	// GoogleLink offers "Open in Google Street View" as a link in a new tab (nothing is fetched).
 	GoogleLink bool `json:"googleLink"`
+	// GoogleKey is a Google Maps Platform key restricted to this site: with it the Street View panel is
+	// docked in the call-entry screen (Maps Embed API) and checked first (Street View metadata), so a
+	// place with no imagery says so instead of opening a blank page.
+	GoogleKey string `json:"googleKey,omitempty"`
 }
 
 // EagleViewConfig is the agency's EagleView Imagery API application (client credentials).

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { api } from './api'
+import { ApiError, api } from './api'
 import type { Health, Notice, Session, View } from './types'
 import { parseLens, type Lens } from './lens'
 import { loadSnapshot, saveSnapshot } from './offline'
@@ -215,9 +215,18 @@ export const can = {
 }
 
 /** Signs out here and on the server. */
-export async function signOut() {
-  await api.post('/auth/logout').catch(() => {})
+export async function signOut(): Promise<boolean> {
+  try {
+    await api.post('/auth/logout')
+  } catch (e) {
+    // Open NCIC or state requests are finished or handed over first (the server refuses otherwise).
+    if (e instanceof ApiError && e.status === 409) {
+      window.dispatchEvent(new CustomEvent('bd:signoff-blocked', { detail: e.data }))
+      return false
+    }
+  }
   window.dispatchEvent(new Event('bd:signedout'))
+  return true
 }
 
 // A screen reached by a link in this window (#/screen/police?d=police) takes the lens its address names.

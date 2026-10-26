@@ -2,11 +2,10 @@ import { useState } from 'react'
 import { DirectoryDialog, ScheduleDialog } from './Roadmap'
 import { BreakButton } from './Dream'
 import { Link } from 'react-router-dom'
-import { Activity, CircleHelp, Cog, LogOut, Moon, Radio, Server, Siren, Sun, Phone, FileText, Database, MapIcon, MonitorCheck, LayoutDashboard, BookUser, CalendarClock, Gavel } from 'lucide-react'
+import { Activity, CircleHelp, Cog, LogOut, Moon, Radio, Server, Siren, Sun, Phone, FileText, Database, MapIcon, MonitorCheck, LayoutDashboard, BookUser, CalendarClock, Gavel, ClipboardCheck, FileSearch } from 'lucide-react'
 import { DISCIPLINES, lensName } from '../lens'
 import { screenDef, type ScreenKind } from '../screens'
-import { api } from '../api'
-import { can, store, useStore } from '../store'
+import { can, signOut, store, useStore } from '../store'
 import { Logo, Tip } from '../ui'
 import { ago, cx, discipline, ms, useNow } from '../util'
 import type { View } from '../types'
@@ -87,7 +86,7 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
         <Logo size={20} />
         <span className="text-sm font-bold tracking-tight text-slate-50">bitdispatcher</span>
       </div>
-      <div className="hidden min-w-0 flex-col leading-tight lg:flex">
+      <div className="hidden min-w-[13rem] shrink-0 flex-col leading-tight lg:flex">
         <span className="truncate text-[11px] font-semibold text-slate-300">{view.settings.agency || 'Agency not named (Admin › Settings)'}</span>
         <span className="truncate text-[10px] text-slate-500">
           {me?.name || me?.username} · {me?.console || 'no position'} · {me?.role}
@@ -207,6 +206,10 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
         {can.supervise(me) && (
           <Link to="/board" className="btn btn-ghost px-1.5" aria-label="Supervisor board" title="Supervisor board"><LayoutDashboard size={14} aria-hidden /></Link>
         )}
+        {can.supervise(me) && (
+          <Link to="/supervisor" className="btn btn-ghost px-1.5" aria-label="Supervisor review: location exceptions, critical incidents, Shift Intelligence" title="Supervisor review: location exceptions, critical incidents, Shift Intelligence"><ClipboardCheck size={14} aria-hidden /></Link>
+        )}
+        <Link to="/requests" className="btn btn-ghost px-1.5" aria-label="NCIC and state requests" title="NCIC and state requests"><FileSearch size={14} aria-hidden /></Link>
         <button className="btn btn-ghost px-1.5" onClick={nextTheme} aria-label={`Theme: ${theme}. Change theme`} title={`Theme: ${theme}`}>
           {theme === 'light' ? <Sun size={14} aria-hidden /> : <Moon size={14} aria-hidden />}
         </button>
@@ -227,10 +230,7 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
           className="btn btn-ghost px-1.5"
           aria-label="Sign out"
           title="Sign out"
-          onClick={async () => {
-            await api.post('/auth/logout').catch(() => {})
-            window.dispatchEvent(new Event('bd:signedout'))
-          }}
+          onClick={() => { signOut() }}
         >
           <LogOut size={14} aria-hidden />
         </button>
