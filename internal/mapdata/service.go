@@ -185,6 +185,27 @@ type Job struct {
 	Update   bool       `json:"update,omitempty"`  // brought up to date from change files rather than recorded afresh
 	Changes  int        `json:"changes,omitempty"` // elements the change files touched
 	cancel   context.CancelFunc
+	prev     []string // extracts updated in place, their old copies kept as .prev until the map is built
+}
+
+// unreachable says plainly that OpenStreetMap could not be reached, which is most often no internet.
+func unreachable(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+	return fmt.Errorf("could not reach OpenStreetMap's change files (is the internet down?): %w; the map in use is unchanged", err)
+}
+
+// settle keeps or puts back the extracts an update changed, once the update has finished.
+func (j *Job) settle(ok bool) {
+	for _, f := range j.prev {
+		if ok {
+			os.Remove(f + ".prev")
+		} else {
+			os.Rename(f+".prev", f)
+		}
+	}
+	j.prev = nil
 }
 
 // Service owns the data directory's map: the store being served and any recording under way.
@@ -194,9 +215,14 @@ type Service struct {
 	Client   *http.Client
 	Agent    string
 	Log      *slog.Logger
-	// Recorded is called after a recording replaces the store; Failed when one does not finish.
+	// Recorded is called after a recording replaces the store; Failed when one does not finish; UpToDate
+	// when an update found nothing to apply.
 	Recorded func(j Job)
 	Failed   func(j Job)
+	UpToDate func(j Job)
+	// MaxDrop refuses an update whose new map has this fraction fewer road segments or addresses than the
+	// map in use (0.1: ten percent); the map in use stays. 0 checks nothing.
+	MaxDrop float64
 
 	mu      sync.RWMutex
 	cur     *Store
@@ -254,6 +280,13 @@ func (s *Service) newStorePath() string {
 }
 
 func (s *Service) srcDir() string { return filepath.Join(s.Dir, "osm") }
+
+// SetMaxDrop sets how much an update may lose before it is refused.
+func (s *Service) SetMaxDrop(f float64) {
+	s.mu.Lock()
+	s.MaxDrop = f
+	s.mu.Unlock()
+}
 
 // Store is the map being served, or nil.
 func (s *Service) Store() *Store {
@@ -433,7 +466,7 @@ func (s *Service) applyChanges(ctx context.Context, j *Job) ([]string, error) {
 		s.setProgress(j, Progress{Phase: "Checking for changes", Detail: e.Name, Fraction: float64(i) / float64(len(j.Extracts))})
 		st, err := s.get(ctx, base+"/state.txt", 4096, nil)
 		if err != nil {
-			return nil, err
+			return nil, unreachable(err)
 		}
 		seq, ts, err := parseState(st)
 		if err != nil {
@@ -452,20 +485,29 @@ func (s *Service) applyChanges(ctx context.Context, j *Job) ([]string, error) {
 			u := fmt.Sprintf("%s/%03d/%03d/%03d.osc.gz", base, q/1000000, q/1000%1000, q%1000)
 			b, err := s.get(ctx, u, 512<<20, nil)
 			if err != nil {
-				return nil, err
+				return nil, unreachable(err)
 			}
 			if err := c.ReadChange(bytes.NewReader(b), true); err != nil {
 				return nil, fmt.Errorf("%s: %w", u, err)
 			}
 		}
 		s.setProgress(j, Progress{Phase: "Applying changes", Detail: fmt.Sprintf("%s: %d elements", e.Name, c.Size())})
+		// The updated extract is written beside the old one, which is kept as .prev until the new map is
+		// built and checked: a failure puts it back, so the next update starts from the same place.
 		tmp := f + ".new"
 		if err := osm.Apply(f, tmp, c, osm.Header{Sequence: seq, Timestamp: ts.Unix(), BaseURL: base}, runtime.NumCPU()); err != nil {
+			os.Remove(tmp)
+			return nil, err
+		}
+		if err := os.Rename(f, f+".prev"); err != nil {
+			os.Remove(tmp)
 			return nil, err
 		}
 		if err := os.Rename(tmp, f); err != nil {
+			os.Rename(f+".prev", f)
 			return nil, err
 		}
+		j.prev = append(j.prev, f)
 		s.mu.Lock()
 		j.Changes += c.Size()
 		s.mu.Unlock()
@@ -496,12 +538,16 @@ func (s *Service) setProgress(j *Job, p Progress) {
 
 func (s *Service) run(ctx context.Context, j *Job) {
 	err := s.record(ctx, j)
+	j.settle(err == nil)
 	now := time.Now().UTC()
 	s.mu.Lock()
 	j.Finished = &now
 	if errors.Is(err, ErrUpToDate) {
 		j.Progress = Progress{Phase: "Already up to date", Fraction: 1}
 		s.mu.Unlock()
+		if s.UpToDate != nil {
+			s.UpToDate(*j)
+		}
 		return
 	}
 	if err != nil {
@@ -552,6 +598,13 @@ func (s *Service) record(ctx context.Context, j *Job) error {
 	if err != nil {
 		return err
 	}
+	s.mu.RLock()
+	cur, drop := s.cur, s.MaxDrop
+	s.mu.RUnlock()
+	if err := checkDrop(j, cur, st, drop); err != nil {
+		removeStore(path)
+		return err
+	}
 	ns, err := Open(path)
 	if err != nil {
 		removeStore(path)
@@ -571,6 +624,24 @@ func (s *Service) record(ctx context.Context, j *Job) error {
 			old.Close()
 			removeStore(oldPath)
 		}()
+	}
+	return nil
+}
+
+// checkDrop refuses an update that lost too much: a damaged or truncated change file shows as roads or
+// addresses gone, and a dispatch map should not lose them overnight without anyone deciding so.
+func checkDrop(j *Job, cur *Store, st Stats, maxDrop float64) error {
+	if !j.Update || cur == nil || maxDrop <= 0 {
+		return nil
+	}
+	for _, c := range []struct {
+		what     string
+		old, new int64
+	}{{"road segments", cur.Stats.RoadSegments, st.RoadSegments}, {"addresses", cur.Stats.Addresses, st.Addresses}} {
+		if c.old > 0 && float64(c.new) < float64(c.old)*(1-maxDrop) {
+			return fmt.Errorf("the updated map has %d %s where the map in use has %d (more than %.0f%% fewer): kept the map in use",
+				c.new, c.what, c.old, maxDrop*100)
+		}
 	}
 	return nil
 }

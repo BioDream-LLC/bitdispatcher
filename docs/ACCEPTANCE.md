@@ -46,3 +46,12 @@ gate.
 | 6 Duty and staffing | browser: wishes.spec "staffing"; Go: `TestStaffingAndQualifications` |
 | 7 Qualifications and special teams | Go: `TestStaffingAndQualifications` |
 | 8 Keys and commands | see update 8 above |
+
+## Continuity and overflow (asked for 26 October 2026)
+
+| Item | Built | Evidence | Not yet shown |
+|---|---|---|---|
+| Scheduled map updates | Off, daily or weekly at an hour in the agency's time zone; built beside the map in use, switched only when complete and not more than 10% (configurable) fewer road segments or addresses; extract restored on failure; overlap and no internet skip to the next window; ledger and supervisor message on failure; last and next run shown | Go: `TestUpdateFailuresKeepTheMap` (corrupt file, no internet, roads lost), `TestUpdateRefusedWhileRunning`, `TestContinuity` (once per window); browser: continuity.spec "scheduled map updates" | A real weekly run against Geofabrik over weeks |
+| Internet outage | Internet checks, BitVoice, sites and neighbours watched; changes in the ledger; red or amber chip on every console with what still works; supervisors told; continuity pack written to folders on a schedule | Go: `TestContinuity`; browser: continuity.spec "the move to the backup site" (pack contents) | A real line cut at a centre |
+| Building lost | Backup site as a second bitdispatcher site (existing active-active sites); relocation declared by a supervisor, shown at every site, checklist ticked and recorded | Go: `TestContinuity`, `TestTwoSitesOverHTTPS`; browser: continuity.spec | A real move between two buildings |
+| Overflow to a neighbouring centre | Per neighbour in the GUI: ask, help, accept on our own, dispatch, agencies, call types, certificate pin; ask, accept or decline, end; calls taken become the asking centre's incidents; notes, units, status and close come back; undelivered calls kept and retried; nothing else crosses | Go: `TestOverflowBetweenTwoCentres` (two centres over HTTPS); browser: continuity.spec "overflow" (one server as its own neighbour, pinned) | Two centres on different networks; the 911 authority's alternate routing, which moves the 911 calls |

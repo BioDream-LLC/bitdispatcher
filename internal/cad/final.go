@@ -20,22 +20,24 @@ type finalState struct {
 	CriticalCases map[string]*CriticalCase    `json:"criticalCases"`
 	PhraseAlerts  []*PhraseAlert              `json:"phraseAlerts"`
 	KeyTests      map[string]*KeyTest         `json:"keyTests"` // by workstation or console
-	lxCount       int
-	rqCount       int
-	rtCount       int
-	fuCount       int
-	crCount       int
-	paCount       int
+	continuityState
+	lxCount int
+	rqCount int
+	rtCount int
+	fuCount int
+	crCount int
+	paCount int
 }
 
 func (s *State) initFinal() {
 	s.LocExceptions, s.Flags, s.Requests = map[string]*LocException{}, map[string]*Flag{}, map[string]*Request{}
 	s.Followups, s.ShiftReports, s.ShiftNotes = map[string]*TrackedFollowup{}, map[string][]*ShiftReport{}, []ShiftNote{}
 	s.CriticalCases, s.PhraseAlerts, s.KeyTests = map[string]*CriticalCase{}, []*PhraseAlert{}, map[string]*KeyTest{}
+	s.initContinuity()
 }
 
 func (s *State) applyFinal(e ledger.Event) (bool, error) {
-	for _, f := range []func(ledger.Event) (bool, error){s.applyPlaces, s.applyFlags, s.applyRequests, s.applyTowDetail, s.applyShift, s.applyCritical, s.applyKeyTests} {
+	for _, f := range []func(ledger.Event) (bool, error){s.applyPlaces, s.applyFlags, s.applyRequests, s.applyTowDetail, s.applyShift, s.applyCritical, s.applyKeyTests, s.applyContinuity} {
 		if ok, err := f(e); ok {
 			return true, err
 		}

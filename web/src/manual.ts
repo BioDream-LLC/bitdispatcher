@@ -14,11 +14,11 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
-    ids: ['transcript', 'translation', 'caller-location', 'location-link', 'grouping', 'nonemergency', 'admin-intake', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'tdos', 'hooks'] },
+    ids: ['transcript', 'translation', 'caller-location', 'location-link', 'grouping', 'nonemergency', 'admin-intake', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'continuity', 'overflow', 'tdos', 'hooks'] },
   { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports, papers to serve and alerts to the public.',
     ids: ['alarms', 'admin-personnel', 'staffing', 'admin-qualifications', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'admin-roads', 'admin-cameras', 'admin-alarms', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
-    ids: ['self-service', 'admin-setup', 'admin-golive', 'admin-support', 'admin-agencies', 'admin-operations', 'admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
+    ids: ['self-service', 'admin-setup', 'admin-golive', 'admin-support', 'admin-agencies', 'admin-operations', 'admin-units', 'admin-stations', 'admin-facilities', 'admin-calltypes', 'admin-plans', 'admin-map', 'admin-gis', 'admin-settings', 'admin-integrations', 'bitvoice', 'admin-users', 'admin-workstations', 'admin-sites', 'admin-continuity', 'admin-premises', 'admin-migrate', 'admin-guidance', 'admin-protocols', 'help'] },
 ]
 
 export const manual: Article[] = [
@@ -546,7 +546,7 @@ An agency moving from PremierOne can choose this profile as a starting point and
 
 - **Send**: on an open incident, **Send to a neighbouring agency…**, choose the agency and say why (*mutual aid, need a ladder*; *on your side of the line*). It goes with the location, the callback, our units on it and the notes; the timeline says it was sent.
 - **Receive**: what a neighbour sends arrives in the 911 calls list as a call from that agency, data only, with their incident number, type and notes. Make the incident from it or attach it as from any call.
-- Each send is a press: closing and unit status do not flow back on their own yet.`,
+- Each send is a press: closing and unit status do not flow back on their own here. For a neighbour that also runs bitdispatcher, [overflow](#overflow) goes further: they take calls for us, and what becomes of each comes back to them.`,
   },
   {
     id: 'station', title: 'The station screen and toning out', route: '/station', keys: 'station alerting tone out tones firehouse quarters voice alert speaker phoenix locution acknowledge',
@@ -763,6 +763,12 @@ Configuration changes can be drafted on the training board, tried there, and **p
 
 **Bring up to date** applies OpenStreetMap's daily change files (Geofabrik publishes one a day per extract) since the map was recorded: a few megabytes instead of the whole extracts, then the store is built again. Record again for a new area, or when the map is more than a year behind; downloads already made are checked against their published checksums and reused.
 
+## Automatic updates
+**Automatic updates** does the same on a schedule: off, daily or weekly, at the hour you choose, in the agency's time zone (Admin › Call entry rules › operational periods).
+- The new map is built beside the one in use, which keeps working the whole time. It is switched to only when it is complete and has not lost more than the percentage you set (10 by default) of its road segments or addresses; a damaged change file shows as roads gone, and is refused.
+- A run that fails, has no internet, or finds a recording already under way leaves the map in use as it was, and the next window tries again. A failed scheduled run messages the supervisors and administrators.
+- Each run is in the ledger. The panel shows the next run and the last one's outcome, and so does the [Continuity](#continuity) page.
+
 ## Aerial photos
 Below the map, **Aerial photos** records photos around the same centre: full detail within the radius you choose (zoom 19: rooftops and cars) and less out to the edge (zoom 16). The estimate (tiles, size, time) follows the form; tiles already recorded are skipped, so a stopped recording carries on where it was. The sources and their terms are listed: VGIN's Virginia Base Mapping Program for Virginia, USGS The National Map (NAIP, public domain) elsewhere.`,
   },
@@ -889,6 +895,29 @@ Passwords are generated or at least 12 characters. Five wrong passwords lock an 
 - **Setting up**: give this site a name and prefix and save; copy its token and certificate fingerprint to the other sites. Add each other site with its address, its token and its fingerprint (**Read it** reads the certificate; check it against the one shown on that site). The status bar shows how many sites are linked.
 
 > A site's name and prefix are written into every event it makes, so they cannot change once in use.`,
+  },
+  {
+    id: 'admin-continuity', title: 'Admin: continuity and overflow', route: '/admin/continuity', keys: 'continuity internet check checklist contacts continuity pack folder overflow neighbour partner ask help accept dispatch call types agencies certificate fingerprint',
+    body: `What the [Continuity](#continuity) and [Overflow](#overflow) pages use.
+
+## Internet checks
+Up to 10 https addresses bitdispatcher asks every 30 seconds (10 to 600); any one answering means the internet works. Choose ones the centre relies on: the state message switch's portal, the paging provider, a large public site. With none set, the consoles cannot say whether the internet is up; BitVoice, the other sites and the overflow neighbours are checked anyway.
+
+## Moving to the backup site
+- **Checklist**: one step a line, ticked on the Continuity page when the centre moves.
+- **Contacts**: the backup site, the neighbours, the phone company, the 911 authority; printed on the continuity pack.
+
+## Continuity pack
+How often it is written (1 to 240 minutes, or not on a schedule) and up to 5 folders, as full paths, beside the data directory. Files are readable by the server's account only.
+
+## Overflow
+First add the neighbour in Admin › Integrations › Neighbouring agencies, with its CAD's address (https://their-cad/api/cad/eido/(the ID they gave us)) and a token each way; if their certificate is their own rather than from an authority, add its SHA-256 fingerprint to pin it. Then, for each neighbour:
+- **We may ask them to take our calls**, and **they may assign our units** while they do.
+- **We take their calls when they ask**, and **accept their requests on our own** for an agreement that says yes in advance.
+- **Our agencies** they may take calls for (empty: all; with one, their calls are its incidents and only its units are shared), and **call types** they may use (empty: all).
+- **An overflow lasts** 240 minutes unless set otherwise or ended.
+
+> Agree overflow in writing with the neighbour, and with the 911 authority, which sets up the phone network's alternate routing that sends the 911 calls over.`,
   },
   {
     id: 'admin-premises', title: 'Premises and hazards', route: '/admin/premises', keys: 'premise premises hazard hazards caution officer safety knox box dog oxygen contacts key holder',
@@ -1286,7 +1315,50 @@ Each incident gets a score over the checks that applied; the page lists them for
 
 - **Offline log**: new incidents, notes and unit statuses are kept in this browser, in order.
 - When the server is back the bar offers **Send them now**: each goes in marked "entered offline at 14:02 by jlee"; anything the server refuses stays, with the reason.
-- For a server that never goes away, run bitdispatcher at two sites ([Several sites](#admin-sites)): each keeps working when the other is cut off.`,
+- For a server that never goes away, run bitdispatcher at two sites ([Several sites](#admin-sites)): each keeps working when the other is cut off.
+- When the internet, rather than the server, is gone, or the centre has to leave its building, see [Continuity](#continuity).`,
+  },
+  {
+    id: 'continuity', title: 'Continuity: outages and the backup site', route: '/continuity', keys: 'continuity outage internet down backup site relocation evacuate coop checklist continuity pack paper links survivability',
+    body: `The **Continuity** page (the life-ring button in the status bar, or a chip there when something is wrong) is what keeps the centre working when a link or the building is lost.
+
+## When the internet goes
+bitdispatcher runs on the centre's own server, so losing the internet does not stop dispatch. Call entry, incidents, units, the recorded street map, routing and addresses, the ledger and printing keep working.
+- What waits for the internet: online map tiles, Street View and aerial photos not recorded, traffic, map updates, neighbouring centres and overflow, NERIS, PSC PIP, and BitVoice or paging when they are reached over the internet.
+- bitdispatcher checks the addresses an administrator sets ([Admin › Continuity](#admin-continuity)), BitVoice, the other sites and each overflow neighbour. When none of the internet checks answers, every console shows **Internet down** in red and the supervisors get a message; another link down shows as an amber chip.
+- Each link going down and coming back is in the ledger; the page lists the links and the outages.
+
+## Moving to the backup site
+When the centre has to leave its building, staff go to the backup site: a second bitdispatcher site the county owns or runs in the cloud ([Several sites](#admin-sites)). It already holds every record, so work carries on from where it was.
+1. At the backup site, a supervisor presses **We are working from the backup site**, with a note. Every console at every site shows **At backup site**, and everyone on duty gets a message.
+2. The checklist set in Admin › Continuity is ticked as it is done (rerouting 911, radio control stations, telling the field); each tick is in the ledger.
+3. Back home, **We are back in our building** ends it.
+
+> The 911 calls reach the backup site only when the phone network sends them there: the 911 authority's alternate routing, or BitVoice's routing in NG911. bitdispatcher cannot move the calls itself.
+
+## The continuity pack
+**Open to print** gives a page of the open incidents (with callers' names and callbacks), every unit and its status, the checklist, the contacts and blank log lines, for working on paper if the CAD cannot be reached at all. It can be written on a schedule to folders an administrator sets: a shared drive or a USB disk on another machine keeps a recent copy if this server is lost. Treat printed copies as records.`,
+  },
+  {
+    id: 'overflow', title: 'Overflow to a neighbouring centre', route: '/overflow', keys: 'overflow overwhelmed surge neighbour neighbouring county centre psap mutual aid take calls help federate backup',
+    body: `When the centre is overwhelmed, or out of its building, a neighbouring centre that also runs bitdispatcher can take its calls; and this centre can take theirs. It is set up for each neighbour in [Admin › Continuity](#admin-continuity), after both centres agree it in writing.
+
+## Asking for help
+1. On the **Overflow** page a supervisor presses **Ask (neighbour) to take our calls**, says why and for how long (4 hours unless set otherwise).
+2. The neighbour's supervisor accepts or declines; a neighbour whose settings accept on their own starts at once. Both centres' status bars show it: *(neighbour) is taking our calls*.
+3. Each call they take becomes an incident here, under our numbers and call types, marked **Taken for us by (neighbour)** with their call taker's name. Our dispatchers send our units, unless we let the neighbour assign them too.
+4. A supervisor at either centre presses **End** when it is over.
+
+## Taking calls for a neighbour
+While it lasts, the Overflow page shows **Take a call for (neighbour)**: the location, their call type, the caller, the callback and what happened. **Send** makes the incident in their CAD and shows its number.
+- What becomes of the call comes back: its status, the units on it, their notes and the close. Notes added here go to them.
+- If they let us, **Their units** lists their available units to assign.
+- If their CAD cannot be reached, the call is kept here and sent again every 20 seconds; tell them by radio or phone if it is urgent.
+
+## What crosses
+Only the calls the neighbour takes, and what becomes of those: no other incidents, no records, no person history, no NCIC returns. Every request, answer, call, note and assignment is in both centres' ledgers.
+
+> The 911 calls themselves reach the neighbour by the phone network's alternate routing, which the 911 authority sets up, or by BitVoice's routing in NG911. Overflow carries the work, not the calls.`,
   },
   {
     id: 'tdos', title: 'Line attacks (TDoS)', keys: 'tdos denial of service flood robocall repeat caller silent calls attack',

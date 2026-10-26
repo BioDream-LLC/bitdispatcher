@@ -198,8 +198,6 @@ if [ "$(api GET /state | jq '[.settings.markOuts[] | select(.maxMinutes)] | leng
   S=$(api GET /state | jq -c '.settings | .markOuts = [.markOuts[] | if .code == "MEAL" then .maxMinutes = 45 elif .code == "FUEL" then .maxMinutes = 20 else . end]')
   api PUT /admin/settings "$S" >/dev/null || true
 fi
-api POST /auth/logout '{}' >/dev/null || true
-echo "demo ready"
 # The final round, seeded once: operational periods in the demo's time zone, critical-incident rules and
 # alert phrases (live, so visitors see an alert), and two flags at a demo address (one for the whole
 # complex, one for a single apartment).
@@ -218,3 +216,14 @@ if [ "$(api GET /state | jq -r '.settings.shift.timeZone // ""')" = "" ]; then
   api PUT /flags '{"category":"dangerous-animal","title":"Two large dogs in apartment 204","warning":"Demo: two large dogs, aggressive with strangers","instruction":"Ask the caller to secure the dogs before entry","severity":"high","source":"demo data","scope":{"address":"1210 WILLIAMSON RD NE","lat":37.2885,"lon":-79.9395,"verified":true,"complex":"Williamson Court (demo)","building":"B","unit":"204"},"conflictOk":true}' >/dev/null || true
   echo "seeded shift periods, critical rules and phrases, and demo flags"
 fi
+# Continuity, seeded once: two internet checks, a relocation checklist and contacts, the continuity pack
+# every 15 minutes. Map updates stay off on the demo (a rebuild of the 100-mile map is heavy for it).
+if [ "$(api GET /state | jq '.settings.continuity.checks // [] | length')" = "0" ]; then
+  S=$(api GET /state | jq -c '.settings | .continuity = {"checks":[{"name":"OpenStreetMap downloads","url":"https://download.geofabrik.de/"},{"name":"BitVoice demo","url":"https://demo.bitvoice.org/"}],
+    "steps":["Call the 911 authority to reroute 911 to the backup site","Sign in at the backup site consoles","Check the radio control stations at the backup site","Tell field units by radio: dispatch is at the backup site","Post a supervisor at the main centre door"],
+    "contacts":["Backup site (demo): 540-555-0199","911 authority (demo): 540-555-0142","Neighbouring centre (demo): 540-555-0188"],"packMinutes":15}')
+  api PUT /admin/settings "$S" >/dev/null || true
+  echo "seeded continuity checks, checklist and contacts"
+fi
+api POST /auth/logout '{}' >/dev/null || true
+echo "demo ready"

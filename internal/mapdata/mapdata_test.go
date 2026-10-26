@@ -379,3 +379,111 @@ func (r rewrite) RoundTrip(req *http.Request) (*http.Response, error) {
 	req2.URL, req2.Host = u, u.Host
 	return http.DefaultTransport.RoundTrip(req2)
 }
+
+// updateSetup records the test town with a replication header and returns a service whose requests go
+// to h, standing in for Geofabrik.
+func updateSetup(t *testing.T, h http.HandlerFunc) (*Service, string) {
+	t.Helper()
+	ts := httptest.NewServer(h)
+	t.Cleanup(ts.Close)
+	dir := t.TempDir()
+	pbf := filepath.Join(dir, "osm", "town.osm.pbf")
+	os.MkdirAll(filepath.Dir(pbf), 0o700)
+	if err := osm.Apply(town(t), pbf, osm.NewChange(), osm.Header{Sequence: 10, BaseURL: "https://download.geofabrik.de/x-updates"}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(context.Background(), filepath.Join(dir, "map-1.db"), testArea, []string{pbf}, "test", nil); err != nil {
+		t.Fatal(err)
+	}
+	s := NewService(dir, "test", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s.Client = &http.Client{Transport: rewrite{to: ts.URL}}
+	return s, pbf
+}
+
+func finish(t *testing.T, s *Service) *Job {
+	t.Helper()
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if j := s.Job(); j != nil && j.Finished != nil {
+			return j
+		}
+	}
+	t.Fatal("the update did not finish")
+	return nil
+}
+
+func gzipped(s string) []byte {
+	var b bytes.Buffer
+	zw := gzip.NewWriter(&b)
+	zw.Write([]byte(s))
+	zw.Close()
+	return b.Bytes()
+}
+
+func TestUpdateFailuresKeepTheMap(t *testing.T) {
+	state := "sequenceNumber=11\ntimestamp=2026-10-18T20\\:21\\:46Z\n"
+	cases := []struct {
+		name string
+		h    http.HandlerFunc
+		drop float64
+		want string
+	}{
+		{"corrupt change file", func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "state.txt") {
+				fmt.Fprint(w, state)
+				return
+			}
+			w.Write([]byte("this is not gzip"))
+		}, 0, "011.osc.gz"},
+		{"no internet", func(w http.ResponseWriter, r *http.Request) {
+			// The connection is dropped, as when the line is down.
+			hj, _ := w.(http.Hijacker)
+			c, _, _ := hj.Hijack()
+			c.Close()
+		}, 0, "is the internet down?"},
+		{"roads lost", func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "state.txt") {
+				fmt.Fprint(w, state)
+				return
+			}
+			w.Write(gzipped(`<osmChange><delete><way id="101"/><way id="102"/><way id="103"/></delete></osmChange>`))
+		}, 0.1, "kept the map in use"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s, pbf := updateSetup(t, c.h)
+			s.MaxDrop = c.drop
+			before := s.Store()
+			failed := false
+			s.Failed = func(Job) { failed = true }
+			if err := s.Update("schedule"); err != nil {
+				t.Fatal(err)
+			}
+			j := finish(t, s)
+			if !strings.Contains(j.Error, c.want) || !failed {
+				t.Fatalf("job error %q (failed callback %v), want %q", j.Error, failed, c.want)
+			}
+			if s.Store() != before {
+				t.Fatal("the map in use was replaced")
+			}
+			if h, _ := osm.ReadHeader(pbf); h.Sequence != 10 {
+				t.Fatalf("the extract moved on to %d after a failed update", h.Sequence)
+			}
+			if _, err := os.Stat(pbf + ".prev"); err == nil {
+				t.Fatal("the old extract was left as .prev")
+			}
+		})
+	}
+}
+
+func TestUpdateRefusedWhileRunning(t *testing.T) {
+	release := make(chan struct{})
+	s, _ := updateSetup(t, func(w http.ResponseWriter, r *http.Request) { <-release; http.NotFound(w, r) })
+	if err := s.Update("schedule"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update("schedule"); err == nil {
+		t.Fatal("a second update started while one was running")
+	}
+	close(release)
+	finish(t, s)
+}

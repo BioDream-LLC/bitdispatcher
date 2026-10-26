@@ -41,7 +41,7 @@ var groups = []group{
 	{"records", "Records", "Reports, inquiries and the record afterwards", []string{
 		"nibrs-reporting", "neris-and-nemsis", "ncic", "records-requests"}},
 	{"platform", "Platform", "What keeps it running, honest and changeable", []string{
-		"event-ledger", "security", "active-active-sites", "scripts-and-advisories", "training-and-staged-changes", "responder-wellbeing", "migration", "self-service-setup"}},
+		"event-ledger", "security", "active-active-sites", "continuity-and-overflow", "scripts-and-advisories", "training-and-staged-changes", "responder-wellbeing", "migration", "self-service-setup"}},
 }
 
 // arts is every article in group order, and bySlug finds one.

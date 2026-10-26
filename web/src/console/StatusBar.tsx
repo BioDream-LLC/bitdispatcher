@@ -15,6 +15,7 @@ import { SearchButton } from './Search'
 import { UnitRecallHost } from './UnitRecall'
 import { WorkingAgency } from './Coverage'
 import { Users2 } from 'lucide-react'
+import { ContinuityChips } from '../continuity/Chips'
 
 const THEMES = ['midnight', 'dark', 'night', 'light'] as const
 
@@ -138,6 +139,7 @@ export default function StatusBar({ view, screen = 'full', onScreens, layout }: 
         )}
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        <ContinuityChips view={view} />
         <Health
           ok={stream === 'live'}
           icon={<Activity size={12} aria-hidden />}

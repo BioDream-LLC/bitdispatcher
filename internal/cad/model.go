@@ -486,6 +486,10 @@ type Settings struct {
 	Requests RequestPolicy  `json:"requests,omitzero"`
 	Shift    ShiftPolicy    `json:"shift,omitzero"`
 	Critical CriticalPolicy `json:"critical,omitzero"`
+	// Continuity: when the map updates itself, the links watched, the relocation checklist, the
+	// continuity pack and overflow to neighbours (continuity.go).
+	MapUpdates MapSchedule      `json:"mapUpdates,omitzero"`
+	Continuity ContinuityPolicy `json:"continuity,omitzero"`
 }
 
 // NextSettings are the settings of the features added after the October 2026 competitor review.

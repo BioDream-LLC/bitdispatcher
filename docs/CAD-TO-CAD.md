@@ -30,6 +30,7 @@ attach. The same incident sent again updates the same call. A wrong token or an 
 ## What is not done yet
 
 - Updates do not flow back on their own; each send is a press. Closing, unit status and comments are not
-  exchanged continuously.
+  exchanged continuously. Between two centres that both run bitdispatcher, overflow (docs/CONTINUITY.md)
+  does exchange them, for the calls one centre takes for the other.
 - bitdispatcher's EIDO has been checked against its own reader and the EIDOs BitVoice writes; it has not
   been tested against another vendor's CAD.

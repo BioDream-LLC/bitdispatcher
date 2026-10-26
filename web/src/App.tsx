@@ -33,6 +33,8 @@ const PageReply = lazy(() => import('./PageReply'))
 const Staffing = lazy(() => import('./console/Staffing'))
 const Supervisor = lazy(() => import('./super/Supervisor'))
 const Requests = lazy(() => import('./requests/Requests'))
+const Continuity = lazy(() => import('./continuity/Continuity'))
+const Overflow = lazy(() => import('./continuity/Overflow'))
 
 const wait = (what: string) => <div className="grid h-full place-items-center text-sm text-slate-500">Loading {what}…</div>
 
@@ -97,6 +99,8 @@ export default function App() {
           <Route path="/staffing" element={<Suspense fallback={wait('staffing')}><Staffing /></Suspense>} />
           <Route path="/supervisor" element={<Suspense fallback={wait('the supervisor review')}><Supervisor /></Suspense>} />
           <Route path="/requests" element={<Suspense fallback={wait('the requests')}><Requests /></Suspense>} />
+          <Route path="/continuity" element={<Suspense fallback={wait('continuity')}><Continuity /></Suspense>} />
+          <Route path="/overflow" element={<Suspense fallback={wait('overflow')}><Overflow /></Suspense>} />
           <Route path="/review/:number" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading the review…</div>}><Review /></Suspense>} />
           <Route path="/records" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />
           <Route path="/records/:id" element={<Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500">Loading records…</div>}><Records /></Suspense>} />

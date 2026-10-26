@@ -149,14 +149,17 @@ Where something has been tested only against simulators or sample data rather th
 - Breaks and workload on the supervisor board, with who is free to relieve; a quality review of every incident against the centre's standards and the questions heard on the transcript.
 - A training environment with scripted scenarios on the agency's own map and units, scored, never touching the live board; shared exercises where everyone who joins works one board while an instructor injects callers, location changes and radio traffic; configuration changes tried on a training board and published to the live one with a reason.
 - Working through an outage from the last board with an offline log sent when the server is back, and a warning of telephony denial-of-service floods.
+- Continuity: the internet, BitVoice, the other sites and the neighbours watched, with every console told what still works when one is down; the move to the backup site declared and its checklist worked; a printable continuity pack of the open work written on a schedule to folders that outlive the server.
 
 **Working with others**
 - Incidents sent to and received from neighbouring agencies' CADs as NENA EIDOs, each agency with its own address and tokens; what arrives is a call in the queue.
+- Overflow between centres that both run bitdispatcher: an overwhelmed centre asks, the neighbour's supervisor accepts, and the neighbour's call takers take its calls as incidents in its own CAD, under its numbers; status, units, notes and the close come back for those calls only, and the neighbour may assign its units if allowed. Every option is set per neighbour in the web interface.
 - A public incident feed for a website or apps such as PulsePoint: hundred-block addresses, points to about 100 m, never callers or notes; off until turned on.
 
 **Built to keep running**
 - An append-only, SHA-256 hash-chained event ledger, verified and searched from the browser.
 - Several sites active-active, each keeping a verified copy of the others' ledgers; each keeps working when cut off.
+- The recorded map brings itself up to date daily or weekly, building the new map beside the one in use and switching only when it is complete and has not lost roads or addresses.
 - Migration of an earlier CAD's premises, history and run cards from its CSV exports.
 - The manual built in: Help on every screen, served at `/manual` and printed as a PDF.
 
@@ -250,6 +253,7 @@ With [BitVoice](https://bitvoice.org) it also uses BitVoice's live event stream 
 - **The operational updates (agencies, presets and views, working calls, messages and BOLOs, search and recall, staffing and qualifications, keys and one-line commands)** are tested in the Go suites and in the browser against the built-in simulators; the attachment virus scan was run against ClamAV 1.5.4's clamd with its full signatures (a clean file passes, the standard EICAR test file is refused on both kinds of upload); the agency-scoped board is tested through the API; the mobile terminal's messages and BOLOs (tone, open and acknowledgement by the crew) are tested in the browser; the priority tones are measured as rendered by Chromium's audio engine (rhythm, level, no clipping) and have not been judged by ear on a dispatch floor; OCR was checked with Tesseract 4 on a rendered plate picture, and PDF text on a Chrome-made PDF. The classic key layout follows PremierOne's documented defaults; it is not a Motorola product or certified by Motorola.
 - **The October 2026 additions (road closures and live traffic, cameras near an incident, location links, alarm companies and permits, twelve more phrasebook languages, the non-emergency intake)** are tested in the Go suites, through the API against stand-ins (a stand-in Waze for Cities feed, a stand-in camera's picture, a stand-in bot on the intake) and in the browser (an emulated phone sharing its location, the alarm card, the intake try-out, a camera opened with its reason). Not yet against a real Waze feed, camera system, central station, voice bot or phone on a carrier network; the phrasebooks were written by machine and have not been checked by native speakers.
 - **The final round (structured places and location exceptions, flags, persons and vehicles, the request queue and hit confirmation, Street View, the key test, the supervisor review, Shift Intelligence, critical reviews, PSC PIP)** is tested in the Go suites, through the API and in the browser against the built-in NCIC training simulator. Not yet against a live switch or DMV, a real PSC PIP system (a local test receiver only), Google Street View with an agency key, or the reviewer's own laptops and keyboards. Where each requirement stands, with its tests: [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md).
+- **Continuity and overflow** (link watch, the backup site and its checklist, the continuity pack, scheduled map updates, overflow between centres) are tested in Go (two centres over HTTPS for overflow; a stand-in change-file server for map updates: success, a corrupt file, no internet, lost roads, overlap) and in the browser (the test server as its own neighbour, its certificate pinned). Not yet between two centres on different networks, or with a 911 authority's alternate routing, which is what moves the 911 calls themselves. See [docs/CONTINUITY.md](docs/CONTINUITY.md).
 - **Self-service setup** (the setup checklist, the go-live check, the support bundle) is tested in Go (the checklist follows the configuration, the go-live check writes only its own result and leaves no test incident, the bundle holds none of a set of planted secrets, numbers, addresses and usernames) and in the browser. No agency has yet set bitdispatcher up by itself from start to finish.
 - **Open decisions:** when an ALI-only call (no hang-up signal) should end; whether agency scripts may reach outside the sandbox; VGIN's terms for its data outside Virginia.
 
@@ -291,6 +295,7 @@ One article for each technology inside bitdispatcher: what it is, the standard b
 | [**Event ledger**](https://bitdispatcher.com/tech/event-ledger/) | An append-only, SHA-256 hash-chained record of every action, so the day cannot be quietly rewritten. |
 | [**Security**](https://bitdispatcher.com/tech/security/) | How a CAD is secured: duty-based access, enrolled workstations, one-time codes, a hash-chained audit ledger and scanned attachments. |
 | [**Active-active sites**](https://bitdispatcher.com/tech/active-active-sites/) | Several sites all live at once, each holding a verified copy of the others' ledgers, each able to keep dispatching alone through an outage. |
+| [**Continuity and overflow**](https://bitdispatcher.com/tech/continuity-and-overflow/) | Working through a lost internet link or a lost building, and a neighboring center taking calls as incidents in your own CAD when you are overwhelmed. |
 | [**Scripts and advisories**](https://bitdispatcher.com/tech/scripts-and-advisories/) | Sandboxed agency scripts in JavaScript and Lua, and an advisory panel of deterministic rules from a versioned codebook, tested first. |
 | [**Training and staged changes**](https://bitdispatcher.com/tech/training-and-staged-changes/) | A scored training board on the agency's own map, instructor-led exercises, and config changes tried on a training board before publishing. |
 | [**Responder wellbeing**](https://bitdispatcher.com/tech/responder-wellbeing/) | Critical calls put everyone who worked them on the supervisor's care list for a break and a debrief, with workload and quality on the board. |
@@ -307,6 +312,7 @@ One article for each technology inside bitdispatcher: what it is, the standard b
 | [**BitVoice**](docs/BITVOICE.md) | Every BitVoice hook and how bitdispatcher uses it |
 | [**Acceptance**](docs/ACCEPTANCE.md) | Where each requested feature stands and which test shows it |
 | [**PSC PIP**](docs/PSC-PIP.md) | The optional PSC PIP connection: what crosses and what never does |
+| [**Continuity**](docs/CONTINUITY.md) | Outages, the backup site, the continuity pack, scheduled map updates, and overflow between centres |
 | [**Compliance**](docs/COMPLIANCE.md) | What can be certified, the CJIS control areas, what bitdispatcher does and the gaps |
 | [**Integrations**](docs/) | Alerts, CAD-to-CAD, station alerting, protocols, the public feed, supplemental location, NERIS, views |
 

@@ -501,6 +501,9 @@ func (s *Server) mapRecord(w http.ResponseWriter, r *http.Request, se *auth.Sess
 }
 
 func (s *Server) mapUpdate(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
+	var drop float64
+	s.Eng.Read(func(st *cad.State) { drop = st.Settings.MapUpdates.MaxDrop() })
+	s.Maps.SetMaxDrop(drop)
 	if err := s.Maps.Update(a.User); err != nil {
 		fail(w, http.StatusConflict, err.Error())
 		return

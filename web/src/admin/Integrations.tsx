@@ -541,19 +541,19 @@ function NERISSettings() {
   )
 }
 
-type PV = { id: string; name: string; url: string; outTokenSet: boolean; inTokenSet: boolean; receive: string }
+type PV = { id: string; name: string; url: string; outTokenSet: boolean; inTokenSet: boolean; receive: string; fingerprint?: string }
 
 // Partners: neighbouring agencies' CADs, for sending and receiving incidents (CAD-to-CAD, as EIDOs).
 function Partners() {
   const [list, setList] = useState<PV[]>([])
-  const [d, setD] = useState({ id: '', name: '', url: '', outToken: '', inToken: '' })
+  const [d, setD] = useState({ id: '', name: '', url: '', outToken: '', inToken: '', fingerprint: '' })
   const load = () => api.get<PV[]>('/admin/partners').then(setList).catch((e) => toast.error(errText(e)))
   useEffect(() => { load() }, [])
   const save = async () => {
     try {
       await api.put(`/admin/partners/${encodeURIComponent(d.id)}`, d)
       toast.success('Saved')
-      setD({ id: '', name: '', url: '', outToken: '', inToken: '' })
+      setD({ id: '', name: '', url: '', outToken: '', inToken: '', fingerprint: '' })
       load()
     } catch (e) {
       toast.error(errText(e))
@@ -569,18 +569,19 @@ function Partners() {
             <span className="font-mono font-bold text-slate-100">{p.id}</span><span className="text-slate-200">{p.name}</span>
             <span className="truncate font-mono text-[11px] text-slate-500">{p.url || 'no address: receive only'}</span>
             <span className="text-[11px] text-slate-400">they send to <Copyable text={location.origin + p.receive} /> {p.inTokenSet ? '' : '(no token yet: refused)'}</span>
-            <button className="btn btn-ghost ml-auto h-6 text-xs" onClick={() => setD({ id: p.id, name: p.name, url: p.url, outToken: '', inToken: '' })}>Change</button>
+            <button className="btn btn-ghost ml-auto h-6 text-xs" onClick={() => setD({ id: p.id, name: p.name, url: p.url, outToken: '', inToken: '', fingerprint: p.fingerprint ?? '' })}>Change</button>
             <button className="btn btn-ghost h-6 text-xs" onClick={async () => { if (confirm(`Remove ${p.name}?`)) { await api.del(`/admin/partners/${p.id}`).catch((e) => toast.error(errText(e))); load() } }}>Remove</button>
           </li>
         ))}
         {!list.length && <li className="text-xs text-slate-500">No neighbouring agencies yet.</li>}
       </ul>
-      <div className="grid gap-2 md:grid-cols-5">
+      <div className="grid gap-2 md:grid-cols-6">
         <Field label="ID" htmlFor="pid"><input id="pid" className="input font-mono uppercase" value={d.id} onChange={(e) => setD({ ...d, id: e.target.value })} placeholder="FRANKLIN" /></Field>
         <Field label="Name" htmlFor="pnm"><input id="pnm" className="input" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="Franklin County 911" /></Field>
         <Field label="Their CAD's EIDO address" htmlFor="purl"><input id="purl" className="input font-mono" value={d.url} onChange={(e) => setD({ ...d, url: e.target.value })} placeholder="https://cad.franklin.example/…" /></Field>
         <Field label="Token we send" htmlFor="pot" hint="empty keeps it; - clears"><input id="pot" type="password" className="input font-mono" value={d.outToken} onChange={(e) => setD({ ...d, outToken: e.target.value })} autoComplete="new-password" /></Field>
         <Field label="Token they send" htmlFor="pit" hint="empty keeps it; - clears"><input id="pit" type="password" className="input font-mono" value={d.inToken} onChange={(e) => setD({ ...d, inToken: e.target.value })} autoComplete="new-password" /></Field>
+        <Field label="Their certificate (SHA-256)" htmlFor="pfp" hint="For overflow, when their certificate is their own; empty trusts the usual authorities"><input id="pfp" className="input font-mono text-xs" value={d.fingerprint} onChange={(e) => setD({ ...d, fingerprint: e.target.value })} placeholder="optional" /></Field>
       </div>
       <div className="flex justify-end"><button className="btn btn-go" disabled={!d.id || !d.name} onClick={save}><Save size={14} aria-hidden /> Save the agency</button></div>
     </section>

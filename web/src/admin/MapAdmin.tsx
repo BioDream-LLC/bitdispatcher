@@ -5,6 +5,7 @@ import { api, errText } from '../api'
 import { Field } from '../ui'
 import { ago, cx, useNow } from '../util'
 import type { MapExtract, MapInfo, View } from '../types'
+import type { MapSchedule } from '../continuity/types'
 import { Page } from './Admin'
 import PhotosAdmin from './PhotosAdmin'
 
@@ -194,8 +195,68 @@ export default function MapAdmin({ view }: { view: View }) {
             </div>
           )}
         </section>
+        <MapSchedulePanel view={view} />
       </div>
       <PhotosAdmin view={view} />
     </Page>
+  )
+}
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/** MapSchedulePanel: the map brings itself up to date on a schedule. Each run builds a new map beside the
+ * one in use and switches only when the new one is complete and has not lost roads or addresses; a
+ * failure leaves the map in use as it was and tells the supervisors. */
+function MapSchedulePanel({ view }: { view: View }) {
+  const cur = view.settings.mapUpdates ?? {}
+  const [m, setM] = useState<MapSchedule>({ mode: cur.mode || 'off', hour: cur.hour ?? 3, weekday: cur.weekday ?? 0, maxDropPct: cur.maxDropPct ?? 0 })
+  const [busy, setBusy] = useState(false)
+  const auto = view.health.continuity?.mapAuto
+  const save = async () => {
+    setBusy(true)
+    try {
+      await api.put('/admin/settings', { ...view.settings, mapUpdates: { ...m, mode: m.mode === 'off' ? '' : m.mode } })
+      toast.success('Map update schedule saved')
+    } catch (e) {
+      toast.error(errText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const when = (t?: string) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
+  return (
+    <section className="panel space-y-3 rounded-lg p-4" aria-labelledby="map-auto-h">
+      <h2 id="map-auto-h" className="flex items-center gap-2 font-semibold text-slate-100"><RefreshCw size={16} aria-hidden /> Automatic updates</h2>
+      <p className="text-xs text-slate-400">Brings the recorded map up to date from OpenStreetMap's daily change files on a schedule, in the agency's time zone (Admin › Call entry rules › operational periods). The new map is built beside the one in use, which keeps working; it is switched to only when complete and checked. With no internet the run fails, the map in use stays, and the next window tries again.</p>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <Field label="Updates" htmlFor="mau-mode">
+          <select id="mau-mode" className="input" value={m.mode} onChange={(e) => setM({ ...m, mode: e.target.value as MapSchedule['mode'] })}>
+            <option value="off">Off</option><option value="daily">Daily</option><option value="weekly">Weekly</option>
+          </select>
+        </Field>
+        {m.mode === 'weekly' && (
+          <Field label="Day" htmlFor="mau-day">
+            <select id="mau-day" className="input" value={m.weekday} onChange={(e) => setM({ ...m, weekday: Number(e.target.value) })}>
+              {DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
+            </select>
+          </Field>
+        )}
+        {m.mode !== 'off' && (
+          <Field label="Starting at" htmlFor="mau-hour" hint="A quiet hour">
+            <select id="mau-hour" className="input" value={m.hour} onChange={(e) => setM({ ...m, hour: Number(e.target.value) })}>
+              {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+            </select>
+          </Field>
+        )}
+        <Field label="Refuse an update losing more than (%)" htmlFor="mau-drop" hint="Of road segments or addresses; empty for 10">
+          <input id="mau-drop" type="number" min={0} max={90} className="input" value={m.maxDropPct || ''} onChange={(e) => setM({ ...m, maxDropPct: e.target.value === '' ? 0 : Number(e.target.value) })} />
+        </Field>
+      </div>
+      <div className="flex items-center gap-3 text-xs text-slate-400">
+        <button className="btn btn-go" disabled={busy} onClick={save}>Save schedule</button>
+        {auto?.next && <span>Next run {when(auto.next)}.</span>}
+        {auto?.last && <span className={cx(auto.result === 'failed' && 'text-rose-300')}>Last scheduled run {when(auto.last)}: {auto.result}{auto.error ? ` (${auto.error})` : ''}.</span>}
+      </div>
+    </section>
   )
 }

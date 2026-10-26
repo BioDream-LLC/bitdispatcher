@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy, Flag, ShieldQuestion, PhoneIncoming, Waypoints } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy, Flag, ShieldQuestion, PhoneIncoming, Waypoints, ArrowRightLeft } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -41,6 +41,7 @@ import { Agencies } from './Agencies'
 import { OperationsRules } from './OperationsRules'
 import { Qualifications } from './Qualifications'
 import { CallEntryRules, CriticalAdmin, FlagsAdmin, PipAdmin } from './FinalAdmin'
+import { ContinuityAdmin } from './ContinuityAdmin'
 import { useViews, VIEW_OF_PAGE } from '../access'
 
 // Charts are large; they load when the report is opened.
@@ -64,6 +65,7 @@ const PAGES = [
   { to: 'users', label: 'Users & positions', icon: UsersIcon, admin: true },
   { to: 'workstations', label: 'Workstations', icon: MonitorSmartphone, admin: true },
   { to: 'sites', label: 'Sites', icon: Network, admin: true },
+  { to: 'continuity', label: 'Continuity & overflow', icon: ArrowRightLeft, admin: true },
   { to: 'operations', label: 'Operations rules', icon: SlidersHorizontal, admin: true },
   { to: 'personnel', label: 'Personnel & crews', icon: HardHat, admin: false },
   { to: 'qualifications', label: 'Qualifications & teams', icon: BadgeCheck, admin: false },
@@ -152,6 +154,7 @@ export default function Admin() {
             <Route path="callentry" element={<CallEntryRules />} />
             <Route path="critical" element={<CriticalAdmin />} />
             <Route path="pip" element={<PipAdmin />} />
+            <Route path="continuity" element={<ContinuityAdmin view={view} />} />
             <Route path="personnel" element={<Personnel view={view} />} />
             <Route path="paging" element={<Paging view={view} />} />
             <Route path="publicalerts" element={<PublicAlerts view={view} />} />

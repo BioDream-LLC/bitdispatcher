@@ -78,6 +78,8 @@ type Server struct {
 	trees          treeCache
 	next           nextRuntime // closures and traffic, location links, intake sessions (next.go)
 	sites          sites
+	cont           continuity // scheduled map updates and the continuity pack (continuity.go)
+	ovf            overflowRuntime
 	TLSFingerprint string   // this site's certificate, for other sites to pin
 	SelfSigned     bool     // the certificate is the server's own, not one the agency gave it
 	Logs           *LogRing // the recent warnings and errors, for the support bundle (nil: none kept)
@@ -143,6 +145,7 @@ func New(s *Server) (*Server, error) {
 	if s.Maps != nil {
 		if !s.isTraining {
 			s.mapEvents()
+			s.mapScheduleEvents()
 		}
 		if s.Maps.Store() != nil {
 			s.Eng.SetRouter(mapRouter{s})
@@ -386,6 +389,8 @@ func (s *Server) routes() {
 	s.nerisRoutes()
 	s.stationRoutes()
 	s.partnerRoutes()
+	s.continuityRoutes()
+	s.overflowRoutes()
 	s.protocolRoutes()
 	s.fileRoutes()
 	s.publicFeedRoutes()
@@ -691,6 +696,8 @@ type HealthView struct {
 	Model    bool             `json:"model"`         // a language model translates
 	NERIS    bool             `json:"neris"`         // fire and EMS incidents go to NERIS
 	LIS      string           `json:"lis,omitempty"` // the location server's name, when one is on
+	// Continuity is the links down, the backup site and overflow (continuity.go).
+	Continuity *ContinuityHealth `json:"continuity,omitempty"`
 }
 
 // ALIHealth is the ALI listener's health.
@@ -716,7 +723,7 @@ func (s *Server) health() HealthView {
 	s.Eng.Read(func(st *cad.State) { seq = st.Seq })
 	x := s.extra()
 	return HealthView{BitVoice: s.BV.Health(), More: s.moreHealth(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth(),
-		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig())}
+		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig()), Continuity: s.continuityHealth()}
 }
 
 func (s *Server) view() ([]byte, error) { return s.viewFor(nil) }
@@ -1890,6 +1897,11 @@ func (s *Server) Run(ctx context.Context) {
 	go s.translator(ctx)
 	go s.requestsWatch(ctx)
 	go s.criticalWatch(ctx)
+	go s.mapSchedule(ctx)
+	go s.linkWatch(ctx)
+	go s.packWriter(ctx)
+	go s.overflowOutbox(ctx)
+	go s.overflowUpdates(ctx)
 	if s.Advisory != nil {
 		go s.Advisory.Run(ctx)
 	}

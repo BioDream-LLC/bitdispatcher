@@ -1,3 +1,4 @@
+import type { ContinuityHealth, ContinuityPolicy, MapSchedule } from './continuity/types'
 // The API's JSON, as the Go side writes it (internal/cad, internal/api, internal/bitvoice).
 
 export type Civic = {
@@ -164,6 +165,7 @@ export type Settings = {
   views?: ViewRule[]; staffing?: StaffingRules; commKinds?: CommKind[]; priorityRules?: PriorityRule[]; commFileTypes?: string[]; commFileMB?: number
   multiCall?: MultiCall; commands?: CommandRules
   next?: NextSettings
+  mapUpdates?: MapSchedule; continuity?: ContinuityPolicy
 }
 
 export type Failure = { at: string; what: string; call?: string; error: string }
@@ -188,6 +190,7 @@ export type Health = {
   site?: string
   sites?: { name: string; url: string; ok: boolean; last?: string; error?: string; copied: number }[]
   drone?: boolean; hooks?: boolean; model?: boolean; neris?: boolean; lis?: string
+  continuity?: ContinuityHealth
 }
 
 export type PhotoHealth = { available: boolean; recorded: boolean; attribution: string; job?: string; jobFrac?: number }

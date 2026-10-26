@@ -205,6 +205,8 @@ body {
   }
   .btn-go:hover:not(:disabled) { filter: brightness(1.12); background: linear-gradient(135deg, var(--color-rose-500), var(--color-orange-500)); }
   .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-danger { border-color: var(--color-rose-600); background: var(--color-rose-800); color: white; }
+  .btn-danger:hover:not(:disabled) { background: var(--color-rose-700); }
   .btn-ghost:hover:not(:disabled) { background: var(--color-slate-800); }
   .kbd {
     display: inline-flex;

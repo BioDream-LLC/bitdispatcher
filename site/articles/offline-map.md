@@ -54,6 +54,8 @@ The dispatch map supports day and night styling, address, intersection and landm
 
 Because the map is recorded locally, address search does not phone an outside geocoder for routine lookups, which keeps incident locations inside the center.
 
+**Keeping it current on a schedule.** OpenStreetMap changes every day, and Geofabrik publishes one change file a day per extract. **Bring up to date** applies them on demand, and **Automatic updates** in the same screen does it daily or weekly at an hour the center chooses. Each run builds the new map beside the one in use, which keeps serving dispatch throughout, and switches only when the new map is complete and has not lost more than a set share (10 percent by default) of its road segments or addresses, since a damaged change file shows up as roads gone. A run that fails, finds no internet, or meets a recording already under way leaves the map in use untouched and puts the source extract back as it was; the next window tries again, and a failed run messages the supervisors.
+
 ## Why bitdispatcher fits
 
 The offline map is a direct expression of what bitdispatcher is: one program with no external dependencies to fail. The map, routing, address search and county GIS are recorded into its own store and used locally, set up entirely in the GUI, with the data sources, OpenStreetMap, Overture and the county's own GIS, all open or the agency's own. There is no map server to run and no per-map-view fee.
@@ -62,7 +64,7 @@ For a small or rural center on a single circuit, this is the feature that makes 
 
 ## What has been tested, and what has not
 
-The Go test suite covers the OSM PBF importer and the router. The map, routing and address search run locally in the demonstration over the full 100-mile recorded area with Virginia's address points loaded. bitdispatcher is **not certified** and not in live service. VGIN's terms for using its data outside Virginia are an open question noted in the project, so a center outside Virginia should confirm its own data licensing. Online tiles outside the recorded area are shown only when the center chooses, and are marked as online.
+The Go test suite covers the OSM PBF importer and the router, and scheduled updates against a stand-in change-file server: a successful update, a corrupt change file, no internet, an update that would lose roads, and a second run refused while one is under way, each leaving the map in use as it was. The map, routing and address search run locally in the demonstration over the full 100-mile recorded area with Virginia's address points loaded. bitdispatcher is **not certified** and not in live service. VGIN's terms for using its data outside Virginia are an open question noted in the project, so a center outside Virginia should confirm its own data licensing. Online tiles outside the recorded area are shown only when the center chooses, and are marked as online.
 
 ## Try it
 

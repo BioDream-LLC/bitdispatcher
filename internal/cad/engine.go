@@ -246,6 +246,9 @@ func (e *Engine) SaveSettings(a Actor, s Settings) error {
 	} else if err := CheckIntake(n.Intake); err != nil {
 		return err
 	}
+	if err := CheckContinuity(s.MapUpdates, s.Continuity); err != nil {
+		return err
+	}
 	if s.RoadFactor < 1 || s.RoadFactor > 3 {
 		return problem("roadFactor", "road factor is between 1 and 3 (1.4 suits most road networks)")
 	}
@@ -451,7 +454,7 @@ func (e *Engine) Record(a Actor, typ string, data any) error {
 		EvPhotosRecording, EvPhotosRecorded, EvPhotosFailed,
 		EvAdvisorySuggested, EvAdvisoryDecided, EvAdvisoryWithdrawn, EvGISImporting, EvGISImported, EvGISFailed, EvJusticeQuery, EvIBRExported,
 		EvLocked, EvUnlocked, EvReviewExported, EvConfigStaged, EvWorkstationCode, EvUserDuties, EvUserMFAReset, EvRecordsViewed, EvTrainingInject,
-		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused, EvSupportBundle, EvPIPSent:
+		EvAccessRefused, EvSearched, EvSearchOpened, EvCommandRefused, EvSupportBundle, EvPIPSent, EvMapChecked:
 	default:
 		return fmt.Errorf("cad: %s is not a record event", typ)
 	}

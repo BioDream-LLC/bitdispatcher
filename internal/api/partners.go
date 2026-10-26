@@ -28,22 +28,33 @@ type Partner struct {
 	URL      string `json:"url"`      // where their CAD takes EIDOs
 	OutToken string `json:"outToken"` // sent to them as Bearer
 	InToken  string `json:"inToken"`  // what they send us as Bearer
+	// Fingerprint pins their CAD's certificate (SHA-256, hex) for overflow, for a neighbour whose
+	// certificate is its own rather than from an authority; empty trusts the usual authorities.
+	Fingerprint string `json:"fingerprint,omitempty"`
+	// Overflow is the overflow agreed with them (overflow.go).
+	Overflow PartnerOverflow `json:"overflow,omitzero"`
 }
 
 // PartnerView is a partner without its tokens.
 type PartnerView struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	OutToken bool   `json:"outTokenSet"`
-	InToken  bool   `json:"inTokenSet"`
-	Receive  string `json:"receive"` // the address they send to
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	URL         string          `json:"url"`
+	OutToken    bool            `json:"outTokenSet"`
+	InToken     bool            `json:"inTokenSet"`
+	Receive     string          `json:"receive"` // the address they send to
+	Overflow    PartnerOverflow `json:"overflow"`
+	Fingerprint string          `json:"fingerprint,omitempty"`
+	// OverflowProblem is why overflow cannot work with them as set up, if it cannot.
+	OverflowProblem string `json:"overflowProblem,omitempty"`
 }
 
 // shareClient sends to neighbouring agencies (replaced in tests).
 var shareClient = &http.Client{Timeout: 15 * time.Second}
 
 var rePartner = regexp.MustCompile(`^[A-Z0-9_-]{2,20}$`)
+
+var reFingerprint = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func (s *Server) partnerRoutes() {
 	s.mux.HandleFunc("POST /api/cad/eido/{partner}", s.receiveShared)
@@ -57,7 +68,9 @@ func (s *Server) partnerRoutes() {
 	s.handle("GET /api/admin/partners", auth.Admin, func(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 		out := []PartnerView{}
 		for _, p := range s.partners() {
-			out = append(out, PartnerView{ID: p.ID, Name: p.Name, URL: p.URL, OutToken: p.OutToken != "", InToken: p.InToken != "", Receive: "/api/cad/eido/" + p.ID})
+			_, _, perr := p.overflowBase()
+			out = append(out, PartnerView{ID: p.ID, Name: p.Name, URL: p.URL, OutToken: p.OutToken != "", InToken: p.InToken != "", Receive: "/api/cad/eido/" + p.ID,
+				Overflow: p.Overflow, Fingerprint: p.Fingerprint, OverflowProblem: errText(perr)})
 		}
 		writeJSON(w, 200, out)
 	})
@@ -120,15 +133,25 @@ func (s *Server) updatePartners(f func([]Partner) []Partner) error {
 
 func (s *Server) savePartner(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
 	var b struct {
-		Name     string `json:"name"`
-		URL      string `json:"url"`
-		OutToken string `json:"outToken"`
-		InToken  string `json:"inToken"`
+		Name        string  `json:"name"`
+		URL         string  `json:"url"`
+		OutToken    string  `json:"outToken"`
+		InToken     string  `json:"inToken"`
+		Fingerprint *string `json:"fingerprint"`
 	}
 	if !readJSON(w, r, &b) {
 		return
 	}
 	id := strings.ToUpper(strings.TrimSpace(r.PathValue("id")))
+	var fp *string
+	if b.Fingerprint != nil {
+		f := strings.ToLower(strings.NewReplacer(":", "", " ", "").Replace(strings.TrimSpace(*b.Fingerprint)))
+		if f != "" && !reFingerprint.MatchString(f) {
+			fail(w, 422, "a certificate fingerprint is the SHA-256 in hex: 64 characters")
+			return
+		}
+		fp = &f
+	}
 	b.URL = strings.TrimSpace(b.URL)
 	switch {
 	case !rePartner.MatchString(id):
@@ -145,12 +168,18 @@ func (s *Server) savePartner(w http.ResponseWriter, r *http.Request, se *auth.Se
 		for i := range ps {
 			if ps[i].ID == id {
 				ps[i].Name, ps[i].URL = strings.TrimSpace(b.Name), b.URL
+				if fp != nil {
+					ps[i].Fingerprint = *fp
+				}
 				keepSecret(&ps[i].OutToken, b.OutToken)
 				keepSecret(&ps[i].InToken, b.InToken)
 				return ps
 			}
 		}
 		p := Partner{ID: id, Name: strings.TrimSpace(b.Name), URL: b.URL}
+		if fp != nil {
+			p.Fingerprint = *fp
+		}
 		keepSecret(&p.OutToken, b.OutToken)
 		keepSecret(&p.InToken, b.InToken)
 		return append(ps, p)
