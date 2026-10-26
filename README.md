@@ -4,7 +4,7 @@
 
 **A complete, Apache-2.0 licensed CAD for 911 centres and dispatch operations, run 100% from its web interface.** Incidents, unit recommendation by road time, a dispatch map that works with no internet, screens for every monitor at the console, mark-outs and status checks, a supervisor board, a mobile terminal for the crews, incident reports, NCIC inquiries and the state's crime reporting file. No per-seat licence. No server farm. No database to stand up first.
 
-**One 35 MB file. 25 MB of memory at rest.** Start it, sign in, and a dispatcher has a working console; the map, the units, the run cards and everything else are set up from the browser.
+**One 44 MB file. About 30 MB of memory at rest.** Start it, sign in, and a dispatcher has a working console; the map, the units, the run cards and everything else are set up from the browser.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg?logo=go&logoColor=white)](https://go.dev)
@@ -210,7 +210,7 @@ make web build sim
 
 `-hooks-addr 127.0.0.1:PORT` takes BitVoice's EIDO and radio pushes over plain HTTP on loopback, when both run on one computer. `bitdispatcher -data <dir>` chooses where the ledger, users and recorded map live; `-tls-cert` and `-tls-key` use your own certificate instead of the self-signed one; `bitdispatcher reset-password <user>` sets a new password from the command line.
 
-**Memory.** 25 MB at rest with the demonstration units and no recorded map. With a 100-mile recorded map (about 620 MB on disk), aerial photos and county GIS loaded, about 500 MB.
+**Memory.** About 30 MB at rest on a new system with no recorded map. With a 100-mile recorded map (about 620 MB on disk), aerial photos and county GIS loaded, about 500 MB.
 
 ## With BitVoice and without it
 

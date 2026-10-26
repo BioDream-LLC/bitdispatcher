@@ -43,7 +43,7 @@ Because continuity rests on the ledger, the same **Verify** that checks a single
 
 **A telephony denial-of-service warning.** Continuity is not only about servers and links. A flood of calls can take a center out as surely as a power cut. bitdispatcher watches the call stream and raises **Possible telephony denial-of-service** on every console and the supervisor board when far more calls than usual arrive in a minute, when one number calls five or more times in ten minutes, or when eight or more silent or very short calls arrive in five minutes. A supervisor acknowledges it and it clears after ten quiet minutes, with a reminder to keep answering because a real emergency can be among them.
 
-**One binary simplifies continuity.** Because bitdispatcher is a single 35 MB file with no separate database or application server, standing up another site is copying a binary and its data directory and pointing the two at each other. The continuity plan has fewer moving parts to test, patch and reason about, which is exactly what a continuity plan needs.
+**One binary simplifies continuity.** Because bitdispatcher is a single 44 MB file with no separate database or application server, standing up another site is copying a binary and its data directory and pointing the two at each other. The continuity plan has fewer moving parts to test, patch and reason about, which is exactly what a continuity plan needs.
 
 ## Why bitdispatcher fits
 
