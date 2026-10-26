@@ -216,9 +216,12 @@ func isAllowedFact(key string) bool {
 	return false
 }
 
-// pseudonym returns a stable per-agency pseudonym for a username, keyed by salt.
+// pseudonym returns a stable per-agency pseudonym for a username, keyed by salt. The HMAC key is the
+// SHA-256 of the salt, so a short salt still makes a 256-bit key (FIPS 140-only mode refuses keys under
+// 112 bits).
 func pseudonym(username, salt string) string {
-	mac := hmac.New(sha256.New, []byte(salt))
+	key := sha256.Sum256([]byte("bitdispatcher pip pseudonym\x00" + salt))
+	mac := hmac.New(sha256.New, key[:])
 	mac.Write([]byte(username))
 	return hex.EncodeToString(mac.Sum(nil))
 }

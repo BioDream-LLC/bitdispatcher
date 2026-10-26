@@ -218,7 +218,7 @@ The connection is configured in the CAD's GUI. The agency decides everything.
   crosses. A class that is not on the list is dropped before anything is built or sent. A correction
   crosses only when the class it corrects is on the list.
 - Identified or pseudonymous. By default people are sent as a stable per-agency pseudonym. The
-  pseudonym is an HMAC-SHA256 of the username keyed with the agency's salt. It is stable, so the same
+  pseudonym is an HMAC-SHA256 of the username, keyed with a SHA-256 of the agency's salt. It is stable, so the same
   person reads the same way across events, and it differs by salt, so it cannot be matched across
   agencies. When the agency turns on the identified setting, usernames are sent as given instead.
 - Aggregate. When the agency turns on aggregate mode, only period summaries ever cross. Every other
