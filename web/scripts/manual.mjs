@@ -18,7 +18,7 @@ const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12)
 const EN = {
   title: 'bitdispatcher manual',
   subtitle: 'A free 911 computer-aided dispatch system in one program, set up entirely in the web interface: the dispatcher screen, the recorded map and aerial photos, road-routed recommendations, move-ups, the mobile terminal and reports built from the ledger.',
-  description: 'The bitdispatcher manual: a free 911 computer-aided dispatch system with a recorded dispatch map, aerial photos, road routing, a mobile terminal and ledger-built reports.',
+  description: 'The bitdispatcher manual: a free 911 CAD with a recorded dispatch map, aerial photos, road routing, a mobile terminal and reports built from the ledger.',
   manual: 'Manual', findTopic: 'Find a topic', contents: 'Contents', part: 'Part', chapter: 'Chapter', chapterRef: 'chapter',
   where: 'In the web interface:', figure: 'Figure', chapters: 'chapters', figures: 'figures', thousandWords: 'thousand words',
   footer: 'bitdispatcher is a product of BioDream LLC, published under the Apache License 2.0. The same chapters are under Help in every bitdispatcher. Map data © OpenStreetMap contributors (ODbL).',

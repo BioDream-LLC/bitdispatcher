@@ -2,7 +2,7 @@
 title: NIBRS incident-based crime reporting, from the record out
 tile: NIBRS reporting
 summary: Incident reports with the FBI's NIBRS data elements checked, supervisor approval, and Virginia's monthly IBR file in one click.
-description: How bitdispatcher builds NIBRS-ready incident reports, checks the FBI data elements, drafts a first narrative and writes Virginia's monthly IBR file from the record.
+description: How bitdispatcher builds NIBRS-ready incident reports, checks the FBI data elements, drafts a narrative and writes Virginia's monthly IBR file.
 icon: file
 ---
 

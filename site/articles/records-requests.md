@@ -2,7 +2,7 @@
 title: Public records requests for 911 data, redacted and released
 tile: Records requests
 summary: FOIA requests for 911 data: redactions proposed by the agency's rules, accepted one by one, released only on approval.
-description: How bitdispatcher answers public records and FOIA requests for 911 data with rule-proposed redactions, per-item approval, a leak check and working-day due dates.
+description: How bitdispatcher answers public records and FOIA requests for 911 data: proposed redactions, per-item approval, a leak check and due dates.
 icon: file
 ---
 

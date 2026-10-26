@@ -4,7 +4,7 @@
  "ui": {
   "title": "Manual do bitdispatcher",
   "subtitle": "Um sistema gratuito de despacho assistido por computador (CAD) para o 911 em um único programa, configurado inteiramente pela interface web: a tela do despachante, o mapa gravado e as fotos aéreas, as recomendações roteadas pelas vias, os remanejamentos (move-ups), o terminal móvel e os relatórios montados a partir do livro-razão.",
-  "description": "O manual do bitdispatcher: um sistema gratuito de despacho assistido por computador (CAD) para o 911, com um mapa de despacho gravado, fotos aéreas, roteamento por vias, um terminal móvel e relatórios montados a partir do livro-razão.",
+  "description": "O manual do bitdispatcher: um CAD gratuito para o 911, com mapa de despacho gravado, fotos aéreas, rotas por vias, terminal móvel e relatórios do livro-razão.",
   "manual": "Manual",
   "findTopic": "Encontrar um tópico",
   "contents": "Sumário",

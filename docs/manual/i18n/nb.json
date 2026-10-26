@@ -4,7 +4,7 @@
  "ui": {
   "title": "bitdispatcher-manual",
   "subtitle": "Et gratis CAD-system for nødnummer 911 i ett program, satt opp i sin helhet i webgrensesnittet: operatørskjermen, det innspilte kartet og flyfotoene, veirutede anbefalinger, flyttinger, den mobile terminalen og rapporter bygget fra hovedboken.",
-  "description": "bitdispatcher-manualen: et gratis CAD-system for nødnummer 911 med et innspilt utrykningskart, flyfoto, veiruting, en mobil terminal og rapporter bygget fra hovedboken.",
+  "description": "bitdispatcher-manualen: et gratis CAD-system for 911 med innspilt kart, flyfoto, veiruting, mobil terminal og rapporter fra hovedboken.",
   "manual": "Manual",
   "findTopic": "Finn et emne",
   "contents": "Innhold",

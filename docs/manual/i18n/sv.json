@@ -4,7 +4,7 @@
  "ui": {
   "title": "bitdispatcher-handboken",
   "subtitle": "Ett fritt 112-system för datorstödd larmhantering (CAD) i ett enda program, uppsatt helt i webbgränssnittet: operatörsskärmen, den inspelade kartan och flygfotona, vägruttade rekommendationer, förflyttningar, mobilterminalen och rapporter byggda ur liggaren.",
-  "description": "bitdispatcher-handboken: ett fritt 112-system för datorstödd larmhantering med en inspelad insatskarta, flygfoton, vägruttning, en mobilterminal och rapporter byggda ur liggaren.",
+  "description": "bitdispatcher-handboken: ett fritt system för larmhantering med inspelad insatskarta, flygfoton, vägruttning, mobilterminal och rapporter ur liggaren.",
   "manual": "Handbok",
   "findTopic": "Hitta ett ämne",
   "contents": "Innehåll",

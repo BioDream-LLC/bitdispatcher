@@ -4,7 +4,7 @@
  "ui": {
   "title": "Podręcznik bitdispatcher",
   "subtitle": "Darmowy system wspomagania dysponowania (CAD) dla numeru alarmowego 911 w jednym programie, konfigurowany w całości w interfejsie webowym: ekran dyspozytora, nagrana mapa i zdjęcia lotnicze, rekomendacje z trasowaniem po drogach, przesunięcia pokrycia, terminal mobilny oraz raporty budowane z dziennika.",
-  "description": "Podręcznik bitdispatcher: darmowy system wspomagania dysponowania dla numeru alarmowego 911 z nagraną mapą dysponowania, zdjęciami lotniczymi, trasowaniem po drogach, terminalem mobilnym i raportami budowanymi z dziennika.",
+  "description": "Podręcznik bitdispatcher: darmowy system dysponowania z nagraną mapą, zdjęciami lotniczymi, trasowaniem, terminalem mobilnym i raportami z dziennika.",
   "manual": "Podręcznik",
   "findTopic": "Znajdź temat",
   "contents": "Spis treści",

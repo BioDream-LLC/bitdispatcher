@@ -100,6 +100,9 @@ func loadArticles(root string) error {
 			if a.title == "" || a.tile == "" || a.summary == "" || a.description == "" {
 				return fmt.Errorf("%s.md: front matter needs title, tile, summary and description", slug)
 			}
+			if err := checkDescription(slug+".md", a.description); err != nil {
+				return err
+			}
 			if _, ok := icons[a.icon]; !ok {
 				return fmt.Errorf("%s.md: no icon %q", slug, a.icon)
 			}

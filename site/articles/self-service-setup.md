@@ -2,7 +2,7 @@
 title: Setting up a 911 CAD yourself, with remote support
 tile: Self-service setup
 summary: A setup checklist, a go-live check and a support bundle, so an agency can set bitdispatcher up itself and get help remotely.
-description: How bitdispatcher lets an agency set itself up with a setup checklist, test itself with a go-live check, and get remote help with a support bundle that holds no secrets or caller data.
+description: How an agency sets up bitdispatcher itself: a setup checklist, a go-live check, and remote help through a support bundle with no secrets or caller data.
 icon: check
 ---
 

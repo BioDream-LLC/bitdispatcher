@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // demoURL is the public demonstration, named on every page.
@@ -34,11 +35,11 @@ type page struct {
 
 var pages = []page{
 	{"home.html", "/", "", "bitdispatcher: open-source 911 computer-aided dispatch in one program",
-		"bitdispatcher is a free, Apache-2.0 computer-aided dispatch system for 911 centres: incidents, units recommended by road time, an offline dispatch map, a screen for every monitor, mark-outs, a mobile terminal, NIBRS and NCIC, all from the browser.", "1.0"},
+		"Free, open-source 911 CAD in one program: road-time unit recommendations, an offline map, a mobile terminal, NIBRS and NCIC, all in the browser.", "1.0"},
 	{"features.html", "/features/", "learn", "Everything bitdispatcher does",
-		"The dispatcher's console, screens for several monitors, fire houses, police mark-outs, the supervisor board, the offline map, the mobile terminal, records and reporting, itemised.", "0.9"},
+		"Everything bitdispatcher does: the dispatcher console, multi-monitor screens, fire and police tools, the offline map, the mobile terminal and reports.", "0.9"},
 	{"bitvoice.html", "/bitvoice/", "proof", "bitdispatcher with BitVoice, and without it",
-		"bitdispatcher takes calls from any standards-compliant call-handling system through ALI, NENA i3 and EIDO, and uses every hook BitVoice, BioDream's open-source phone system and 911 call handling, offers a CAD.", "0.8"},
+		"bitdispatcher takes calls from any standards-based call-handling system via ALI, NENA i3 and EIDO, and uses every CAD hook BitVoice offers.", "0.8"},
 	{"proof.html", "/proof/", "proof", "How bitdispatcher is tested, and what has not been tested",
 		"The tests every change must pass, what bitdispatcher is checked against, and what it has not been tried with yet. Not certified, not yet in service.", "0.8"},
 	{"get.html", "/get/", "learn", "Get bitdispatcher",
@@ -144,6 +145,9 @@ func build(root, out, base string) error {
 		if strings.Contains(body, "{{") {
 			return fmt.Errorf("%s: a placeholder was not filled", p.src)
 		}
+		if err := checkDescription(p.src, p.description); err != nil {
+			return err
+		}
 		if err := write(out, p.path, layout(base, p.path, p.section, p.title, p.description, body)); err != nil {
 			return err
 		}
@@ -151,7 +155,7 @@ func build(root, out, base string) error {
 	}
 	// The technology articles, and their index.
 	if err := write(out, "/tech/", layout(base, "/tech/", "learn", "The technology inside bitdispatcher, explained",
-		"How a 911 dispatch system works, one technology at a time: NG9-1-1 and EIDO, caller location, the offline map, road-time recommendation, the ledger, NIBRS, NCIC and more.", techIndex())); err != nil {
+		"How a 911 dispatch system works, one technology at a time: NG9-1-1, caller location, the offline map, road-time recommendation, NIBRS, NCIC and more.", techIndex())); err != nil {
 		return err
 	}
 	fmt.Fprintf(&sitemap, "<url><loc>%s/tech/</loc><priority>0.8</priority></url>\n", base)
@@ -192,7 +196,7 @@ func build(root, out, base string) error {
 	notFound := `<section class="hero small"><div class="wrap"><p class="eyebrow">404</p><h1>That page is not here</h1>
 <p class="lede">It may have moved when the site was rebuilt.</p>
 <div class="actions"><a class="btn btn-primary" href="/">Home</a><a class="btn btn-ghost" href="/manual/">The manual</a></div></div></section>`
-	return os.WriteFile(filepath.Join(out, "404.html"), []byte(layout(base, "/404.html", "", "Page not found · bitdispatcher", "This page does not exist.", notFound)), 0o644)
+	return os.WriteFile(filepath.Join(out, "404.html"), []byte(layout(base, "/404.html", "", "Page not found · bitdispatcher", "This page does not exist. Find bitdispatcher, the free 911 CAD, from the home page, the features, the technology articles or the manual.", notFound)), 0o644)
 }
 
 // write puts a page at its path: "/features/" is features/index.html.
@@ -438,4 +442,12 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return o.Close()
+}
+
+// checkDescription keeps a page's meta description to the length search engines show whole: 70 to 160 characters.
+func checkDescription(name, d string) error {
+	if n := utf8.RuneCountInString(d); n < 70 || n > 160 {
+		return fmt.Errorf("%s: the description is %d characters; keep it to 70-160 so search results show it whole", name, n)
+	}
+	return nil
 }

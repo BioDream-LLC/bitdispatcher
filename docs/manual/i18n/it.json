@@ -4,7 +4,7 @@
  "ui": {
   "title": "Manuale di bitdispatcher",
   "subtitle": "Un sistema di dispatch computerizzato (CAD) per il 911 gratuito in un unico programma, configurato interamente nell'interfaccia web: la schermata dell'operatore di sala, la mappa registrata e le foto aeree, le raccomandazioni instradate su strada, i riposizionamenti, il terminale mobile e i report costruiti dal registro.",
-  "description": "Il manuale di bitdispatcher: un sistema di dispatch computerizzato per il 911 gratuito con una mappa d'intervento registrata, foto aeree, instradamento su strada, un terminale mobile e report costruiti dal registro.",
+  "description": "Il manuale di bitdispatcher: un CAD gratuito per il 911 con mappa registrata, foto aeree, instradamento stradale, terminale mobile e report dal registro.",
   "manual": "Manuale",
   "findTopic": "Cerca un argomento",
   "contents": "Indice",

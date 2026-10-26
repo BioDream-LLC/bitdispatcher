@@ -4,7 +4,7 @@
  "ui": {
   "title": "bitdispatcher-käsikirja",
   "subtitle": "Ilmainen hätäkeskuksen (911) tietokoneavusteinen hälytysjärjestelmä yhdessä ohjelmassa, joka asetetaan kokonaan verkkokäyttöliittymässä: päivystäjän näyttö, tallennettu kartta ja ilmakuvat, tieverkkoon reititetyt suositukset, siirrot, mobiilipääte ja tapahtumalokista rakennetut raportit.",
-  "description": "bitdispatcher-käsikirja: ilmainen hätäkeskuksen (911) tietokoneavusteinen hälytysjärjestelmä, jossa on tallennettu hälytyskartta, ilmakuvat, tiereititys, mobiilipääte ja tapahtumalokista rakennetut raportit.",
+  "description": "bitdispatcher-käsikirja: ilmainen hälytysjärjestelmä, jossa on tallennettu kartta, ilmakuvat, tiereititys, mobiilipääte ja lokista rakennetut raportit.",
   "manual": "Käsikirja",
   "findTopic": "Etsi aihe",
   "contents": "Sisällys",

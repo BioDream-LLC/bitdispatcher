@@ -2,7 +2,7 @@
 title: Where the caller is: location from ALI to device fixes
 tile: Caller location
 summary: ALI/ANI, wireless Phase I and II, device-based hybrid fixes, HELD, altitude and trails for moving callers.
-description: How bitdispatcher gets caller location: ALI/ANI, wireless Phase I and II, device-based hybrid fixes over HELD, altitude and floor, and trails for moving callers.
+description: How bitdispatcher gets caller location: ALI/ANI, wireless Phase I and II, device-based hybrid fixes over HELD, altitude and floor, and moving callers.
 icon: pin
 ---
 
