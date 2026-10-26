@@ -148,7 +148,12 @@ func layout(base, path, section, title, description, body string) string {
 	fmt.Fprintf(&b, "<link rel=\"stylesheet\" href=\"/site.css?v=%s\">\n", cssVersion)
 	fmt.Fprintf(&b, "<meta property=\"og:type\" content=\"website\">\n<meta property=\"og:title\" content=\"%s\">\n<meta property=\"og:description\" content=\"%s\">\n<meta property=\"og:url\" content=\"%s\">\n",
 		html.EscapeString(title), html.EscapeString(description), html.EscapeString(canonical))
-	fmt.Fprintf(&b, "<meta property=\"og:image\" content=\"%s/assets/screens/console.%s\">\n", base, map[bool]string{true: "png", false: "webp"}[pngFallback])
+	// The shared-link picture: site/static/social-card.png, made by make social-card.
+	fmt.Fprintf(&b, "<meta property=\"og:site_name\" content=\"bitdispatcher\">\n<meta property=\"og:image\" content=\"%s/assets/social-card.png\">\n", base)
+	b.WriteString("<meta property=\"og:image:width\" content=\"1200\">\n<meta property=\"og:image:height\" content=\"630\">\n")
+	b.WriteString("<meta property=\"og:image:alt\" content=\"bitdispatcher, the 911 CAD built for NG9-1-1, beside its dispatcher console\">\n")
+	fmt.Fprintf(&b, "<meta name=\"twitter:card\" content=\"summary_large_image\">\n<meta name=\"twitter:title\" content=\"%s\">\n<meta name=\"twitter:description\" content=\"%s\">\n<meta name=\"twitter:image\" content=\"%s/assets/social-card.png\">\n",
+		html.EscapeString(title), html.EscapeString(description), base)
 	b.WriteString("<meta name=\"author\" content=\"BioDream LLC\">\n</head>\n<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n")
 
 	b.WriteString("<header class=\"top\"><div class=\"wrap\">\n<a class=\"brand\" href=\"/\"><img src=\"/assets/bitdispatcher-logo.svg\" alt=\"\" width=\"30\" height=\"30\"><span>bit<b>dispatcher</b></span></a>\n<nav aria-label=\"Main\"><ul class=\"menu\">\n")

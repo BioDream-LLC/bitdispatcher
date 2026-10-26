@@ -6,7 +6,7 @@ PKG     := ./cmd/bitdispatcher
 VERSION ?= v0.0.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build fips sim test test-fips vet vuln fmt check web web-test manual e2e site clean
+.PHONY: all build fips sim test test-fips vet vuln fmt check web web-test manual e2e site clean social-card
 
 all: check build
 
@@ -71,5 +71,8 @@ clean:
 
 # The bitdispatcher.com website, built from README.md, docs/manual and docs/screenshots (site/ holds its
 # pages). Publish it with deploy/site.sh.
+social-card:
+	cd web && node scripts/social-card.mjs $(CURDIR)
+
 site:
 	$(GO) run ./cmd/bitdispatchersite -out dist-site -base https://bitdispatcher.com

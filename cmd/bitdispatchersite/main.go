@@ -97,6 +97,9 @@ func build(root, out, base string) error {
 	if err := copyFile(filepath.Join(root, "site/static/biodream-wordmark.png"), filepath.Join(out, "assets/biodream-wordmark.png")); err != nil {
 		return err
 	}
+	if err := copyFile(filepath.Join(root, "site/static/social-card.png"), filepath.Join(out, "assets/social-card.png")); err != nil {
+		return err
+	}
 	if err := copyShots(root, out); err != nil {
 		return err
 	}
