@@ -24,7 +24,7 @@
 <div class="strip"><div class="wrap">
   <div><b>$0</b><span>No licence, no per-seat or per-console fee</span></div>
   <div><b>One file</b><span>About 44 MB, for Linux, macOS and Windows</span></div>
-  <div><b>Offline</b><span>Map, routing and addresses recorded for 100 miles</span></div>
+  <div><b>Offline</b><span>Dispatch, map and routing keep working with no internet</span></div>
   <div><b>100%</b><span>Of the settings have a screen in the browser</span></div>
 </div></div>
 
@@ -88,6 +88,42 @@
     <p class="edge-more">Also: a map, routing and address search that work with no internet; P25 radio emergencies and unit
       positions; drones; working through an outage. <a href="/features/">Everything it does</a> ·
       <a href="/proof/">How each is tested</a> · <a href="#what-is-bitvoice">What is BitVoice?</a></p>
+  </div>
+</section>
+
+<section class="band" id="resilience">
+  <div class="wrap">
+    <div class="intro">
+      <p class="eyebrow">On the bad days</p>
+      <h2>Keeps dispatching when the internet goes, and shows its security work</h2>
+      <p>Two questions every 911 director asks of a new CAD: what happens when the link is cut, and how do we know it is secure.
+        Here is what bitdispatcher does, and how far each part has been tested.</p>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+      <div class="card">
+        <h3>When the internet goes down</h3>
+        <p>bitdispatcher runs on the center's own server with its own street map, routing, address search and records, so a cut
+          internet circuit does not stop call entry or dispatch. Every console shows <b>Internet down</b> and a page says what
+          still works and what waits.</p>
+        <p>If the building itself is lost, a second bitdispatcher site, in a building the county owns or in the cloud, already
+          holds every record and carries on. A printable continuity pack is written on a schedule to folders that outlive the
+          server. When the lines fill faster than the floor can answer, a neighboring center that runs bitdispatcher can take
+          calls straight into your CAD.</p>
+        <p class="tested sim">Tested in the Go and browser suites; not yet through a real line cut or a 911 authority's call rerouting</p>
+        <p><a href="/tech/continuity-and-overflow/">Continuity and overflow</a> · <a href="/tech/offline-map/">The offline map</a></p>
+      </div>
+      <div class="card">
+        <h3>Security you can check</h3>
+        <p>Every sign-in, view and change is an event in a hash-chained ledger that anyone can verify from the browser. The data
+          stays on the agency's server. The FIPS build uses the Go Cryptographic Module, which holds FIPS 140-3 certificate
+          #5247. The code is open for anyone to read.</p>
+        <p>We publish our scan results. No known vulnerabilities in the code or its dependencies (govulncheck, OSV-Scanner,
+          Trivy). <b>A+</b> from Mozilla HTTP Observatory and Qualys SSL Labs. An OWASP ZAP attack scan of all 475 API
+          operations, signed in, found two small faults, both fixed.</p>
+        <p class="tested sim">Automated scans, not a penetration test; not reviewed against the CJIS Security Policy</p>
+        <p><a href="/tech/security/">Security</a> · <a href="https://github.com/BioDream-LLC/bitdispatcher/blob/main/docs/SECURITY-SCANS.md">The scan results</a></p>
+      </div>
+    </div>
   </div>
 </section>
 
