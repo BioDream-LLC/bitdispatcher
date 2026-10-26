@@ -105,6 +105,14 @@ func TestAPIFlow(t *testing.T) {
 		t.Fatalf("me signed out: %d %s", code, b)
 	}
 	admin := login(t, ts, "admin", pw["admin"])
+	// An API path not served here is a JSON not-found, not the web page; a missing critical
+	// review is not found rather than a server error (both found by an OWASP ZAP scan).
+	if code, b := admin.do("GET", "/api/training/scenarios", nil, false); code != 404 || !strings.Contains(string(b), "no such API path") {
+		t.Fatalf("unknown API path: %d %s", code, b)
+	}
+	if code, _ := admin.do("GET", "/api/critical/none/report", nil, false); code != 404 {
+		t.Fatalf("missing critical review: %d", code)
+	}
 	if code, b := admin.do("PUT", "/api/admin/stations/st1", cad.Station{Name: "Station 1", Lat: 40.27, Lon: -76.88}, true); code != 204 {
 		t.Fatalf("station: %d %s", code, b)
 	}

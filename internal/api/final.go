@@ -1144,7 +1144,7 @@ func (s *Server) criticalReport(id, cutoff string) (cad.CriticalReport, string, 
 		}
 	})
 	if number == "" {
-		return cad.CriticalReport{}, "", fmt.Errorf("no critical review %s", id)
+		return cad.CriticalReport{}, "", httpErr{http.StatusNotFound, "no critical review " + id}
 	}
 	evs, err := s.Eng.Events(0, 0, func(e ledger.Event) bool { return e.Incident == number })
 	if err != nil {

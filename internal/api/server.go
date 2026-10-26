@@ -294,6 +294,11 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, err error) {
+	var h httpErr
+	if errors.As(err, &h) {
+		fail(w, h.code, h.msg)
+		return
+	}
 	var p *cad.Problem
 	if errors.As(err, &p) {
 		writeJSON(w, http.StatusUnprocessableEntity, p)
@@ -538,6 +543,9 @@ func (s *Server) routes() {
 		m.Handle("GET /manual", s.Manual)
 		m.Handle("GET /manual/", s.Manual)
 	}
+	// An API path that is not served here (or not on this server, such as training's) is a
+	// plain not-found, not the web app's page.
+	m.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, http.StatusNotFound, "no such API path") })
 	if s.Web != nil {
 		m.Handle("/", s.Web)
 	}

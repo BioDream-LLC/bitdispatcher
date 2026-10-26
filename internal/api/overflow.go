@@ -677,14 +677,7 @@ type httpErr struct {
 
 func (e httpErr) Error() string { return e.msg }
 
-func writeOvf(w http.ResponseWriter, err error) {
-	var h httpErr
-	if errors.As(err, &h) {
-		fail(w, h.code, h.msg)
-		return
-	}
-	writeErr(w, err)
-}
+func writeOvf(w http.ResponseWriter, err error) { writeErr(w, err) }
 
 func (s *Server) supervisorPartner(a cad.Actor, id string) (Partner, error) {
 	if !isSupervisor(a) {
