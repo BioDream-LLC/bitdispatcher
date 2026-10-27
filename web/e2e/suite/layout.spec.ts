@@ -3,6 +3,11 @@ import { signIn } from './helpers'
 
 test('the console layout: ready-made layouts per duty, sections dragged and snapped into place, the preset kept with the account and locked', async ({ page, browser }) => {
   const errors = await signIn(page)
+  // The simulator's calls can raise urgent messages for supervisors (a critical phrase heard) at any
+  // moment; this test is about the layout, so a banner that appears is acknowledged and the step goes on.
+  await page.addLocatorHandler(page.getByRole('alert', { name: 'Urgent communication' }), async (banner) => {
+    for (const b of await banner.getByRole('button', { name: 'Acknowledge' }).all()) await b.click()
+  })
   const sec = (s: string) => page.locator(`[data-section=${s}]`)
   // A supervisor starts on the full console, locked: nothing to drag.
   for (const s of ['queue', 'map', 'units', 'incident']) await expect(sec(s)).toBeVisible()
