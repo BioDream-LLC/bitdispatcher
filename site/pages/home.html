@@ -95,7 +95,7 @@
   <div class="wrap">
     <div class="intro">
       <p class="eyebrow">On the bad days</p>
-      <h2>Keeps dispatching when the internet goes, and shows its security work</h2>
+      <h2>Keeps dispatching when the internet goes, on hardware you can afford, and shows its security work</h2>
       <p>Two questions every 911 director asks of a new CAD: what happens when the link is cut, and how do we know it is secure.
         Here is what bitdispatcher does, and how far each part has been tested.</p>
     </div>
@@ -111,6 +111,17 @@
           calls straight into your CAD.</p>
         <p class="tested sim">Tested in the Go and browser suites; not yet through a real line cut or a 911 authority's call rerouting</p>
         <p><a href="/tech/continuity-and-overflow/">Continuity and overflow</a> · <a href="/tech/offline-map/">The offline map</a></p>
+      </div>
+      <div class="card">
+        <h3>A backup server on a Raspberry Pi</h3>
+        <p>We ran bitdispatcher as the backup site on a Raspberry Pi 5 with 4 GB of memory that was already busy with other
+          services. It copied the main server's records in 3 seconds and showed each new incident about a second later.
+          With the main server switched off, the Pi took a new incident and dispatched a unit on its own, and when the main
+          server came back both had everything.</p>
+        <p>Under 60 simulated consoles and 2 call-takers entering a call every 2 seconds, the Pi answered in 7 ms at the median
+          and under 200 ms for 99 requests in 100, with nothing failed, using 55 MB of memory and one of its four cores.</p>
+        <p class="tested sim">Tested on a home network; not yet with a recorded map, for days, or across a real network cut. A live backup should boot from an SSD.</p>
+        <p><a href="/tech/active-active-sites/">Active-active sites</a></p>
       </div>
       <div class="card">
         <h3>Security you can check</h3>
