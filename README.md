@@ -222,7 +222,7 @@ make web build sim
 
 `-hooks-addr 127.0.0.1:PORT` takes BitVoice's EIDO and radio pushes over plain HTTP on loopback, when both run on one computer. `bitdispatcher -data <dir>` chooses where the ledger, users and recorded map live; `-tls-cert` and `-tls-key` use your own certificate instead of the self-signed one; `bitdispatcher reset-password <user>` sets a new password from the command line.
 
-**Memory.** About 30 MB at rest on a new system with no recorded map. With a 100-mile recorded map (about 620 MB on disk), aerial photos and county GIS loaded, about 500 MB.
+**Memory.** About 30 MB at rest on a new system with no recorded map (55 MB on a Raspberry Pi 5 serving 60 simulated consoles as a second site; see [Active-active sites](https://bitdispatcher.com/tech/active-active-sites/) and `make arm64`). With a 100-mile recorded map (about 620 MB on disk), aerial photos and county GIS loaded, about 500 MB.
 
 ## With BitVoice and without it
 

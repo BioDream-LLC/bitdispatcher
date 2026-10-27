@@ -6,7 +6,7 @@ PKG     := ./cmd/bitdispatcher
 VERSION ?= v0.0.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build fips sim test test-fips vet vuln fmt check web web-test manual e2e site clean social-card
+.PHONY: all build fips arm64 sim test test-fips vet vuln fmt check web web-test manual e2e site clean social-card
 
 all: check build
 
@@ -18,6 +18,10 @@ build:
 # in FIPS 140-3 mode. GODEBUG=fips140=only at run time also refuses every non-approved algorithm.
 fips:
 	GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) $(PKG)
+
+# arm64 builds for 64-bit ARM Linux, such as a Raspberry Pi 5 kept as a second site (FIPS build, as above).
+arm64:
+	GOOS=linux GOARCH=arm64 GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/bitdispatcher-linux-arm64 $(PKG)
 
 # test-fips runs the Go tests in FIPS 140-only mode: anything using a non-approved algorithm fails.
 test-fips:
