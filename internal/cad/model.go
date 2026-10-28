@@ -265,12 +265,13 @@ type Incident struct {
 	Talkgroup   string          `json:"talkgroup,omitempty"`
 	LocVerified bool            `json:"locVerified,omitempty"` // the call-taker confirmed the address on the map
 	NewLocation *LocOffer       `json:"newLocation,omitempty"`
-	Guidance    []Shown         `json:"guidance,omitempty"` // approved guidance shown for it, by version
-	Changed     *LocChange      `json:"changed,omitempty"`  // the last accepted location change, for dispatchers
-	NERIS       *NERISRecord    `json:"neris,omitempty"`    // what NERIS last said about it (fire and EMS)
-	Protocol    *ProtocolRun    `json:"protocol,omitempty"` // the call-taking protocol worked on it
-	Files       []IncidentFile  `json:"files,omitempty"`    // attachments: pictures, documents
-	Alarm       int             `json:"alarm,omitempty"`    // the alarm level; 0 or 1 is the first alarm
+	Guidance    []Shown         `json:"guidance,omitempty"`   // approved guidance shown for it, by version
+	Changed     *LocChange      `json:"changed,omitempty"`    // the last accepted location change, for dispatchers
+	NERIS       *NERISRecord    `json:"neris,omitempty"`      // what NERIS last said about it (fire and EMS)
+	Protocol    *ProtocolRun    `json:"protocol,omitempty"`   // the call-taking protocol worked on it
+	Files       []IncidentFile  `json:"files,omitempty"`      // attachments: pictures, documents
+	DroneClips  []DroneClip     `json:"droneClips,omitempty"` // drone video recorded for this incident (dronevideo.go)
+	Alarm       int             `json:"alarm,omitempty"`      // the alarm level; 0 or 1 is the first alarm
 	Fireground  *Fireground     `json:"fireground,omitempty"`
 	// ePCR is what each EMS unit's patient-care report system last said (nemsis), by unit.
 	EPCR map[string]*EPCRRecord `json:"epcr,omitempty"`

@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import { HelpLink } from '../Help'
 import { lazy, Suspense } from 'react'
-import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy, Flag, ShieldQuestion, PhoneIncoming, Waypoints, ArrowRightLeft } from 'lucide-react'
+import { ArrowLeft, Award, BarChart3, BookOpen, FileLock2, Hospital, Layers3, Lightbulb, MonitorSmartphone, Network, Route as RouteIcon, ShieldAlert, FileInput, Building2, Cable, ClipboardList, Database, Map as MapIcon, Settings as Cog, Truck, Users as UsersIcon, ListChecks, HardHat, BellRing, Truck as TowIcon, BookUser, Hexagon, Megaphone, Landmark, SlidersHorizontal, BadgeCheck, Ban, Cctv, Siren, Bot, ListTodo, Rocket, LifeBuoy, Flag, ShieldQuestion, PhoneIncoming, Waypoints, ArrowRightLeft, Plane } from 'lucide-react'
 import { can, useStore } from '../store'
 import { Logo } from '../ui'
 import { cx } from '../util'
@@ -16,6 +16,7 @@ import MapAdmin from './MapAdmin'
 import AdvisoryAdmin from './AdvisoryAdmin'
 import GisAdmin from './GisAdmin'
 import Sites from './Sites'
+import Drones from './Drones'
 import Premises from './Premises'
 import Migrate from './Migrate'
 import Workstations from './Workstations'
@@ -65,6 +66,7 @@ const PAGES = [
   { to: 'users', label: 'Users & positions', icon: UsersIcon, admin: true },
   { to: 'workstations', label: 'Workstations', icon: MonitorSmartphone, admin: true },
   { to: 'sites', label: 'Sites', icon: Network, admin: true },
+  { to: 'drones', label: 'Drones', icon: Plane, admin: true },
   { to: 'continuity', label: 'Continuity & overflow', icon: ArrowRightLeft, admin: true },
   { to: 'operations', label: 'Operations rules', icon: SlidersHorizontal, admin: true },
   { to: 'personnel', label: 'Personnel & crews', icon: HardHat, admin: false },
@@ -149,6 +151,7 @@ export default function Admin() {
             <Route path="protocols" element={<Protocols view={view} />} />
             <Route path="gis" element={<GisAdmin />} />
             <Route path="sites" element={<Sites />} />
+            <Route path="drones" element={<Drones />} />
             <Route path="premises" element={<Premises />} />
             <Route path="flags" element={<FlagsAdmin />} />
             <Route path="callentry" element={<CallEntryRules />} />

@@ -54,7 +54,7 @@ export type Assignment = {
 
 export type Entry = { seq: number; at: string; actor: string; kind: string; text: string; unit?: string; priority?: boolean }
 
-export type Incident = { files?: IncidentFile[]; protocol?: ProtocolRun; neris?: { id?: string; at: string; ok: boolean; status: number; error?: string; by: string };
+export type Incident = { files?: IncidentFile[]; droneClips?: DroneClip[]; protocol?: ProtocolRun; neris?: { id?: string; at: string; ok: boolean; status: number; error?: string; by: string };
   reports?: string[]
   number: string; type: string; priority: number; status: 'pending' | 'active' | 'closed'
   location?: Location; caller?: { name?: string; callback?: string }; calls: string[]; units: Assignment[]
@@ -131,7 +131,9 @@ export type Crash = {
   vehicle: { year?: number; make?: string; model?: string; color?: string; vin?: string; plate?: string }
 }
 export type CrashRisk = { risk: 'high' | 'medium' | 'low' | 'unknown'; reasons: string[]; suggest: string[]; summary: string }
-export type Drone = { id: string; name?: string; status: string; lat?: number; lon?: number; altM?: number; battery?: number; incident?: string; videoUrl?: string; pilot?: string; updated: string }
+export type Drone = { id: string; name?: string; status: string; lat?: number; lon?: number; altM?: number; battery?: number; incident?: string; videoUrl?: string; pilot?: string; updated: string
+  direct?: boolean; live?: boolean; recording?: boolean; heading?: number; speedMs?: number; detail?: string; pending?: string; pilots?: string[]; approval?: boolean }
+export type DroneClip = { id: string; drone: string; name?: string; start: string; end: string; size: number; sha256: string; final?: boolean; type: string; codec?: string }
 export type RadioLine = { at: string; unit?: string; radioUnit?: string; channel?: string; channelName?: string; text: string; incident?: string }
 export type CareNote = { at: string; by: string; action: string; user?: string; note?: string }
 export type CareCase = { incident: string; reason: string; at: string; people: string[]; takers?: string[]; status: 'open' | 'debrief' | 'closed'; offered?: string[]; actions?: CareNote[] }

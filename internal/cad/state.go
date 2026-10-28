@@ -279,6 +279,9 @@ func (s *State) apply(e ledger.Event) error {
 		}
 		return err
 	}
+	if ok, err := s.applyDroneClip(e); ok {
+		return err
+	}
 	if ok, err := s.applyFiles(e); ok {
 		if err == nil {
 			s.afterApply(e)

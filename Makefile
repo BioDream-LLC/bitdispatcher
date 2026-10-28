@@ -37,6 +37,7 @@ vuln:
 # bvsim is a stand-in for BitVoice's CAD hooks, for demonstrations and tests without a phone system.
 sim:
 	CGO_ENABLED=0 $(GO) build -trimpath -o bin/bvsim ./cmd/bvsim
+	CGO_ENABLED=0 $(GO) build -trimpath -o bin/dronesim ./cmd/dronesim
 
 web:
 	cd web && $(PNPM) install --frozen-lockfile && $(PNPM) build
@@ -45,7 +46,7 @@ web-test:
 	cd web && $(PNPM) test
 
 # e2e runs the browser suite (web/e2e/suite) against a real bitdispatcher with demo data and the
-# BitVoice simulator.
+# BitVoice and drone simulators.
 e2e: build sim
 	cd web && $(PNPM) exec playwright test
 

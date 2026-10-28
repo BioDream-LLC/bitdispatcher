@@ -29,8 +29,11 @@ export default async function setup() {
   const sim = spawn(join(root, 'bin/bvsim'), ['-addr', '127.0.0.1:9644', '-every', '8s', '-calls', '2', '-eido-url', 'https://127.0.0.1:9643/api/ng911/eido', '-eido-token', 'bd_eido_e2e',
     '-radio-url', 'https://127.0.0.1:9643/api/radio/events', '-radio-secret', 'bd_radio_e2e',
     '-hook-url', 'https://127.0.0.1:9643/api/hooks', '-hook-token', 'bd_hook_e2e', '-crash-every', '0'], { stdio: ['ignore', 'pipe', 'pipe'] })
+  // A simulated drone (MAVLink and its camera), for drone.spec.ts.
+  const drone = spawn(join(root, 'bin/dronesim'), ['-mavlink', 'udp:127.0.0.1:14651', '-rtsp', '127.0.0.1:8655', '-speed', '40'], { stdio: ['ignore', 'pipe', 'pipe'] })
   await new Promise((r) => setTimeout(r, 1500))
-  writeFileSync(state, JSON.stringify({ data, password, pids: [bd.pid, sim.pid] }))
+  writeFileSync(state, JSON.stringify({ data, password, pids: [bd.pid, sim.pid, drone.pid] }))
   bd.unref()
   sim.unref()
+  drone.unref()
 }

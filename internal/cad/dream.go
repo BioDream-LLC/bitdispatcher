@@ -95,6 +95,19 @@ type Drone struct {
 	VideoURL string    `json:"videoUrl,omitempty"` // the live picture, for the console to open
 	Pilot    string    `json:"pilot,omitempty"`
 	Updated  time.Time `json:"updated"`
+	// Direct is a drone bitdispatcher flies itself over MAVLink, with its video relayed and recorded by
+	// this server (drones.go in the API); the rest belong to a drone system that reports to the hook.
+	Direct    bool    `json:"direct,omitempty"`
+	Live      bool    `json:"live,omitempty"`      // its video is coming in now
+	Recording bool    `json:"recording,omitempty"` // and being recorded for the incident
+	Heading   float64 `json:"heading,omitempty"`
+	SpeedMS   float64 `json:"speedMs,omitempty"`
+	Detail    string  `json:"detail,omitempty"` // what the drone last said, such as a refused command
+	// Pending is the incident a launch waits for the remote pilot's approval for; Pilots are who may give
+	// it (empty: supervisors); Approval is whether launches wait for it.
+	Pending  string   `json:"pending,omitempty"`
+	Pilots   []string `json:"pilots,omitempty"`
+	Approval bool     `json:"approval,omitempty"`
 }
 
 // DroneRequest is a request sent to the drone system for an incident.
@@ -478,6 +491,25 @@ func (e *Engine) UpdateDrone(a Actor, d Drone) error {
 		if _, ok := e.st.Incidents[d.Incident]; !ok {
 			d.Incident = ""
 		}
+	}
+	// A drone reports several times a second. Its live state always updates; the ledger gets an entry
+	// when anything but its position, battery, speed or heading changes, and otherwise once every 15
+	// seconds or after 500 m, which is enough to reconstruct a flight (as for units' positions).
+	if old := e.st.Drones[d.ID]; old != nil && d.Lat != nil && old.Lat != nil {
+		last := e.lastDrone[d.ID]
+		same := old.Status == d.Status && old.Incident == d.Incident && old.Live == d.Live && old.Recording == d.Recording &&
+			old.Detail == d.Detail && old.Pilot == d.Pilot && old.Direct == d.Direct && old.Pending == d.Pending && old.Approval == d.Approval && slices.Equal(old.Pilots, d.Pilots) && (d.Name == "" || d.Name == old.Name) &&
+			(d.VideoURL == "" || d.VideoURL == old.VideoURL)
+		if same && e.now().Sub(last.At) < 15*time.Second && distance(last, Position{Lat: *d.Lat, Lon: *d.Lon}) < 500 {
+			v := *old
+			v.Lat, v.Lon, v.AltM, v.Battery, v.Heading, v.SpeedMS, v.Updated = d.Lat, d.Lon, d.AltM, d.Battery, d.Heading, d.SpeedMS, e.now()
+			e.st.Drones[d.ID] = &v
+			e.notify(Notice{Type: EvDroneUpdated, Inc: d.Incident, Actor: a.User})
+			return nil
+		}
+	}
+	if d.Lat != nil && d.Lon != nil {
+		e.lastDrone[d.ID] = Position{Lat: *d.Lat, Lon: *d.Lon, At: e.now()}
 	}
 	_, err := e.write(a, EvDroneUpdated, refs{Incident: d.Incident}, d)
 	return err

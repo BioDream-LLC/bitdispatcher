@@ -63,9 +63,11 @@ type Engine struct {
 	st   *State
 	now  func() time.Time
 	// lastPos limits how often a unit's AVL position is written to the ledger.
-	lastPos  map[string]Position
-	router   Router
-	geocoder Geocoder
+	lastPos map[string]Position
+	// lastDrone does the same for drones' positions.
+	lastDrone map[string]Position
+	router    Router
+	geocoder  Geocoder
 	// KnownUser says whether a username is a person who can sign in (set by the server from its user
 	// store; nil: the users the ledger knows).
 	KnownUser func(string) bool
@@ -94,7 +96,7 @@ func Open(path string) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	e := &Engine{led: led, path: path, st: newState(), now: time.Now, lastPos: map[string]Position{}, subs: map[chan Notice]struct{}{}}
+	e := &Engine{led: led, path: path, st: newState(), now: time.Now, lastPos: map[string]Position{}, lastDrone: map[string]Position{}, subs: map[chan Notice]struct{}{}}
 	e.st.clock = func() time.Time { return e.now() }
 	for _, ev := range events {
 		if err := e.st.apply(ev); err != nil {

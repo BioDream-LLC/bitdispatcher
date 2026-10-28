@@ -52,6 +52,7 @@ type Integrations struct {
 	Alerting   Alerting          `json:"alerting"`     // public alerts (mass notification)
 	Next       NextConfig        `json:"next"`         // live traffic, alarm companies, the intake bots' token (next.go)
 	PIP        pip.Config        `json:"pip"`          // the optional PSC PIP connection (final.go, docs/PSC-PIP.md)
+	Drones     []DroneConf       `json:"drones"`       // drones bitdispatcher flies itself (drones.go, docs/DRONES.md)
 }
 
 // Server is the API.
@@ -80,9 +81,10 @@ type Server struct {
 	sites          sites
 	cont           continuity // scheduled map updates and the continuity pack (continuity.go)
 	ovf            overflowRuntime
-	TLSFingerprint string   // this site's certificate, for other sites to pin
-	SelfSigned     bool     // the certificate is the server's own, not one the agency gave it
-	Logs           *LogRing // the recent warnings and errors, for the support bundle (nil: none kept)
+	drones         droneRuntime // drones flown over MAVLink (drones.go)
+	TLSFingerprint string       // this site's certificate, for other sites to pin
+	SelfSigned     bool         // the certificate is the server's own, not one the agency gave it
+	Logs           *LogRing     // the recent warnings and errors, for the support bundle (nil: none kept)
 	started        time.Time
 	photoStats     statsCache
 
@@ -530,6 +532,7 @@ func (s *Server) routes() {
 		s.exerciseRoutes()
 	}
 	s.siteRoutes()
+	s.droneRoutes()
 	s.rmsRoutes()
 	s.migrateRoutes()
 	if s.GIS != nil {
@@ -731,7 +734,7 @@ func (s *Server) health() HealthView {
 	s.Eng.Read(func(st *cad.State) { seq = st.Seq })
 	x := s.extra()
 	return HealthView{BitVoice: s.BV.Health(), More: s.moreHealth(), ALI: ali, Ledger: seq, Tiles: tiles, Map: s.mapHealth(), Photos: s.photoHealth(), Advisory: s.advisoryHealth(), Site: s.Eng.Site(), Sites: s.siteHealth(),
-		Drone: x.DroneURL != "", Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig()), Continuity: s.continuityHealth()}
+		Drone: x.DroneURL != "" || s.directDrones(), Hooks: x.HookToken != "", Model: x.ModelOn && x.ModelURL != "", NERIS: s.nerisConfig().On, LIS: lisName(s.lisConfig()), Continuity: s.continuityHealth()}
 }
 
 func (s *Server) view() ([]byte, error) { return s.viewFor(nil) }
@@ -1883,6 +1886,7 @@ func (s *Server) Run(ctx context.Context) {
 	s.runMore(ctx)
 	go s.runSites(ctx)
 	go s.droneRule(ctx)
+	go s.runDrones(ctx)
 	go s.endDataCalls(ctx)
 	go s.alarmAnswers(ctx)
 	go s.runRoads(ctx)

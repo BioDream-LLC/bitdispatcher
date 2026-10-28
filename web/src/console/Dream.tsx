@@ -1,5 +1,5 @@
 import { TrainingTools } from './TrainingTools'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { BellOff, ClipboardCopy, Coffee, Drama, GraduationCap, HeartHandshake, NotebookPen, Plane, Play, RotateCcw, ShieldAlert, Trophy, Video, WifiOff } from 'lucide-react'
 import { drop, keep, outbox, send, type OutItem } from '../offline'
@@ -7,7 +7,7 @@ import { api, errText } from '../api'
 import { can, useStore } from '../store'
 import { Modal } from '../ui'
 import { ago, cx, hasPoint, useNow } from '../util'
-import type { Check, Incident, Review, View } from '../types'
+import type { Check, Drone, Incident, Review, View } from '../types'
 
 /** SummaryBox is the incident in a paragraph, for the crews and the next dispatcher. */
 export function SummaryBox({ inc, text }: { inc: Incident; text: string }) {
@@ -25,20 +25,35 @@ export function SummaryBox({ inc, text }: { inc: Incident; text: string }) {
   )
 }
 
-/** DroneBox is the drones over an incident, and the button that asks for one. */
+/** DroneBox is the drones over an incident: their state and live picture, the pilot's approval, the
+ * commands to hold or come home, the recordings, and the button that asks for one. */
 export function DroneBox({ inc, view }: { inc: Incident; view: View }) {
   const me = useStore((s) => s.me)
   const now = useNow()
   const [busy, setBusy] = useState(false)
-  const ds = (view.drones ?? []).filter((d) => d.incident === inc.number && d.status !== 'docked')
+  const [watch, setWatch] = useState<string | null>(null)
+  const ds = (view.drones ?? []).filter((d) => (d.incident === inc.number && d.status !== 'docked') || d.pending === inc.number)
+  const clips = inc.droneClips ?? []
   const asked = inc.timeline.some((t) => t.kind === 'drone')
-  if (!ds.length && !(view.health.drone && can.dispatch(me) && inc.status !== 'closed')) return null
+  const mayAsk = view.health.drone && can.dispatch(me) && inc.status !== 'closed'
+  if (!ds.length && !clips.length && !mayAsk) return null
+  const act = async (d: Drone, action: string, body?: object) => {
+    setBusy(true)
+    try {
+      await api.post(`/drones/${d.id}/${action}`, body)
+    } catch (e) {
+      toast.error(errText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const mayApprove = (d: Drone) => !!me && (d.pilots?.length ? d.pilots.includes(me.username) : can.supervise(me))
   return (
     <section aria-label="Drone" className="rounded-md border border-cyan-900/60 bg-cyan-950/15 p-1.5 text-xs">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-200">
         <Plane size={12} aria-hidden /> Drone
-        {ds.length === 0 && view.health.drone && can.dispatch(me) && inc.status !== 'closed' && (
-          <button className="btn ml-auto h-6 px-2 py-0 text-[11px]" disabled={busy || !hasPoint(inc.location)} title={hasPoint(inc.location) ? 'Ask the drone system to fly to this incident' : 'Place the incident on the map first'}
+        {ds.length === 0 && mayAsk && (
+          <button className="btn ml-auto h-6 px-2 py-0 text-[11px]" disabled={busy || !hasPoint(inc.location)} title={hasPoint(inc.location) ? 'Ask for a drone over this incident' : 'Place the incident on the map first'}
             onClick={async () => {
               setBusy(true)
               try {
@@ -53,15 +68,117 @@ export function DroneBox({ inc, view }: { inc: Incident; view: View }) {
         )}
       </div>
       {ds.map((d) => (
-        <div key={d.id} className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="font-semibold text-slate-100">{d.name ?? d.id}</span>
-          <span className={cx('chip uppercase', d.status === 'onscene' ? 'bg-cyan-500 text-slate-950' : 'bg-cyan-500/20 text-cyan-200')}>{d.status === 'onscene' ? 'over the scene' : d.status}</span>
-          {d.battery ? <span className="font-mono text-[10px] text-slate-400">battery {d.battery}%</span> : null}
-          <span className="text-[10px] text-slate-500">{ago(d.updated, now)} ago</span>
-          {d.videoUrl && <a className="btn ml-auto h-6 px-2 py-0 text-[11px]" href={d.videoUrl} target="_blank" rel="noreferrer"><Video size={11} aria-hidden /> Live picture</a>}
+        <div key={d.id} className="mt-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold text-slate-100">{d.name ?? d.id}</span>
+            {d.pending === inc.number
+              ? <span className="chip bg-amber-500/20 uppercase text-amber-200">waiting for the pilot</span>
+              : <span className={cx('chip uppercase', d.status === 'onscene' ? 'bg-cyan-500 text-slate-950' : 'bg-cyan-500/20 text-cyan-200')}>{d.status === 'onscene' ? 'over the scene' : d.status}</span>}
+            {d.recording && <span className="chip bg-rose-600/80 font-bold text-white" title="The picture is being recorded for this incident">● REC</span>}
+            {d.battery ? <span className="font-mono text-[10px] text-slate-400">battery {d.battery}%</span> : null}
+            {d.direct && d.altM ? <span className="font-mono text-[10px] text-slate-400">{Math.round(d.altM)} m</span> : null}
+            <span className="text-[10px] text-slate-500">{ago(d.updated, now)} ago</span>
+            <span className="ml-auto flex gap-1">
+              {d.pending === inc.number && mayApprove(d) && <>
+                <button className="btn btn-go h-6 px-2 py-0 text-[11px]" disabled={busy} title="Airspace, weather and the drone checked: launch it" onClick={() => act(d, 'approve')}>Approve launch</button>
+                <button className="btn h-6 px-2 py-0 text-[11px]" disabled={busy} onClick={() => { const why = prompt('Why is the launch declined?'); if (why) act(d, 'decline', { why }) }}>Decline</button>
+              </>}
+              {d.direct && d.pending !== inc.number && can.dispatch(me) && d.status !== 'returning' && d.status !== 'offline' && <>
+                <button className="btn h-6 px-2 py-0 text-[11px]" disabled={busy} title="Stop and hold where it is" onClick={() => act(d, 'hold')}>Hold</button>
+                <button className="btn h-6 px-2 py-0 text-[11px]" disabled={busy} title="Fly home and land" onClick={() => act(d, 'return')}>Return home</button>
+              </>}
+              {d.videoUrl && d.pending !== inc.number && (d.direct
+                ? <button className="btn h-6 px-2 py-0 text-[11px]" aria-pressed={watch === d.id} disabled={!d.live} title={d.live ? 'Show the live picture here' : 'No picture coming in'} onClick={() => setWatch(watch === d.id ? null : d.id)}><Video size={11} aria-hidden /> {watch === d.id ? 'Hide picture' : 'Live picture'}</button>
+                : <a className="btn h-6 px-2 py-0 text-[11px]" href={d.videoUrl} target="_blank" rel="noreferrer"><Video size={11} aria-hidden /> Live picture</a>)}
+            </span>
+          </div>
+          {d.detail && <p className="text-[11px] text-amber-200">{d.detail}</p>}
+          {watch === d.id && d.videoUrl && <LivePicture url={d.videoUrl} label={`Live picture from ${d.name ?? d.id}`} />}
         </div>
       ))}
+      {clips.length > 0 && (
+        <ul aria-label="Drone recordings" className="mt-1 space-y-0.5 border-t border-cyan-900/50 pt-1">
+          {clips.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-300">
+              <Video size={11} aria-hidden className="text-cyan-300" />
+              <span>{c.name ?? c.drone}, {new Date(c.start).toLocaleTimeString()}</span>
+              <span className="font-mono text-slate-400">{Math.max(0, Math.round((Date.parse(c.end) - Date.parse(c.start)) / 1000))} s, {(c.size / 1048576).toFixed(1)} MB</span>
+              <span className="font-mono text-[10px] text-slate-500" title={`SHA-256 ${c.sha256}${c.final ? '' : ' (so far: still recording)'}`}>{c.sha256.slice(0, 12)}{c.final ? '' : ' · recording'}</span>
+              <a className="ml-auto underline hover:text-cyan-200" href={`/api/incidents/${inc.number}/drone-video/${c.id}`} target="_blank" rel="noreferrer">Play</a>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
+  )
+}
+
+/** LivePicture plays a drone's picture as it comes in: fragmented MP4 through Media Source Extensions,
+ * kept at the live edge (it skips ahead rather than fall behind). */
+export function LivePicture({ url, label }: { url: string; label: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  const [state, setState] = useState<'connecting' | 'live' | 'none'>('connecting')
+  const [lag, setLag] = useState(0)
+  useEffect(() => {
+    let stopped = false
+    let ctrl = new AbortController()
+    const run = async () => {
+      while (!stopped) {
+        try {
+          ctrl = new AbortController()
+          const r = await fetch(url, { signal: ctrl.signal, credentials: 'same-origin' })
+          if (!r.ok || !r.body) throw new Error(String(r.status))
+          const type = `video/mp4; codecs="${r.headers.get('X-Video-Codec') ?? 'avc1.42e01e'}"`
+          const v = ref.current
+          if (!v || !('MediaSource' in window) || !MediaSource.isTypeSupported(type)) throw new Error('unsupported')
+          const ms = new MediaSource()
+          v.src = URL.createObjectURL(ms)
+          await new Promise((res) => ms.addEventListener('sourceopen', res, { once: true }))
+          const sb = ms.addSourceBuffer(type)
+          const queue: Uint8Array[] = []
+          const pump = () => {
+            if (sb.updating || !queue.length || ms.readyState !== 'open') return
+            const n = queue.reduce((a, b) => a + b.length, 0)
+            const all = new Uint8Array(n)
+            let o = 0
+            for (const q of queue.splice(0)) { all.set(q, o); o += q.length }
+            sb.appendBuffer(all)
+          }
+          sb.addEventListener('updateend', () => {
+            const b = v.buffered
+            if (b.length) {
+              const end = b.end(b.length - 1)
+              if (end - v.currentTime > 1.2 || v.currentTime < b.start(0)) v.currentTime = Math.max(b.start(0), end - 0.2)
+              setLag(end - v.currentTime)
+              if (!sb.updating && v.currentTime - b.start(0) > 30) { sb.remove(b.start(0), v.currentTime - 10); return }
+            }
+            pump()
+          })
+          v.play().catch(() => {})
+          setState('live')
+          const reader = r.body.getReader()
+          for (;;) {
+            const { value, done } = await reader.read()
+            if (done) break
+            if (value) { queue.push(value); pump() }
+          }
+        } catch {
+          if (stopped) return
+        }
+        setState('none')
+        await new Promise((res) => setTimeout(res, 2000))
+      }
+    }
+    run()
+    return () => { stopped = true; ctrl.abort() }
+  }, [url])
+  return (
+    <div className="relative">
+      <video ref={ref} aria-label={label} muted playsInline autoPlay className="aspect-video w-full rounded bg-black" />
+      <span className={cx('absolute left-1 top-1 rounded px-1 text-[10px] font-bold', state === 'live' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300')} data-lag={lag.toFixed(2)}>
+        {state === 'live' ? 'LIVE' : state === 'connecting' ? 'Connecting…' : 'No picture: trying again'}
+      </span>
+    </div>
   )
 }
 

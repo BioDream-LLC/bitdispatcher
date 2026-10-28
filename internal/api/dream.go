@@ -512,7 +512,13 @@ func (s *Server) attachAll(w http.ResponseWriter, r *http.Request, se *auth.Sess
 // ---- drones ----
 
 func (s *Server) requestDrone(w http.ResponseWriter, r *http.Request, se *auth.Session, a cad.Actor) {
-	detail, err := s.launchDrone(r.Context(), a, r.PathValue("n"), false)
+	var detail string
+	var err error
+	if s.directDrones() {
+		detail, err = s.launchDirect(r.Context(), a, r.PathValue("n"), strings.ToUpper(r.URL.Query().Get("drone")), false)
+	} else {
+		detail, err = s.launchDrone(r.Context(), a, r.PathValue("n"), false)
+	}
 	if err != nil {
 		fail(w, http.StatusBadGateway, err.Error())
 		return
@@ -623,7 +629,7 @@ func (s *Server) droneRule(ctx context.Context) {
 				continue
 			}
 			x := s.extra()
-			if !x.DroneAuto || x.DroneURL == "" {
+			if !x.DroneAuto || (x.DroneURL == "" && !s.directDrones()) {
 				continue
 			}
 			want := false
@@ -637,7 +643,11 @@ func (s *Server) droneRule(ctx context.Context) {
 			})
 			if want {
 				asked[n.Inc] = true
-				go s.launchDrone(ctx, cad.SystemActor, n.Inc, true)
+				if s.directDrones() {
+					go s.launchDirect(ctx, cad.SystemActor, n.Inc, "", true) // waits for the pilot's approval
+				} else {
+					go s.launchDrone(ctx, cad.SystemActor, n.Inc, true)
+				}
 			}
 		}
 	}
