@@ -14,7 +14,7 @@ export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
   { title: 'Supervising', intro: 'Reports built from the ledger, and the ledger itself.', ids: ['board', 'reports', 'admin-advisory', 'ledger', 'records', 'admin-disclosure'] },
   { title: 'What 911 centres asked for', intro: 'Transcripts and translation, callers grouped and screened, crash data, drones, care for the people, training, quality review, outages and line attacks.',
-    ids: ['transcript', 'translation', 'caller-location', 'location-link', 'grouping', 'nonemergency', 'admin-intake', 'crash', 'drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'continuity', 'overflow', 'tdos', 'hooks'] },
+    ids: ['transcript', 'translation', 'caller-location', 'location-link', 'grouping', 'nonemergency', 'admin-intake', 'crash', 'drones', 'admin-drones', 'radio-text', 'summary', 'care', 'breaks', 'training', 'exercises', 'quality', 'offline', 'continuity', 'overflow', 'tdos', 'hooks'] },
   { title: 'Fire ground, crews and the police desk', intro: 'Bigger fires, who is aboard each unit, roll calls, paging volunteers, tows, the schedule, the numbers to call, areas on the map, a unit\u2019s day, patient-care reports, papers to serve and alerts to the public.',
     ids: ['alarms', 'admin-personnel', 'staffing', 'admin-qualifications', 'accountability', 'admin-paging', 'admin-tows', 'schedule', 'admin-directory', 'admin-geofences', 'admin-roads', 'admin-cameras', 'admin-alarms', 'unit-history', 'epcr', 'papers', 'public-alerts', 'admin-publicalerts'] },
   { title: 'Setting up', intro: 'Everything is set up on these screens; there is no configuration file to edit.',
@@ -1255,6 +1255,21 @@ Each test passes, has something to look at, or fails:
 
 - **Launch rule**: incidents of call types marked **Send a drone** (Call types) ask by themselves, once each.
 - The drone reports back to the drone hook: its status, position, battery and live picture. It flies on the map, its status goes on the incident's timeline, and **Live picture** opens its video.`,
+  },
+  {
+    id: 'admin-drones', title: 'Admin: Drones', route: '/admin/drones', keys: 'drone dfr mavlink px4 ardupilot rtsp camera signing key pilot approval launch altitude battery record video evidence sha-256 dronesim',
+    body: `Drones bitdispatcher flies itself, over MAVLink, the protocol of the PX4 and ArduPilot autopilots. Each drone has:
+
+- **MAVLink link**: \`udp-listen:0.0.0.0:14550\`, \`udp:host:port\`, \`tcp:host:port\` or \`serial:/dev/ttyUSB0:57600\`, and the autopilot's **system id** (0 takes the first one heard).
+- **Signing key**: 64 hex digits for MAVLink 2 signing. Turn it on: without it anyone who can reach the link can command the drone. A drone signing with another key is ignored.
+- **Camera**: an RTSP address for H.264 video. The password is masked here and never logged.
+- **Height** (10 to 120 m) and the **lowest battery** for a launch.
+- **Needs pilot approval** and the **pilots**: listed pilots approve a launch; with none listed, supervisors do. A launch rule always waits for a person.
+- **Record video**: while the drone is on an incident its video is kept with the incident, with its size and SHA-256 written to the ledger every 10 seconds. A recording that no longer matches is not served.
+
+On an incident, **Send a drone** picks the nearest ready drone. Dispatchers can press **Hold** or **Return home**; the pilot's own controller can take over at any time. Training boards never fly real drones. Check Part 107, Remote ID and your state's drone laws before flying.
+
+Tested with the bundled simulator (\`bin/dronesim\`) only, not yet a real drone. Details in docs/DRONES.md. [Open Drones](#/admin/drones)`,
   },
   {
     id: 'radio-text', title: 'Radio transcripts', keys: 'radio transcription speech words transmission timeline',
