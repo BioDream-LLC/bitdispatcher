@@ -46,6 +46,8 @@ bitdispatcher rates **injury risk** by rule. It is high for a delta-V of 40 km/h
 
 Drones work through a connected drone system (Admin › Integrations). An incident on the map shows **Send a drone**, and bitdispatcher hands the drone system the incident, its type, priority, position and summary; the **drone system decides which drone flies**. A **launch rule** can send a drone by itself: incidents of call types marked **Send a drone** ask once each. The drone reports back to the drone hook with its status, position, battery and live picture; it **flies on the map**, its status goes on the incident's timeline, and **Live picture** opens its video. The incident summary, built from the record, notes a drone over the scene.
 
+bitdispatcher can also fly a PX4 or ArduPilot drone itself over MAVLink, with the live video in the incident panel and the recording kept as evidence; see [Flying a drone to the incident](/tech/drones/).
+
 ## Why bitdispatcher fits
 
 Both features live inside the one program and on the incident the dispatcher is already working. The crash rating is transparent and adjustable: the thresholds are stated, the suggestions follow from them, and an administrator can tune them to local protocol rather than accept a vendor's hidden logic. The electric-vehicle flag reaches the fire crew through the incident summary and suggestions, not a buried field. The drone's launch, track and status land on the incident timeline and the hash-chained ledger, so the record shows who launched and what was seen. And bitdispatcher stays in its lane: it hands the drone system the facts and lets it own flight safety and aircraft selection.
