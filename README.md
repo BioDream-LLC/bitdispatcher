@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg?logo=go&logoColor=white)](https://go.dev)
-[![Version](https://img.shields.io/badge/version-v0.0.0-orange.svg)](#status)
+[![Version](https://img.shields.io/badge/version-v0.1.0-orange.svg)](#status)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#build-and-run)
 [![Works with](https://img.shields.io/badge/works%20with-BitVoice-3b82f6.svg)](https://bitvoice.org)
 [![CI](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/biodream-llc/bitdispatcher/actions/workflows/ci.yml)
@@ -23,7 +23,7 @@
 <a href="#build-and-run"><img src="docs/assets/buttons/build.svg" alt="Build bitdispatcher from source" width="240"></a>&nbsp;<a href="https://bitdispatcher.com/manual/"><img src="docs/assets/buttons/manual.svg" alt="Read the bitdispatcher manual" width="240"></a>&nbsp;<a href="https://bitdispatcher.com"><img src="docs/assets/buttons/website.svg" alt="Visit bitdispatcher.com" width="240"></a>
 </p>
 
-<p align="center"><sub>Installers for Windows, Linux and macOS; no release to download yet: build them from source with one <code>make</code>. Launch state: <b>Virginia</b>.</sub></p>
+<p align="center"><sub>Installers for Windows, Linux and macOS in the <a href="https://github.com/BioDream-LLC/bitdispatcher/releases/latest">latest release</a>, or build them from source with one <code>make</code>. Launch state: <b>Virginia</b>.</sub></p>
 
 [**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Install**](#install) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq) · [**bitdispatcher.com**](https://bitdispatcher.com)
 
@@ -205,7 +205,7 @@ Everything below ships inside the binary, shown with the Roanoke demonstration d
 
 bitdispatcher installs as a service that starts with the computer, before anyone signs in; every console opens it in a browser. Each installer shows the first administrator's password once, at the end. A newer installer upgrades it and keeps the records, settings and users; uninstalling keeps the records unless you confirm twice.
 
-There is no release to download yet: build the installers from source (see [Build and run](#build-and-run)) and they are written to `bin/`.
+Download them from the [latest release](https://github.com/BioDream-LLC/bitdispatcher/releases/latest), with SHA-256 checksums, or build them from source (see [Build and run](#build-and-run)): they are written to `bin/`.
 
 | | Build | What you get | Service | Records |
 |---|---|---|---|---|
@@ -255,7 +255,7 @@ With [BitVoice](https://bitvoice.org) it also uses BitVoice's live event stream 
 
 ## Status
 
-**Version 0.0.0: built and tested, not yet in service anywhere.** It is on a lab and design-partner track, like BitVoice's public-safety side. Before a centre relies on it:
+**Version 0.1.0, the first release: built and tested, not yet in service anywhere.** It is on a lab and design-partner track, like BitVoice's public-safety side. Before a centre relies on it:
 
 - **Not certified.** Not CJIS-audited, no VCIN certification yet, and the Virginia IBR file has not yet been accepted by the State Police.
 - **Tested against simulators and samples:** NCIC (our own training simulator; no outside NCIC or Nlets simulator was reachable), ALI (sample spills), the NIBRS file in the FBI's layout against SEARCH's NIBRS Pre-Certification Tool validator (`scripts/nibrs-validator.sh`), and public alerts against Google's CAP library with its IPAWS profile (`scripts/cap-validator.sh`) and EAS Station's feed reader (`scripts/eas-station.sh`). None of these is certification, and no alert has been sent to IPAWS.

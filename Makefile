@@ -3,7 +3,7 @@ PNPM    ?= corepack pnpm
 BIN     := bin/bitdispatcher
 PKG     := ./cmd/bitdispatcher
 # The released version, written here so a build from a source archive reports the same version as a checkout.
-VERSION ?= v0.0.0
+VERSION ?= v0.1.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: all build fips arm64 windows linux macos sim test test-fips vet vuln fmt check web web-test manual e2e site clean social-card

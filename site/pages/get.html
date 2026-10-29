@@ -1,8 +1,8 @@
 <section class="hero small"><div class="wrap">
   <p class="eyebrow">Get it</p>
   <h1>Try it in your browser, or install it yourself</h1>
-  <p class="lede">bitdispatcher is built and tested, not yet in service anywhere. Try the live demonstration, or build it from
-    source with Go and install it on Windows, Linux or macOS. There is no release to download yet.</p>
+  <p class="lede">bitdispatcher is built and tested, not yet in service anywhere. Try the live demonstration, or download the
+    installer for Windows, Linux or macOS from the latest release, or build it from source with Go.</p>
 </div></section>
 
 <section class="band"><div class="wrap prose-lite">
@@ -33,8 +33,10 @@ make web build sim
   <h2 style="margin-top:48px">Install it</h2>
   <p>Each installer sets bitdispatcher up as a service that starts with the computer, before anyone signs in, and shows the
     first administrator's password once, at the end. Every console then opens it in a browser. A newer installer upgrades it
-    and keeps the records, the settings and the users; uninstalling keeps the records unless you confirm twice. Build the
-    installers with one <code>make</code> after the steps above; they are written to <code>bin/</code>.</p>
+    and keeps the records, the settings and the users; uninstalling keeps the records unless you confirm twice.</p>
+  <p><a class="btn btn-primary" href="https://github.com/BioDream-LLC/bitdispatcher/releases/latest">ICON:download Download the latest release</a></p>
+  <p>Each file is listed with its SHA-256 checksum in SHA256SUMS. Or build them yourself with one <code>make</code> after the
+    steps above; they are written to <code>bin/</code>.</p>
   <ul class="ticks">
     <li><b>Windows</b> (64-bit, desktop or Server): <code>make windows</code>, with NSIS, builds <code>bitdispatcher-setup.exe</code>.
       A wizard with the port and the records folder, a firewall rule, Start menu entries including <b>Reset admin password</b>,

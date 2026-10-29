@@ -195,7 +195,7 @@ Started with \`-demo\`, bitdispatcher seeds a fictional agency on the Roanoke, V
     id: 'install', title: 'Installing it', keys: 'install installer setup download windows linux macos mac deb rpm pkg service upgrade uninstall remove port firewall reset password',
     body: `bitdispatcher runs as a service on one computer, and every console opens it in a browser. Each installer sets it up to start with the computer, before anyone signs in, and shows the first administrator's password once, at the end. Upgrading means running a newer installer: the records, the settings and the users are kept. Uninstalling keeps the records unless you confirm twice that they should go.
 
-There is no release to download yet. Build the installers from the source on any computer with Go (see the README): \`make windows\` (needs NSIS), \`make linux\` and \`make macos\` (on a Mac) write them to the bin folder.
+Download them from the latest release at github.com/BioDream-LLC/bitdispatcher/releases, where SHA256SUMS lists each file's checksum. Or build them from the source on any computer with Go (see the README): \`make windows\` (needs NSIS), \`make linux\` and \`make macos\` (on a Mac) write them to the bin folder.
 
 | | Windows | Linux | macOS |
 |---|---|---|---|
