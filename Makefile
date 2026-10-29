@@ -38,13 +38,15 @@ windows:
 # linux builds, for Intel and Arm, the Linux download (bin/bitdispatcher-<version>-linux-<arch>.tar.gz,
 # with install.sh) and .deb and .rpm packages: a hardened systemd service (packaging/linux). FIPS build.
 NFPM := github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0
+# The archive's files are recorded as root's, never the builder's account (GNU tar and BSD tar differ).
+TAR_ROOT := $(shell tar --version 2>/dev/null | grep -q GNU && echo --owner=0 --group=0 --numeric-owner || echo --uid 0 --gid 0 --uname root --gname root)
 linux:
 	set -e; for a in amd64 arm64; do \
 	  d=bin/bitdispatcher-$(PKGVER)-linux-$$a; rm -rf $$d; mkdir -p $$d; \
 	  GOOS=linux GOARCH=$$a GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $$d/bitdispatcher $(PKG); \
 	  cp packaging/linux/install.sh packaging/linux/uninstall.sh packaging/linux/postinstall.sh packaging/linux/bitdispatcher.service \
 	    packaging/linux/bitdispatcher.default LICENSE docs/manual/bitdispatcher-manual.pdf $$d/; \
-	  tar -C bin -czf $$d.tar.gz $${d#bin/}; \
+	  tar $(TAR_ROOT) -C bin -czf $$d.tar.gz $${d#bin/}; \
 	  mkdir -p bin/nfpm; cp $$d/bitdispatcher bin/nfpm/bitdispatcher; \
 	  for f in deb rpm; do NFPM_ARCH=$$a NFPM_VERSION=$(PKGVER) $(GO) run $(NFPM) package -f packaging/linux/nfpm.yaml -p $$f -t bin/; done; \
 	  rm -rf $$d bin/nfpm; \
