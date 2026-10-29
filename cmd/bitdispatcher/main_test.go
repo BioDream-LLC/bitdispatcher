@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/biodream-llc/bitdispatcher/internal/auth"
 )
 
 func TestVersionFlag(t *testing.T) {
@@ -39,5 +41,28 @@ func TestHooksListenerIsLoopbackOnly(t *testing.T) {
 			t.Fatalf("%s: %v", a, err)
 		}
 		ln.Close()
+	}
+}
+
+func TestInitAdminOnce(t *testing.T) {
+	dir := t.TempDir()
+	var out, errOut bytes.Buffer
+	if code := run([]string{"init-admin", "-data", dir}, &out, &errOut); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	pw := strings.TrimSpace(out.String())
+	if len(pw) < 12 || strings.ContainsAny(pw, " \n") {
+		t.Fatalf("want only a password, got %q", out.String())
+	}
+	users, err := auth.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := users.Login("admin", pw, "test", "127.0.0.1"); err != nil {
+		t.Fatalf("printed password does not sign in: %v", err)
+	}
+	out.Reset()
+	if code := run([]string{"init-admin", "-data", dir}, &out, &errOut); code != 0 || out.Len() != 0 {
+		t.Fatalf("second run: exit %d, printed %q; want silence on a system with users", code, out.String())
 	}
 }

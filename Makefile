@@ -6,7 +6,7 @@ PKG     := ./cmd/bitdispatcher
 VERSION ?= v0.0.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build fips arm64 sim test test-fips vet vuln fmt check web web-test manual e2e site clean social-card
+.PHONY: all build fips arm64 windows linux macos sim test test-fips vet vuln fmt check web web-test manual e2e site clean social-card
 
 all: check build
 
@@ -22,6 +22,39 @@ fips:
 # arm64 builds for 64-bit ARM Linux, such as a Raspberry Pi 5 kept as a second site (FIPS build, as above).
 arm64:
 	GOOS=linux GOARCH=arm64 GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/bitdispatcher-linux-arm64 $(PKG)
+
+# windows builds the Windows program (FIPS build, with its icon and version) and its installer,
+# bin/bitdispatcher-setup.exe: a service started with Windows (packaging/windows). Needs NSIS 3 (makensis).
+MAKENSIS ?= makensis
+PKGVER   := $(patsubst v%,%,$(VERSION))
+windows:
+	cd cmd/bitdispatcher && $(GO) run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --icon ../../packaging/windows/icon-256.png \
+		--product-name bitdispatcher --file-description "bitdispatcher computer-aided dispatch" \
+		--copyright "Copyright BioDream LLC. Apache License 2.0." --file-version $(PKGVER).0 --product-version $(PKGVER).0 --manifest cli --out rsrc
+	GOOS=windows GOARCH=amd64 GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/bitdispatcher-windows-amd64.exe $(PKG); \
+		s=$$?; rm -f cmd/bitdispatcher/rsrc_windows_amd64.syso; exit $$s
+	cd packaging/windows && $(MAKENSIS) -V2 -DVERSION=$(PKGVER) bitdispatcher.nsi
+
+# linux builds, for Intel and Arm, the Linux download (bin/bitdispatcher-<version>-linux-<arch>.tar.gz,
+# with install.sh) and .deb and .rpm packages: a hardened systemd service (packaging/linux). FIPS build.
+NFPM := github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0
+linux:
+	set -e; for a in amd64 arm64; do \
+	  d=bin/bitdispatcher-$(PKGVER)-linux-$$a; rm -rf $$d; mkdir -p $$d; \
+	  GOOS=linux GOARCH=$$a GOFIPS140=v1.0.0 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $$d/bitdispatcher $(PKG); \
+	  cp packaging/linux/install.sh packaging/linux/uninstall.sh packaging/linux/postinstall.sh packaging/linux/bitdispatcher.service \
+	    packaging/linux/bitdispatcher.default LICENSE docs/manual/bitdispatcher-manual.pdf $$d/; \
+	  tar -C bin -czf $$d.tar.gz $${d#bin/}; \
+	  mkdir -p bin/nfpm; cp $$d/bitdispatcher bin/nfpm/bitdispatcher; \
+	  for f in deb rpm; do NFPM_ARCH=$$a NFPM_VERSION=$(PKGVER) $(GO) run $(NFPM) package -f packaging/linux/nfpm.yaml -p $$f -t bin/; done; \
+	  rm -rf $$d bin/nfpm; \
+	done
+
+# macos builds bin/bitdispatcher-VERSION-macos.pkg (Apple silicon and Intel, macOS 12+): a launchd service
+# under its own account, apps in Applications › bitdispatcher (packaging/macos). FIPS build. On a Mac only.
+# Optional: APP_SIGN, PKG_SIGN (Developer ID identities) and NOTARY_PROFILE; see packaging/macos/build.sh.
+macos:
+	GO=$(GO) sh packaging/macos/build.sh $(PKGVER) "$(LDFLAGS)"
 
 # test-fips runs the Go tests in FIPS 140-only mode: anything using a non-approved algorithm fails.
 test-fips:

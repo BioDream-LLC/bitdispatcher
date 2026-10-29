@@ -1,0 +1,8 @@
+#!/bin/sh
+# Before the files are replaced: stop the service of an earlier version (an upgrade), so its program
+# is not running while it is swapped. The data, the settings and the users stay as they are.
+LABEL=com.biodream.bitdispatcher
+if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+  launchctl bootout "system/$LABEL" 2>/dev/null || true
+fi
+exit 0

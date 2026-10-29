@@ -13,8 +13,8 @@ id bitdispatcher >/dev/null 2>&1 || useradd --system --home /var/lib/bitdispatch
 install -d -o bitdispatcher -g bitdispatcher -m 700 /var/lib/bitdispatcher
 install -d -m 755 /opt/bitdispatcher/bin
 install -m 755 bitdispatcher bvsim /opt/bitdispatcher/bin/
-install -m 755 demo-setup.sh demo-reset.sh /opt/bitdispatcher/
-install -m 644 bitdispatcher.service bvsim.service demo-reset.service demo-reset.timer /etc/systemd/system/
+install -m 755 demo-setup.sh demo-reset.sh demo-tidy.sh /opt/bitdispatcher/
+install -m 644 bitdispatcher.service bvsim.service demo-reset.service demo-reset.timer demo-tidy.service demo-tidy.timer /etc/systemd/system/
 install -d -m 700 /etc/bitdispatcher
 install -m 644 Caddyfile /etc/caddy/Caddyfile
 systemctl daemon-reload
@@ -32,7 +32,7 @@ if [ ! -s /etc/bitdispatcher/push.env ]; then
   (umask 077; printf 'EIDO_TOKEN=bd_eido_%s\nRADIO_SECRET=bd_radio_%s\nHOOK_TOKEN=bd_hook_%s\n' \
     "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > /etc/bitdispatcher/push.env)
 fi
-systemctl enable -q demo-reset.timer bvsim
-systemctl start demo-reset.timer
+systemctl enable -q demo-reset.timer demo-tidy.timer bvsim
+systemctl start demo-reset.timer demo-tidy.timer
 systemctl restart bvsim caddy
 systemctl is-active bitdispatcher bvsim caddy

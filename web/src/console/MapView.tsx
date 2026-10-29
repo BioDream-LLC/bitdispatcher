@@ -4,7 +4,7 @@ import * as maplibregl from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import PlaceViews from '../views/PlaceViews'
 import { Modal } from '../ui'
-import { Ban, Box, Circle as CircleIcon, Crosshair, Image as ImageIcon, Layers, MapPinPlus, Moon, Move, Search, Sun, Undo2 } from 'lucide-react'
+import { Ban, Box, Map as MapIcon, Circle as CircleIcon, Crosshair, Image as ImageIcon, Layers, MapPinPlus, Moon, Move, Search, Sun, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText } from '../api'
 import { can, store, useStore } from '../store'
@@ -528,9 +528,25 @@ export default function MapView({ view, rec, onCreateAt }: { view: View; rec: Re
         })}
         {staleN > 0 && <span className="chip bg-amber-500/20 text-amber-300">AVL stale {staleN}</span>}
         {noAvl > 0 && <span className="chip bg-slate-950/85 text-slate-400">no AVL {noAvl}</span>}
-        {!tilesOn && !recorded && <span className="chip bg-slate-950/85 text-slate-400">grid 0.01° · no map recorded (Admin › Map)</span>}
         {view.health.map?.job && <span className="chip bg-sky-500/20 text-sky-300">recording map: {view.health.map.job} {Math.round((view.health.map.jobFrac ?? 0) * 100)}%</span>}
       </div>
+      {!tilesOn && !recorded && !view.health.map?.job && (
+        // A new system has no streets until an administrator records them; say so, plainly, where the map would be.
+        <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
+          <div role="status" className="pointer-events-auto max-w-sm rounded-xl border border-slate-700 bg-slate-900/95 p-5 text-center shadow-2xl">
+            <MapIcon size={28} className="mx-auto text-teal-400" aria-hidden />
+            <h3 className="mt-2 font-semibold text-slate-100">No map yet</h3>
+            <p className="mt-1 text-sm text-slate-400">
+              bitdispatcher keeps its own copy of your area's streets and addresses, so the map, routing and address search
+              work with no internet. It is recorded once, by an administrator, while this server has internet.
+            </p>
+            {can.admin(me)
+              ? <a href="#/admin/map" className="btn btn-go mt-4 inline-flex">Record the map</a>
+              : <p className="mt-3 text-xs text-slate-400">An administrator records it in Admin › Map. If that is you, sign in again and choose the Administrator duty.</p>}
+            <p className="mt-3 text-[11px] text-slate-500">Until then, units and incidents show on a plain grid.</p>
+          </div>
+        </div>
+      )}
       <div className="absolute bottom-2 left-2 flex gap-1">
         <button className={cx('btn h-6 px-1.5 py-0 text-[10px]', show.oos && 'ring-1 ring-sky-400')} onClick={() => setShow((s) => ({ ...s, oos: !s.oos }))} aria-pressed={show.oos}>
           <Layers size={11} aria-hidden /> OOS

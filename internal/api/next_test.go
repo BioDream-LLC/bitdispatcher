@@ -68,7 +68,9 @@ func gridServer(t *testing.T) (*httptest.Server, *Server, map[string]string) {
 		users.Save(u[0], u[0], u[1], p, false)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	s, err := New(&Server{Eng: eng, Auth: users, BV: bitvoice.New(eng, log), Log: log, DataDir: dir, Version: "test", Maps: mapdata.NewService(mapDir, "test", log)})
+	maps := mapdata.NewService(mapDir, "test", log)
+	t.Cleanup(func() { maps.Close() })
+	s, err := New(&Server{Eng: eng, Auth: users, BV: bitvoice.New(eng, log), Log: log, DataDir: dir, Version: "test", Maps: maps})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,7 @@
+[Unit]
+Description=Acknowledge radio emergencies on the bitdispatcher demo
+After=bitdispatcher.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bitdispatcher/demo-tidy.sh

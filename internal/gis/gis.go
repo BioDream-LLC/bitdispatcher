@@ -622,6 +622,36 @@ type Service struct {
 	cur     *mapdata.Store
 	curPath string
 	job     *Job
+	retired map[*mapdata.Store]string // replaced layers, closed and deleted once requests using them finish
+}
+
+// Close closes the imported layers in use, and deletes replaced ones at once.
+func (s *Service) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for st, p := range s.retired {
+		st.Close()
+		removeStore(p)
+		delete(s.retired, st)
+	}
+	if s.cur == nil {
+		return nil
+	}
+	err := s.cur.Close()
+	s.cur, s.curPath = nil, ""
+	return err
+}
+
+// retire closes and deletes replaced layers, unless Close already has.
+func (s *Service) retire(st *mapdata.Store) {
+	s.mu.Lock()
+	p, ok := s.retired[st]
+	delete(s.retired, st)
+	s.mu.Unlock()
+	if ok {
+		st.Close()
+		removeStore(p)
+	}
 }
 
 // NewService opens dir (data/gis).
@@ -847,10 +877,15 @@ func (s *Service) run(ctx context.Context, j *Job, area mapdata.Area, layers []L
 	jj := *j
 	s.mu.Unlock()
 	if old != nil {
+		s.mu.Lock()
+		if s.retired == nil {
+			s.retired = map[*mapdata.Store]string{}
+		}
+		s.retired[old] = oldPath
+		s.mu.Unlock()
 		go func() {
 			time.Sleep(30 * time.Second)
-			old.Close()
-			removeStore(oldPath)
+			s.retire(old)
 		}()
 	}
 	if s.Imported != nil {

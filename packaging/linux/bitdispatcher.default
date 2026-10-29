@@ -1,0 +1,12 @@
+# bitdispatcher service settings. After a change: sudo systemctl restart bitdispatcher
+
+# The HTTPS address consoles connect to (https://<this server>:8443/).
+BITDISPATCHER_ADDR=:8443
+
+# The data folder: the ledger of every call and change, users, settings, the recorded map. A folder other
+# than /var/lib/bitdispatcher also needs ReadWritePaths (see the comment in the service file).
+BITDISPATCHER_DATA=/var/lib/bitdispatcher
+
+# Extra options, such as a certificate your network trusts (readable by the bitdispatcher user):
+# BITDISPATCHER_FLAGS=-tls-cert /etc/bitdispatcher/cert.pem -tls-key /etc/bitdispatcher/key.pem
+BITDISPATCHER_FLAGS=

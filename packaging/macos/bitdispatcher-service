@@ -1,0 +1,20 @@
+#!/bin/sh
+# Started by launchd (com.biodream.bitdispatcher) as _bitdispatcher. Reads the settings, keeps the Mac
+# awake if asked, opens the log and becomes bitdispatcher.
+BITDISPATCHER_ADDR=:8443
+BITDISPATCHER_DATA="/Library/Application Support/bitdispatcher"
+BITDISPATCHER_KEEP_AWAKE=yes
+BITDISPATCHER_FLAGS=
+[ -r /usr/local/etc/bitdispatcher.conf ] && . /usr/local/etc/bitdispatcher.conf
+
+# The log: /Library/Logs/bitdispatcher/bitdispatcher.log, the previous one kept as .1 once it passes 20 MB.
+LOG=/Library/Logs/bitdispatcher/bitdispatcher.log
+if [ -f "$LOG" ] && [ "$(stat -f %z "$LOG")" -gt 20971520 ]; then mv -f "$LOG" "$LOG.1"; fi
+exec >>"$LOG" 2>&1
+
+# caffeinate holds a "no sleep" assertion for as long as this process (bitdispatcher, after exec) lives.
+case "$BITDISPATCHER_KEEP_AWAKE" in
+  [Yy]*|1|true) /usr/bin/caffeinate -i -s -w $$ & ;;
+esac
+# shellcheck disable=SC2086 # FLAGS are words on purpose
+exec /usr/local/bitdispatcher/bin/bitdispatcher -addr "$BITDISPATCHER_ADDR" -data "$BITDISPATCHER_DATA" $BITDISPATCHER_FLAGS

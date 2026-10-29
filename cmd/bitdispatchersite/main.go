@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"unicode/utf8"
 )
@@ -376,6 +377,10 @@ func copyShots(root, out string) error {
 	}
 	cwebp, _ := exec.LookPath("cwebp")
 	convert, _ := exec.LookPath("convert")
+	if runtime.GOOS == "windows" {
+		// Windows' own convert.exe converts disks; ImageMagick there is magick.
+		convert, _ = exec.LookPath("magick")
+	}
 	for _, f := range shots {
 		name := strings.TrimSuffix(filepath.Base(f), ".png")
 		dst := filepath.Join(out, "assets/screens", name+".webp")

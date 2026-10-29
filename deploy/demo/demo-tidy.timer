@@ -1,0 +1,10 @@
+[Unit]
+Description=Acknowledge radio emergencies on the bitdispatcher demo every 20 seconds
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=20
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target

@@ -39,7 +39,7 @@ export default function Setup() {
           <span className="text-slate-300">{v.done} of {v.steps.length} done</span>
         </div>
         <p className="mt-2 text-xs text-slate-400" data-testid="setup-left">
-          {v.left === 0 ? 'Every required step is done.' : `${v.left} required ${v.left === 1 ? 'step is' : 'steps are'} not done yet.`} When they are, run the <Link className="text-sky-300 underline" to="../golive">go-live check</Link>.
+          {v.left === 0 ? 'Every required step is done.' : `${v.left} required ${v.left === 1 ? 'step is' : 'steps are'} not done yet.`} When they are, run the <Link className="text-sky-300 underline" to="/admin/golive">go-live check</Link>.
         </p>
       </section>
       <ol className="space-y-2">
@@ -68,7 +68,7 @@ export default function Setup() {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                {x.page && <Link className="btn h-7 py-0 text-xs" to={'../' + x.page}>Open</Link>}
+                {x.page && <Link className="btn h-7 py-0 text-xs" to={'/admin/' + x.page}>Open</Link>}
                 {x.chapter && <Link className="btn h-7 px-2 py-0 text-xs" to={'/help?a=' + x.chapter} aria-label={'Manual: ' + x.title} title="The manual"><CircleHelp size={12} className="text-sky-300" aria-hidden /></Link>}
                 {x.tick ? (
                   <button className="btn h-7 py-0 text-xs" onClick={() => tick(x.id, false)} aria-label={'Undo: ' + x.title}><Undo2 size={12} aria-hidden /> Undo</button>

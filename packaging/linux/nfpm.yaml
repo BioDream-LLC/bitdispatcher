@@ -1,0 +1,36 @@
+# nfpm (github.com/goreleaser/nfpm, MIT) packaging for .deb and .rpm. Built by `make linux`.
+name: bitdispatcher
+arch: ${NFPM_ARCH}
+platform: linux
+version: ${NFPM_VERSION}
+section: net
+priority: optional
+maintainer: BioDream LLC <firstmind@biodream.io>
+vendor: BioDream LLC
+homepage: https://bitdispatcher.com/
+license: Apache-2.0
+description: |
+  Open-source computer-aided dispatch for 911 centers.
+  One program with its own web interface, run as a systemd service. Records stay on this server.
+depends:
+  - systemd
+contents:
+  - src: bin/nfpm/bitdispatcher
+    dst: /usr/bin/bitdispatcher
+    file_info: { mode: 0755 }
+  - src: packaging/linux/bitdispatcher.service
+    dst: /usr/lib/systemd/system/bitdispatcher.service
+    file_info: { mode: 0644 }
+  - src: packaging/linux/bitdispatcher.default
+    dst: /etc/default/bitdispatcher
+    type: config|noreplace
+    file_info: { mode: 0644 }
+  - src: LICENSE
+    dst: /usr/share/doc/bitdispatcher/LICENSE
+    file_info: { mode: 0644 }
+  - src: docs/manual/bitdispatcher-manual.pdf
+    dst: /usr/share/doc/bitdispatcher/bitdispatcher-manual.pdf
+    file_info: { mode: 0644 }
+scripts:
+  postinstall: packaging/linux/postinstall.sh
+  preremove: packaging/linux/preremove.sh

@@ -45,11 +45,11 @@ export default function GoLive() {
                   <div className="font-semibold text-slate-100">{c.title}</div>
                   {c.detail && <p className="mt-0.5 text-xs text-slate-300">{c.detail}</p>}
                 </div>
-                {c.fix && c.result !== 'pass' && <Link className="btn h-7 shrink-0 py-0 text-xs" to={'../' + c.fix}>Fix</Link>}
+                {c.fix && c.result !== 'pass' && <Link className="btn h-7 shrink-0 py-0 text-xs" to={'/admin/' + c.fix}>Fix</Link>}
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-xs text-slate-500">The check cannot see copies of the data kept elsewhere, the phone system's own wiring, or the radio. Confirm those on the <Link className="text-sky-300 underline" to="../setup">setup checklist</Link>.</p>
+          <p className="mt-4 text-xs text-slate-500">The check cannot see copies of the data kept elsewhere, the phone system's own wiring, or the radio. Confirm those on the <Link className="text-sky-300 underline" to="/admin/setup">setup checklist</Link>.</p>
         </>
       )}
     </Page>

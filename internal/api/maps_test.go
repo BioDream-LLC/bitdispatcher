@@ -55,6 +55,7 @@ func mapServer(t *testing.T) (*httptest.Server, *Server, map[string]string) {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := mapdata.NewService(mapDir, "test", log)
+	t.Cleanup(func() { svc.Close() })
 	if svc.Store() == nil {
 		t.Fatal("the recorded map did not open")
 	}

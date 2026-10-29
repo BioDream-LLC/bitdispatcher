@@ -198,8 +198,11 @@ func (s *Server) applyIntegrations() {
 	}
 }
 
-// Close stops the integrations.
+// Close stops the integrations and closes the training boards.
 func (s *Server) Close() {
+	if s.trainer != nil {
+		s.trainer.closeAll()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.ali != nil {

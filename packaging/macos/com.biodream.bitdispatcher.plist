@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- bitdispatcher as a macOS service (launchd), started at boot before anyone signs in and restarted if
+     it stops. Settings are in /usr/local/etc/bitdispatcher.conf; after a change:
+       sudo launchctl kickstart -k system/com.biodream.bitdispatcher -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.biodream.bitdispatcher</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bitdispatcher/bin/bitdispatcher-service</string>
+  </array>
+  <key>UserName</key>
+  <string>_bitdispatcher</string>
+  <key>GroupName</key>
+  <string>_bitdispatcher</string>
+  <key>Umask</key>
+  <integer>63</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>ExitTimeOut</key>
+  <integer>30</integer>
+  <key>ProcessType</key>
+  <string>Standard</string>
+  <!-- Every console keeps a live connection: macOS's default of 256 open files is too few for a centre. -->
+  <key>SoftResourceLimits</key>
+  <dict><key>NumberOfFiles</key><integer>8192</integer></dict>
+  <key>HardResourceLimits</key>
+  <dict><key>NumberOfFiles</key><integer>8192</integer></dict>
+  <!-- Until the service has opened its own log (a failure to start at all lands here). -->
+  <key>StandardErrorPath</key>
+  <string>/Library/Logs/bitdispatcher/launchd.log</string>
+</dict>
+</plist>

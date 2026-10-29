@@ -1,6 +1,7 @@
 # Every push and pull request: Go checks, known vulnerabilities in the Go and web dependencies, the Go
 # tests in FIPS 140-only mode, the web build and unit tests, and the browser suite against a real
-# bitdispatcher with demo data and the BitVoice simulator.
+# bitdispatcher with demo data and the BitVoice simulator. The Windows installer and the Linux packages
+# are built, installed, checked and removed on their own runners.
 name: ci
 on: [push, pull_request]
 permissions:
@@ -35,3 +36,105 @@ jobs:
         with:
           name: playwright-traces
           path: web/test-results
+
+  # Windows: the Go tests, then the installer built and installed silently on the runner, the service
+  # checked over HTTPS, upgraded in place, and uninstalled (keeping the records).
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./... -count=1
+      - name: Build the program and the installer
+        shell: pwsh
+        run: |
+          Push-Location cmd/bitdispatcher
+          go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --icon ../../packaging/windows/icon-256.png --product-name bitdispatcher --file-description "bitdispatcher computer-aided dispatch" --file-version 0.0.0.0 --product-version 0.0.0.0 --manifest cli --out rsrc
+          Pop-Location
+          $env:GOFIPS140 = 'v1.0.0'; $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags "-s -w" -o bin/bitdispatcher-windows-amd64.exe ./cmd/bitdispatcher
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) { choco install nsis -y --no-progress }
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" -V2 -DVERSION=0.0.0 packaging/windows/bitdispatcher.nsi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Install, check, upgrade and uninstall
+        shell: pwsh
+        run: |
+          $setup = Start-Process bin/bitdispatcher-setup.exe -ArgumentList '/S', '/PORT=9443' -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "setup exit $($setup.ExitCode)" }
+          if ((Get-Service bitdispatcher).Status -ne 'Running') { throw 'service not running' }
+          Start-Sleep 3
+          curl.exe -skf https://127.0.0.1:9443/api/health
+          if ($LASTEXITCODE -ne 0) { throw 'health check failed' }
+          if (-not (Get-NetFirewallRule -DisplayName 'bitdispatcher (HTTPS)' -ErrorAction SilentlyContinue)) { throw 'no firewall rule' }
+          $setup = Start-Process bin/bitdispatcher-setup.exe -ArgumentList '/S' -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "upgrade exit $($setup.ExitCode)" }
+          Start-Sleep 3
+          curl.exe -skf https://127.0.0.1:9443/api/health
+          if ($LASTEXITCODE -ne 0) { throw 'health check after upgrade failed' }
+          $u = Start-Process 'C:\Program Files\bitdispatcher\uninstall.exe' -ArgumentList '/S', '_?=C:\Program Files\bitdispatcher' -Wait -PassThru
+          if (Get-Service bitdispatcher -ErrorAction SilentlyContinue) { throw 'service left behind' }
+          if (-not (Test-Path 'C:\ProgramData\bitdispatcher\ledger.jsonl')) { throw 'records not kept' }
+          if (Get-NetFirewallRule -DisplayName 'bitdispatcher (HTTPS)' -ErrorAction SilentlyContinue) { throw 'firewall rule left behind' }
+
+  # Linux packages: built for Intel and Arm, the .deb installed on the runner as a systemd service,
+  # checked over HTTPS, and removed (keeping the records).
+  macos-installer:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make macos VERSION=v0.0.1
+      - name: Install, upgrade, uninstall keeping the records, reinstall, purge
+        run: |
+          set -eux
+          P=bin/bitdispatcher-0.0.1-macos.pkg
+          health() { for i in $(seq 1 30); do curl -skf https://127.0.0.1:8443/api/health && return 0; sleep 1; done; return 1; }
+          sudo installer -pkg $P -target /
+          health
+          sudo test -s /usr/local/etc/bitdispatcher.first-sign-in
+          sudo cat /usr/local/etc/bitdispatcher.first-sign-in | grep -q '^password '
+          ps -o user= -p "$(pgrep -f 'bitdispatcher -addr')" | grep -qx _bitdispatcher
+          pgrep -f 'caffeinate -i -s -w'
+          test "$(stat -f %Sp '/Library/Application Support/bitdispatcher')" = drwx------
+          test "$(stat -f '%Su:%Sg %Sp' /Applications)" = "root:admin drwxrwxr-x"
+          lipo -archs /usr/local/bitdispatcher/bin/bitdispatcher | grep -q 'x86_64 arm64'
+          sudo rm /usr/local/etc/bitdispatcher.first-sign-in
+          sudo installer -pkg $P -target /            # upgrade: no new first sign-in
+          health
+          sudo test ! -e /usr/local/etc/bitdispatcher.first-sign-in
+          sudo /usr/local/bitdispatcher/reset-admin.sh | grep -q '^New password for admin: '
+          health
+          sudo /usr/local/bitdispatcher/uninstall.sh --keep
+          ! launchctl print system/com.biodream.bitdispatcher
+          test ! -e /usr/local/bitdispatcher && test ! -e /Applications/bitdispatcher
+          sudo test -f '/Library/Application Support/bitdispatcher/ledger.jsonl'
+          sudo installer -pkg $P -target /            # over the kept records: the same users
+          health
+          sudo test ! -e /usr/local/etc/bitdispatcher.first-sign-in
+          sudo /usr/local/bitdispatcher/uninstall.sh --purge-confirmed
+          test ! -e '/Library/Application Support/bitdispatcher' && test ! -e /usr/local/etc/bitdispatcher.conf
+          ! id _bitdispatcher
+          ! pkgutil --pkgs | grep -q biodream
+
+  linux-packages:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make linux VERSION=v0.0.1
+      - name: Install, check and remove the .deb
+        run: |
+          sudo apt-get install -y ./bin/bitdispatcher_0.0.1_amd64.deb
+          sleep 3
+          systemctl is-active bitdispatcher
+          curl -skf https://127.0.0.1:8443/api/health
+          sudo apt-get remove -y bitdispatcher
+          ! systemctl is-active bitdispatcher
+          sudo test -f /var/lib/bitdispatcher/ledger.jsonl

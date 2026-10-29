@@ -33,7 +33,13 @@ import (
 // version is set at build time by the Makefile (-X main.version=...).
 var version = "dev"
 
+// rootCtx is what serving stops on besides an interrupt; the Windows service cancels it to stop.
+var rootCtx = context.Background()
+
 func main() {
+	if code, ok := runService(os.Args[1:]); ok {
+		os.Exit(code)
+	}
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
@@ -51,6 +57,9 @@ func defaultDataDir() string {
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "reset-password" {
 		return resetPassword(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "init-admin" {
+		return initAdmin(args[1:], stdout, stderr)
 	}
 	fs := flag.NewFlagSet("bitdispatcher", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -87,12 +96,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if users.Empty() {
-		pw := auth.GeneratePassword()
-		if err := users.Save("admin", "Administrator", auth.Admin, pw, false); err != nil {
+		pw, err := firstAdmin(eng, users)
+		if err != nil {
 			log.Error("first administrator", "err", err)
 			return 1
 		}
-		eng.Record(cad.SystemActor, cad.EvUserSaved, cad.UserInfo{Username: "admin", Name: "Administrator", Role: auth.Admin})
 		fmt.Fprintf(stderr, "\n  First start: sign in as  admin  with password  %s\n  It is shown once. Change it in Admin › Users.\n\n", pw)
 	}
 	if *demo {
@@ -138,7 +146,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer srv.Close()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(rootCtx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv.Run(ctx)
 	hs := &http.Server{Addr: *addr, Handler: srv, TLSConfig: tlsCfg, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second,
@@ -201,6 +209,53 @@ func displayAddr(a string) string {
 		host = "localhost"
 	}
 	return net.JoinHostPort(host, port)
+}
+
+// firstAdmin makes the administrator of a new system and returns its password.
+func firstAdmin(eng *cad.Engine, users *auth.Store) (string, error) {
+	pw := auth.GeneratePassword()
+	if err := users.Save("admin", "Administrator", auth.Admin, pw, false); err != nil {
+		return "", err
+	}
+	eng.Record(cad.SystemActor, cad.EvUserSaved, cad.UserInfo{Username: "admin", Name: "Administrator", Role: auth.Admin})
+	return pw, nil
+}
+
+// initAdmin makes the first administrator before the first start and prints only its password, for
+// an installer that shows it once. On a system that already has users it prints nothing.
+func initAdmin(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("init-admin", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	dataDir := fs.String("data", defaultDataDir(), "data directory")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "usage: bitdispatcher init-admin [-data dir]")
+		return 2
+	}
+	if err := os.MkdirAll(*dataDir, 0o700); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	eng, err := cad.Open(filepath.Join(*dataDir, "ledger.jsonl"))
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	defer eng.Close()
+	users, err := auth.Open(*dataDir)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	if !users.Empty() {
+		return 0
+	}
+	pw, err := firstAdmin(eng, users)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	fmt.Fprintln(stdout, pw)
+	return 0
 }
 
 // resetPassword sets a new generated password for a user, for an administrator locked out of the GUI.

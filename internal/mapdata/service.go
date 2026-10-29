@@ -228,6 +228,7 @@ type Service struct {
 	cur     *Store
 	curPath string
 	job     *Job
+	retired map[*Store]string // replaced maps, closed and deleted once requests using them finish
 }
 
 // NewService opens the store in dir if there is one.
@@ -252,6 +253,35 @@ func NewService(dir, agent string, log *slog.Logger) *Service {
 		}
 	}
 	return s
+}
+
+// Close closes the recorded map in use, and deletes replaced ones at once.
+func (s *Service) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for st, p := range s.retired {
+		st.Close()
+		removeStore(p)
+		delete(s.retired, st)
+	}
+	if s.cur == nil {
+		return nil
+	}
+	err := s.cur.Close()
+	s.cur, s.curPath = nil, ""
+	return err
+}
+
+// retire closes and deletes a replaced map, unless Close already has.
+func (s *Service) retire(st *Store) {
+	s.mu.Lock()
+	p, ok := s.retired[st]
+	delete(s.retired, st)
+	s.mu.Unlock()
+	if ok {
+		st.Close()
+		removeStore(p)
+	}
 }
 
 // removeStore deletes a store file and SQLite's files beside it.
@@ -619,10 +649,15 @@ func (s *Service) record(ctx context.Context, j *Job) error {
 	s.mu.Unlock()
 	if old != nil {
 		// Requests already holding the old store finish first.
+		s.mu.Lock()
+		if s.retired == nil {
+			s.retired = map[*Store]string{}
+		}
+		s.retired[old] = oldPath
+		s.mu.Unlock()
 		go func() {
 			time.Sleep(30 * time.Second)
-			old.Close()
-			removeStore(oldPath)
+			s.retire(old)
 		}()
 	}
 	return nil

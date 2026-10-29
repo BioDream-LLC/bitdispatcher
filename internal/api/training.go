@@ -116,6 +116,20 @@ func (t *trainer) get(key string) (*Server, error) {
 	return b.srv, nil
 }
 
+// closeAll closes every board's ledger when the server stops. The boards' folders are left; an exercise's
+// timeline is kept as it was.
+func (t *trainer) closeAll() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for key, b := range t.boards {
+		delete(t.boards, key)
+		b.srv.stopPlayer()
+		close(b.srv.quit)
+		b.srv.Close()
+		b.srv.Eng.Close()
+	}
+}
+
 // drop closes a board and removes its ledger. The caller holds t.mu.
 func (t *trainer) drop(key string) {
 	b := t.boards[key]

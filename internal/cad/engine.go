@@ -130,8 +130,16 @@ func (e *Engine) seed() error {
 	return nil
 }
 
-// Close closes the ledger.
-func (e *Engine) Close() error { return e.led.Close() }
+// Close closes the ledger and the copies of other sites' ledgers.
+func (e *Engine) Close() error {
+	e.mu.Lock()
+	for n, r := range e.replicas {
+		r.Close()
+		delete(e.replicas, n)
+	}
+	e.mu.Unlock()
+	return e.led.Close()
+}
 
 // LedgerPath is the ledger file.
 func (e *Engine) LedgerPath() string { return e.path }

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+  <title>bitdispatcher VERSION</title>
+  <organization>com.biodream</organization>
+  <background file="background.tiff" alignment="bottomleft" scaling="none" mime-type="image/tiff"/>
+  <background-darkAqua file="background-dark.tiff" alignment="bottomleft" scaling="none" mime-type="image/tiff"/>
+  <welcome file="welcome.html" mime-type="text/html"/>
+  <license file="LICENSE.txt" mime-type="text/plain"/>
+  <conclusion file="conclusion.html" mime-type="text/html"/>
+  <options customize="never" require-scripts="true" rootVolumeOnly="true" hostArchitectures="arm64,x86_64"/>
+  <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+  <volume-check>
+    <allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
+  </volume-check>
+  <choices-outline>
+    <line choice="default"/>
+  </choices-outline>
+  <choice id="default" title="bitdispatcher">
+    <pkg-ref id="com.biodream.bitdispatcher"/>
+    <pkg-ref id="com.biodream.bitdispatcher.launchd"/>
+    <pkg-ref id="com.biodream.bitdispatcher.apps"/>
+    <pkg-ref id="com.biodream.bitdispatcher.setup"/>
+  </choice>
+  <pkg-ref id="com.biodream.bitdispatcher" version="VERSION" onConclusion="none">com.biodream.bitdispatcher.pkg</pkg-ref>
+  <pkg-ref id="com.biodream.bitdispatcher.launchd" version="VERSION" onConclusion="none">com.biodream.bitdispatcher.launchd.pkg</pkg-ref>
+  <pkg-ref id="com.biodream.bitdispatcher.apps" version="VERSION" onConclusion="none">com.biodream.bitdispatcher.apps.pkg</pkg-ref>
+  <pkg-ref id="com.biodream.bitdispatcher.setup" version="VERSION" onConclusion="none">com.biodream.bitdispatcher.setup.pkg</pkg-ref>
+</installer-gui-script>

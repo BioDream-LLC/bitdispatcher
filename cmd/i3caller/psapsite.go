@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -101,7 +99,7 @@ func runSite(addr, name, queue, svc string, answerAfter time.Duration) error {
 	// SIGUSR1 switches the queue between Active and Full and tells the subscribers, as a PSAP whose
 	// call-takers are all busy and then free again.
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGUSR1)
+	notifyQueueToggle(sig)
 	go func() {
 		for range sig {
 			s.mu.Lock()

@@ -13,6 +13,7 @@ require (
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/pion/rtp v1.10.5
 	github.com/yuin/gopher-lua v1.1.1
+	golang.org/x/sys v0.48.0
 	modernc.org/sqlite v1.56.0
 )
 
@@ -42,7 +43,6 @@ require (
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	go.bug.st/serial v1.7.1 // indirect
 	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	modernc.org/libc v1.74.4 // indirect

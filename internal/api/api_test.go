@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -205,7 +206,7 @@ func TestAPIFlow(t *testing.T) {
 	}
 	admin.do("PUT", "/api/admin/integrations", map[string]string{"bitvoiceUrl": "https://bv.example:8443"}, true)
 	fi, _ := os.Stat(s.integrationsPath())
-	if fi.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 { // Windows: the installer's folder permissions protect it
 		t.Fatalf("integrations.json mode %v", fi.Mode())
 	}
 	// The EIDO webhook takes BitVoice's EIDO with the token.

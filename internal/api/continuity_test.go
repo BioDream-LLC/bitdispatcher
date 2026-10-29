@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -298,7 +299,7 @@ func TestContinuity(t *testing.T) {
 		t.Fatalf("write: %d %s", code, b)
 	}
 	f := filepath.Join(st.Continuity.PackDirs[0], "continuity-pack.html")
-	if fi, err := os.Stat(f); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(f); err != nil || (runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600) {
 		t.Fatalf("pack file %v %v", fi, err)
 	}
 	if code, _ := admin.do("POST", "/api/continuity/relocation", map[string]any{"active": false}, true); code != 204 {

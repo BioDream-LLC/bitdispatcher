@@ -339,6 +339,7 @@ func TestUpdateFromChangeFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := NewService(dir, "test", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { s.Close() })
 	// The service only follows Geofabrik; the test server stands in for it.
 	s.Client = &http.Client{Transport: rewrite{to: ts.URL}}
 	if err := s.Update("admin"); err != nil {
@@ -396,6 +397,7 @@ func updateSetup(t *testing.T, h http.HandlerFunc) (*Service, string) {
 		t.Fatal(err)
 	}
 	s := NewService(dir, "test", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { s.Close() })
 	s.Client = &http.Client{Transport: rewrite{to: ts.URL}}
 	return s, pbf
 }

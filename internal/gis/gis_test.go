@@ -66,6 +66,7 @@ func TestImportArcGISAndGeoJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { s.Close() })
 	// Hydrants and a zone from a GeoJSON upload.
 	up, _ := s.UploadPath("hydrants.geojson")
 	os.WriteFile(up, []byte(`{"type":"FeatureCollection","features":[
@@ -107,6 +108,7 @@ func TestImportArcGISAndGeoJSON(t *testing.T) {
 	}
 	// A restart opens the newest store.
 	s2, _ := NewService(dir, "test", nil)
+	t.Cleanup(func() { s2.Close() })
 	if s2.Store() == nil || len(s2.Layers()) != 3 {
 		t.Fatal("not reopened")
 	}

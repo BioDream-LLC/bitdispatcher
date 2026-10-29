@@ -190,7 +190,7 @@ if [ "$(api GET /agencies | jq '.agencies | length')" = "0" ]; then
     | .commands = ((.commands // {}) | .keys = {"police":"classic"})')
   api PUT /admin/settings "$S" >/dev/null || true
   for m in 1101 1102 1103 1104 1105 1106 1107; do api POST "/members/$m/on" '{"kind":"regular","shift":"A"}' >/dev/null || true; done
-  api POST /comms '{"kind":"bolo","priority":"high","subject":"(demo) Stolen vehicle: silver Honda Civic","body":"Fictional demo BOLO: silver Honda Civic, VA plate DEMO123, taken from Market St this morning. Do not stop on this alone; confirm first.","plate":"DEMO123","plateState":"VA","vehicle":"silver Honda Civic","agency":"RPD"}' >/dev/null || true
+  api POST /comms '{"kind":"bolo","priority":"medium","subject":"(demo) Stolen vehicle: silver Honda Civic","body":"Fictional demo BOLO: silver Honda Civic, VA plate DEMO123, taken from Market St this morning. Do not stop on this alone; confirm first.","plate":"DEMO123","plateState":"VA","vehicle":"silver Honda Civic","agency":"RPD"}' >/dev/null || true
   echo "seeded agencies, qualifications, staffing and a BOLO"
 fi
 # Mark-outs with a longest time, so a long one is shown OVER and told to supervisors (once).
@@ -225,5 +225,12 @@ if [ "$(api GET /state | jq '.settings.continuity.checks // [] | length')" = "0"
   api PUT /admin/settings "$S" >/dev/null || true
   echo "seeded continuity checks, checklist and contacts"
 fi
+# No full-width banners that must be acknowledged: a shared demo has nobody to acknowledge them, and they
+# covered the screen. Urgent and high messages still sound once and show in the inbox. (Radio emergencies are
+# acknowledged by demo-tidy.timer.) Every start, so it also applies to a board seeded before this was added.
+S=$(api GET /state | jq -c '.settings | .priorityRules = [
+  {"level":"urgent","tone":"alarm","silenceable":true},{"level":"high","tone":"alert","silenceable":true},
+  {"level":"medium","tone":"chime","silenceable":true},{"level":"low","tone":"tick","silenceable":true}]')
+api PUT /admin/settings "$S" >/dev/null || true
 api POST /auth/logout '{}' >/dev/null || true
 echo "demo ready"

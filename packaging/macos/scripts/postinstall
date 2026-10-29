@@ -1,0 +1,133 @@
+#!/bin/sh
+# Sets bitdispatcher up as a service after its files are in place. Safe to run again: an upgrade keeps
+# the data, the settings and the users, and only starts the service again.
+# Installer runs this as root; $3 is the target volume.
+set -e
+[ "${3:-/}" = "/" ] || { echo "bitdispatcher installs only on the startup disk" >&2; exit 1; }
+
+LABEL=com.biodream.bitdispatcher
+HOME_DIR=/usr/local/bitdispatcher
+CONF=/usr/local/etc/bitdispatcher.conf
+PLIST=/Library/LaunchDaemons/$LABEL.plist
+LOGDIR=/Library/Logs/bitdispatcher
+APPS=/Applications/bitdispatcher
+SVC=_bitdispatcher
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+in_use() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+
+# The service account: hidden, no shell, no home, no password. It owns the data and nothing else.
+if ! dscl . -read "/Users/$SVC" >/dev/null 2>&1; then
+  id=400
+  while dscl . -list /Users UniqueID | awk '{print $2}' | grep -qx "$id" ||
+        dscl . -list /Groups PrimaryGroupID | awk '{print $2}' | grep -qx "$id"; do
+    id=$((id + 1))
+    [ "$id" -lt 500 ] || { echo "bitdispatcher: no free service account number from 400 to 499" >&2; exit 1; }
+  done
+  if ! dscl . -read "/Groups/$SVC" >/dev/null 2>&1; then
+    dscl . -create "/Groups/$SVC"
+    dscl . -create "/Groups/$SVC" PrimaryGroupID "$id"
+    dscl . -create "/Groups/$SVC" RealName "bitdispatcher service"
+    dscl . -create "/Groups/$SVC" Password '*'
+  fi
+  gid=$(dscl . -read "/Groups/$SVC" PrimaryGroupID | awk '{print $2}')
+  dscl . -create "/Users/$SVC"
+  dscl . -create "/Users/$SVC" UniqueID "$id"
+  dscl . -create "/Users/$SVC" PrimaryGroupID "$gid"
+  dscl . -create "/Users/$SVC" RealName "bitdispatcher service"
+  dscl . -create "/Users/$SVC" UserShell /usr/bin/false
+  dscl . -create "/Users/$SVC" NFSHomeDirectory /var/empty
+  dscl . -create "/Users/$SVC" Password '*'
+  dscl . -create "/Users/$SVC" IsHidden 1
+fi
+
+# The settings: written once, then left as the administrator keeps them. A first install takes 8443, or
+# the first free port from 9443 when another program already has 8443.
+NEWPORT=""
+mkdir -p /usr/local/etc
+if [ ! -f "$CONF" ]; then
+  cp "$HOME_DIR/share/bitdispatcher.conf" "$CONF"
+  if in_use 8443; then
+    p=9443
+    while in_use "$p" && [ "$p" -lt 9499 ]; do p=$((p + 1)); done
+    sed -i '' "s/^BITDISPATCHER_ADDR=.*/BITDISPATCHER_ADDR=:$p/" "$CONF"
+    NEWPORT=$p
+  fi
+fi
+chown root:wheel "$CONF"; chmod 644 "$CONF"
+BITDISPATCHER_ADDR=:8443
+BITDISPATCHER_DATA="/Library/Application Support/bitdispatcher"
+. "$CONF"
+DATA=$BITDISPATCHER_DATA
+PORT=${BITDISPATCHER_ADDR##*:}
+HOST=${BITDISPATCHER_ADDR%:*}
+case "$HOST" in ""|0.0.0.0|"[::]") HOST=localhost ;; esac
+
+# The data holds criminal justice and personal information: the service account only.
+mkdir -p "$DATA" "$LOGDIR"
+chown "$SVC:$SVC" "$DATA" "$LOGDIR"
+chmod 700 "$DATA" "$LOGDIR"
+ln -sfh "$HOME_DIR/bin/bitdispatcher" /usr/local/bin/bitdispatcher 2>/dev/null || {
+  mkdir -p /usr/local/bin && ln -sfh "$HOME_DIR/bin/bitdispatcher" /usr/local/bin/bitdispatcher; }
+
+# The first administrator is made here, so its password is shown once to the person installing,
+# never written to a log. Nothing happens when there are users already (an upgrade).
+PW=$(sudo -u "$SVC" "$HOME_DIR/bin/bitdispatcher" init-admin -data "$DATA" 2>/dev/null || true)
+
+# macOS's own firewall, when it is on, must let consoles on other computers reach the program.
+FW=/usr/libexec/ApplicationFirewall/socketfilterfw
+if [ -x "$FW" ] && "$FW" --getglobalstate 2>/dev/null | grep -qi enabled; then
+  "$FW" --add "$HOME_DIR/bin/bitdispatcher" >/dev/null 2>&1 || true
+  "$FW" --unblockapp "$HOME_DIR/bin/bitdispatcher" >/dev/null 2>&1 || true
+fi
+
+chown root:wheel "$PLIST"; chmod 644 "$PLIST"
+launchctl bootout "system/$LABEL" 2>/dev/null || true
+launchctl bootstrap system "$PLIST"
+launchctl enable "system/$LABEL"
+UP=no
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if curl -skf -o /dev/null --max-time 2 "https://127.0.0.1:$PORT/api/health"; then UP=yes; break; fi
+  sleep 1
+done
+echo "bitdispatcher: service started: $UP, port $PORT"
+
+# Tell the person at the Mac (the password only to them, on screen).
+URL="https://$HOST:$PORT/"
+CU=$(stat -f %Su /dev/console 2>/dev/null || echo root)
+if [ -n "$PW" ]; then
+  if [ -z "${COMMAND_LINE_INSTALL:-}" ] && [ "$CU" != root ] && [ "$CU" != loginwindow ]; then
+    NL='
+'
+    MSG="Sign in as  admin  with this password:${NL}${NL}$PW${NL}${NL}It is shown only now. Change it in Admin › Users. If it is lost, use Reset admin password in Applications › bitdispatcher.${NL}${NL}Consoles open $URL"
+    [ -n "$NEWPORT" ] && MSG="$MSG${NL}${NL}Port 8443 was already in use, so bitdispatcher uses port $NEWPORT."
+    [ "$UP" = yes ] || MSG="$MSG${NL}${NL}The service has not answered yet. Its log is in $LOGDIR."
+    launchctl asuser "$(id -u "$CU")" sudo -u "$CU" /usr/bin/osascript - "$MSG" "$PW" "$URL" "$APPS/bitdispatcher.app/Contents/Resources/applet.icns" <<'OSA' || true
+on run argv
+  set msg to item 1 of argv
+  set pw to item 2 of argv
+  set u to item 3 of argv
+  set ic to POSIX file (item 4 of argv)
+  activate
+  with timeout of 86400 seconds
+    repeat
+      set r to display dialog msg with title "bitdispatcher: first sign-in" buttons {"Copy password", "Open bitdispatcher", "Done"} default button "Open bitdispatcher" with icon ic
+      if button returned of r is "Copy password" then
+        set the clipboard to pw
+        set msg to "The password is copied.\n\n" & msg
+      else
+        if button returned of r is "Open bitdispatcher" then open location u
+        exit repeat
+      end if
+    end repeat
+  end timeout
+end run
+OSA
+  else
+    # A command-line install (or nobody signed in): only root may read it; delete it after signing in.
+    F=/usr/local/etc/bitdispatcher.first-sign-in
+    ( umask 077; printf 'user admin\npassword %s\nconsoles %s\nDelete this file after the first sign-in.\n' "$PW" "$URL" > "$F" )
+    echo "bitdispatcher: the first sign-in password is in $F (root only): sudo cat $F"
+  fi
+fi
+exit 0

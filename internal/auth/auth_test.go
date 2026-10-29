@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -45,7 +46,7 @@ func TestLoginLockoutAndPersistence(t *testing.T) {
 		t.Fatal("the password is in the file")
 	}
 	fi, _ := os.Stat(filepath.Join(dir, "users.json"))
-	if fi.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 { // Windows: the installer's folder permissions protect it
 		t.Fatalf("users.json mode %v", fi.Mode())
 	}
 	s2, _ := Open(dir)
