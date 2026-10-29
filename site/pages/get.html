@@ -1,8 +1,8 @@
 <section class="hero small"><div class="wrap">
   <p class="eyebrow">Get it</p>
-  <h1>Try it in your browser, or build it yourself</h1>
-  <p class="lede">There is no release yet: bitdispatcher is built and tested, not yet in service. Try the live demonstration, or
-    build it from source with Go and run it on your own computer.</p>
+  <h1>Try it in your browser, or install it yourself</h1>
+  <p class="lede">bitdispatcher is built and tested, not yet in service anywhere. Try the live demonstration, or build it from
+    source with Go and install it on Windows, Linux or macOS. There is no release to download yet.</p>
 </div></section>
 
 <section class="band"><div class="wrap prose-lite">
@@ -29,6 +29,28 @@ make web build sim
   <p>The program is pure Go with no C libraries, built for Linux, macOS and Windows on Intel and Arm.
     <code>make fips</code> builds it with the Go Cryptographic Module under FIPS 140-3 certificate #5247, for agencies whose
     CJIS Systems Agency asks for validated cryptography.</p>
+
+  <h2 style="margin-top:48px">Install it</h2>
+  <p>Each installer sets bitdispatcher up as a service that starts with the computer, before anyone signs in, and shows the
+    first administrator's password once, at the end. Every console then opens it in a browser. A newer installer upgrades it
+    and keeps the records, the settings and the users; uninstalling keeps the records unless you confirm twice. Build the
+    installers with one <code>make</code> after the steps above; they are written to <code>bin/</code>.</p>
+  <ul class="ticks">
+    <li><b>Windows</b> (64-bit, desktop or Server): <code>make windows</code>, with NSIS, builds <code>bitdispatcher-setup.exe</code>.
+      A wizard with the port and the records folder, a firewall rule, Start menu entries including <b>Reset admin password</b>,
+      and a silent install for IT: <code>/S /PORT=8443 /DATA=D:\bitdispatcher /NOFIREWALL</code>.</li>
+    <li><b>Linux</b> (systemd, Intel and Arm): <code>make linux</code> builds a <code>.deb</code>, an <code>.rpm</code> and a
+      <code>.tar.gz</code> with <code>install.sh</code>. A hardened service under its own user; settings in
+      <code>/etc/default/bitdispatcher</code>.</li>
+    <li><b>macOS</b> 12 or later (Apple silicon and Intel): <code>make macos</code> on a Mac builds one <code>.pkg</code>. A launchd
+      service under its own hidden account that keeps the Mac awake, and <b>Applications › bitdispatcher</b> with the console,
+      Reset admin password, Uninstall and the manual.</li>
+  </ul>
+  <p>Every option, and how to reset a lost password: <a href="/manual/#install">Installing it</a> in the manual.</p>
+  <p><b>What has been tested:</b> Windows on one desktop computer and Windows Server 2022 in CI; the Linux Intel packages in
+    Debian 12 and Red Hat UBI 9 with systemd and on Ubuntu 24.04 in CI, the Arm packages only on an emulated Arm processor;
+    macOS on one Apple silicon Mac and in CI, not yet on an Intel Mac. <b>The installers are not signed yet:</b> Windows
+    SmartScreen warns, and macOS asks before opening a downloaded <code>.pkg</code> (Privacy &amp; Security › Open Anyway).</p>
 
   <h2 style="margin-top:48px">Set it up yourself</h2>
   <p>Everything is configured on the admin screens, and nobody needs to come on site. <b>Admin › Setup checklist</b> shows

@@ -57,7 +57,7 @@ jobs:
           $env:GOFIPS140 = 'v1.0.0'; $env:CGO_ENABLED = '0'
           go build -trimpath -ldflags "-s -w" -o bin/bitdispatcher-windows-amd64.exe ./cmd/bitdispatcher
           if (-not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) { choco install nsis -y --no-progress }
-          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" -V2 -DVERSION=0.0.0 packaging/windows/bitdispatcher.nsi
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" -V2 '-DVERSION=0.0.0' packaging/windows/bitdispatcher.nsi
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Install, check, upgrade and uninstall
         shell: pwsh

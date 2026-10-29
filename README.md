@@ -4,7 +4,7 @@
 
 **A complete, Apache-2.0 licensed CAD for 911 centres and dispatch operations, run 100% from its web interface.** Incidents, unit recommendation by road time, a dispatch map that works with no internet, screens for every monitor at the console, mark-outs and status checks, a supervisor board, a mobile terminal for the crews, incident reports, NCIC inquiries and the state's crime reporting file. No per-seat licence. No server farm. No database to stand up first.
 
-**One 44 MB file. About 30 MB of memory at rest.** Start it, sign in, and a dispatcher has a working console; the map, the units, the run cards and everything else are set up from the browser.
+**One 48 MB file. About 30 MB of memory at rest.** Start it, sign in, and a dispatcher has a working console; the map, the units, the run cards and everything else are set up from the browser.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8.svg?logo=go&logoColor=white)](https://go.dev)
@@ -23,9 +23,9 @@
 <a href="#build-and-run"><img src="docs/assets/buttons/build.svg" alt="Build bitdispatcher from source" width="240"></a>&nbsp;<a href="https://bitdispatcher.com/manual/"><img src="docs/assets/buttons/manual.svg" alt="Read the bitdispatcher manual" width="240"></a>&nbsp;<a href="https://bitdispatcher.com"><img src="docs/assets/buttons/website.svg" alt="Visit bitdispatcher.com" width="240"></a>
 </p>
 
-<p align="center"><sub>No release yet: build it from source with one <code>make</code>. Launch state: <b>Virginia</b>.</sub></p>
+<p align="center"><sub>Installers for Windows, Linux and macOS; no release to download yet: build them from source with one <code>make</code>. Launch state: <b>Virginia</b>.</sub></p>
 
-[**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq) · [**bitdispatcher.com**](https://bitdispatcher.com)
+[**What it does**](#everything-it-does) · [**What it looks like**](#what-it-looks-like) · [**Install**](#install) · [**Build and run**](#build-and-run) · [**With BitVoice**](#with-bitvoice-and-without-it) · [**How it is tested**](#how-it-is-tested) · [**Status**](#status) · [**Manual (PDF)**](docs/manual/bitdispatcher-manual.pdf) · [**FAQ**](#faq) · [**bitdispatcher.com**](https://bitdispatcher.com)
 
 ---
 
@@ -200,6 +200,22 @@ Everything below ships inside the binary, shown with the Roanoke demonstration d
 ![The operations report](docs/screenshots/report.png)
 
 ![The advisory panel](docs/screenshots/advisory.png)
+
+## Install
+
+bitdispatcher installs as a service that starts with the computer, before anyone signs in; every console opens it in a browser. Each installer shows the first administrator's password once, at the end. A newer installer upgrades it and keeps the records, settings and users; uninstalling keeps the records unless you confirm twice.
+
+There is no release to download yet: build the installers from source (see [Build and run](#build-and-run)) and they are written to `bin/`.
+
+| | Build | What you get | Service | Records |
+|---|---|---|---|---|
+| **Windows** (64-bit) | `make windows` (needs NSIS) | `bitdispatcher-setup.exe`: a wizard with port and folder settings, firewall rule, Start menu, Reset admin password; silent `/S /PORT= /DATA= /NOFIREWALL` | Windows service, restarted if it stops | `C:\ProgramData\bitdispatcher` |
+| **Linux** (systemd, Intel and Arm) | `make linux` | `.deb`, `.rpm`, and a `.tar.gz` with `install.sh` (`--port`, `--open-firewall`) and `uninstall.sh` | hardened systemd unit, own user | `/var/lib/bitdispatcher` |
+| **macOS** 12+ (Apple silicon and Intel) | `make macos` (on a Mac) | one `.pkg`; Applications › bitdispatcher with the console, Reset admin password, Uninstall and the manual | launchd, own hidden account, keeps the Mac awake | `/Library/Application Support/bitdispatcher` |
+
+The records folder is closed to everyone but the service and administrators. Details, every option and how to reset a lost password: the manual's [Installing it](https://bitdispatcher.com/manual/#install) chapter.
+
+**Tested:** Windows on one desktop computer (install, upgrades, reset, uninstall) and Windows Server 2022 in CI; Linux Intel packages in Debian 12 and Red Hat UBI 9 containers with systemd and Ubuntu 24.04 in CI, the Arm packages only on an emulated Arm processor; macOS on one Apple silicon Mac with macOS 26 and in CI, not yet on an Intel Mac. **Not signed yet:** Windows SmartScreen warns, and macOS asks before opening a downloaded `.pkg` (Privacy & Security › Open Anyway).
 
 ## Build and run
 

@@ -8,7 +8,7 @@ export interface Article { id: string; title: string; route?: string; keys: stri
 /** The manual's parts, in reading order. Every article is in exactly one part. */
 export const parts: { title: string; intro: string; ids: string[] }[] = [
   { title: 'Dispatching', intro: 'The dispatcher\u2019s screen and everything done from it: calls, incidents, units, the map and the command line.',
-    ids: ['start', 'signin', 'taker', 'resources', 'console', 'layout', 'working-agency', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'road-closures', 'cameras', 'photos', 'views', 'messages', 'inbox', 'search', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
+    ids: ['start', 'install', 'signin', 'taker', 'resources', 'console', 'layout', 'working-agency', 'console-route', 'dispatching', 'screens', 'screen-calls', 'screen-stations', 'screen-police', 'screen-units', 'screen-map', 'screen-incident', 'calls', 'incidents', 'recommend', 'advisory', 'moveup', 'units', 'map', 'road-closures', 'cameras', 'photos', 'views', 'messages', 'inbox', 'search', 'alerts', 'station', 'cad-to-cad', 'files', 'command', 'keys'] },
   { title: 'Locations, people, requests and review', intro: 'The place and how a location is settled, flags, persons and vehicles, NCIC requests, Street View, key tests, and the supervisor\u2019s review.',
     ids: ['place', 'flags', 'persons-vehicles', 'requests', 'streetview', 'keytest', 'supervisor', 'admin-callentry', 'admin-critical', 'admin-pip'] },
   { title: 'In the field', intro: 'The mobile data terminal a crew uses from the vehicle.', ids: ['mdt', 'rms', 'ncic'] },
@@ -190,6 +190,47 @@ Admin › Setup checklist follows these steps and the rest of what comes before 
 
 ## Demo mode
 Started with \`-demo\`, bitdispatcher seeds a fictional agency on the Roanoke, Virginia map (stations at real station positions, made-up units). With \`bvsim\`, a simulated BitVoice, calls ring and radios report positions; everything simulated is marked SIMULATED.`,
+  },
+  {
+    id: 'install', title: 'Installing it', keys: 'install installer setup download windows linux macos mac deb rpm pkg service upgrade uninstall remove port firewall reset password',
+    body: `bitdispatcher runs as a service on one computer, and every console opens it in a browser. Each installer sets it up to start with the computer, before anyone signs in, and shows the first administrator's password once, at the end. Upgrading means running a newer installer: the records, the settings and the users are kept. Uninstalling keeps the records unless you confirm twice that they should go.
+
+There is no release to download yet. Build the installers from the source on any computer with Go (see the README): \`make windows\` (needs NSIS), \`make linux\` and \`make macos\` (on a Mac) write them to the bin folder.
+
+| | Windows | Linux | macOS |
+|---|---|---|---|
+| File | bitdispatcher-setup.exe | .deb, .rpm, or a .tar.gz with install.sh | bitdispatcher-VERSION-macos.pkg |
+| Systems | 64-bit Windows, desktop or Server | systemd: Debian, Ubuntu, Red Hat and alike, Intel or Arm | macOS 12 or later, Apple silicon or Intel |
+| Service | Windows service, restarted if it stops | systemd service, hardened, its own user | launchd service, its own hidden account |
+| Records | C:\\ProgramData\\bitdispatcher | /var/lib/bitdispatcher | /Library/Application Support/bitdispatcher |
+| Settings | the installer's Settings page | /etc/default/bitdispatcher | /usr/local/etc/bitdispatcher.conf |
+| Log | the records folder, logs | journalctl -u bitdispatcher | /Library/Logs/bitdispatcher |
+
+In every case the records folder is closed to everyone but the service and administrators: it holds criminal justice and personal information. The service listens on port 8443 (HTTPS) unless you choose another.
+
+## Windows
+Run **bitdispatcher-setup.exe** and approve the administrator prompt. The pages: licence, what to install, the folder, **Settings** (the port and the records folder; a port another program holds is refused), and the **First sign-in** password. It adds a firewall rule for domain and private networks, and Start menu entries: bitdispatcher, its manual, and **Reset admin password**. It is removed from Settings › Apps.
+
+For IT, a silent install: \`bitdispatcher-setup.exe /S /PORT=8443 /DATA=D:\\bitdispatcher /NOFIREWALL\` (each option may be left out). A silent install shows no password: run Reset admin password afterwards. A silent uninstall keeps the records.
+
+## Linux
+With the package manager: \`sudo apt install ./bitdispatcher_VERSION_amd64.deb\` or \`sudo dnf install ./bitdispatcher-VERSION-1.x86_64.rpm\`. The password is printed at the end. Without one: unpack the .tar.gz and run \`sudo ./install.sh\`, with \`--port 9443\` for another port and \`--open-firewall\` to open it in ufw or firewalld; \`sudo ./uninstall.sh\` removes it, \`--purge\` deletes the records after you type DELETE twice.
+
+Change the port or the records folder in /etc/default/bitdispatcher, then \`sudo systemctl restart bitdispatcher\`. A lost password: \`sudo systemctl stop bitdispatcher\`, \`sudo -u bitdispatcher bitdispatcher reset-password -data /var/lib/bitdispatcher admin\`, then start it again.
+
+## macOS
+Open the .pkg and follow it. At the end a dialog shows the password, with **Copy password** and **Open bitdispatcher**. If port 8443 is taken it uses the first free port from 9443 and says so. It keeps the Mac awake while the service runs (a dispatch server must answer at any time; the display may still turn off): set BITDISPATCHER_KEEP_AWAKE=no in the settings file to let it sleep. If macOS's firewall is on, bitdispatcher is allowed through it.
+
+**Applications › bitdispatcher** holds four things: **bitdispatcher** opens the console, **Reset admin password**, **Uninstall bitdispatcher** (it asks twice before deleting the records) and the manual. From Terminal: \`sudo installer -pkg FILE -target /\` installs without dialogs and leaves the password in /usr/local/etc/bitdispatcher.first-sign-in for root to read once; delete that file afterwards. After changing the settings file: \`sudo launchctl kickstart -k system/com.biodream.bitdispatcher\`.
+
+## The certificate
+On first start bitdispatcher makes its own certificate, so each browser warns once until it trusts it. Give it one your network trusts with the \`-tls-cert\` and \`-tls-key\` options (on Linux and macOS in BITDISPATCHER_FLAGS in the settings file).
+
+## What has been tested
+- **Windows:** installing, three upgrades, the password reset and uninstalling, on one Windows desktop computer; and on every change, a silent install, upgrade and uninstall on Windows Server 2022 in CI.
+- **Linux:** the Intel .deb, .rpm and .tar.gz in Debian 12 and Red Hat UBI 9 containers running systemd (install, upgrade, reset, remove); the Arm ones in the same containers on an emulated Arm processor, not yet on Arm hardware; the .deb on Ubuntu 24.04 in CI.
+- **macOS:** installing, two upgrades, opening the console, the password reset and uninstalling with the records kept, on one Apple silicon Mac with macOS 26; in CI also a reinstall over the kept records and a full removal. Not yet on an Intel Mac, and not with macOS's firewall on.
+- **Not signed.** Windows SmartScreen warns about the installer, and macOS asks before opening a downloaded .pkg (System Settings › Privacy & Security › Open Anyway). Signed installers need code-signing certificates, which BioDream has not bought yet.`,
   },
   {
     id: 'console', title: 'The dispatcher screen', route: '/', keys: 'console screen layout dispatcher main panels',
