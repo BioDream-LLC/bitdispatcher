@@ -43,6 +43,11 @@ if [ "$PURGE" = yes ]; then
   dscl . -delete /Users/_bitdispatcher 2>/dev/null || true
   dscl . -delete /Groups/_bitdispatcher 2>/dev/null || true
   echo "bitdispatcher removed, with its records."
+  # macOS 26 can refuse to delete an account even for an administrator with Full Disk Access.
+  if dscl . -read /Users/_bitdispatcher >/dev/null 2>&1; then
+    echo "macOS did not allow removing the hidden service account _bitdispatcher. It has no password and no"
+    echo "shell and owns nothing now; installing bitdispatcher again reuses it."
+  fi
 else
   echo "bitdispatcher removed. The records are kept in $DATA; delete them only under your retention rules."
 fi

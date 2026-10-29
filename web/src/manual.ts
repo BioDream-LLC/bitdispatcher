@@ -229,7 +229,7 @@ On first start bitdispatcher makes its own certificate, so each browser warns on
 ## What has been tested
 - **Windows:** installing, three upgrades, the password reset and uninstalling, on one Windows desktop computer; and on every change, a silent install, upgrade and uninstall on Windows Server 2022 in CI.
 - **Linux:** the Intel .deb, .rpm and .tar.gz in Debian 12 and Red Hat UBI 9 containers running systemd (install, upgrade, reset, remove); the Arm ones in the same containers on an emulated Arm processor, not yet on Arm hardware; the .deb on Ubuntu 24.04 in CI.
-- **macOS:** installing, two upgrades, opening the console, the password reset and uninstalling with the records kept, on one Apple silicon Mac with macOS 26; in CI also a reinstall over the kept records and a full removal. Not yet on an Intel Mac, and not with macOS's firewall on.
+- **macOS:** installing, two upgrades, opening the console, the password reset and uninstalling with the records kept, on one Apple silicon Mac with macOS 26; in CI also a reinstall over the kept records and a full removal. Not yet on an Intel Mac, and not with macOS's firewall on. On macOS 26, deleting the records also tries to remove the hidden _bitdispatcher account, and macOS can refuse that even for an administrator; the uninstaller then says so. The account has no password and owns nothing, and a later install reuses it.
 - **Not signed.** Windows SmartScreen warns about the installer, and macOS asks before opening a downloaded .pkg (System Settings › Privacy & Security › Open Anyway). Signed installers need code-signing certificates, which BioDream has not bought yet.`,
   },
   {
